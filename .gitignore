@@ -4,6 +4,7 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+/plan
 
 # --- SECURITY (HARAM MASUK GIT) ---
 .env
