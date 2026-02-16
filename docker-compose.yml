@@ -1,0 +1,64 @@
+services:
+  # 1. DATABASE UTAMA (PostgreSQL)
+  postgres:
+    image: postgres:17.8-alpine
+    container_name: pal_postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: pal_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 2. CACHING & RATE LIMIT (Redis)
+  redis:
+    image: redis:8.2-alpine
+    container_name: pal_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # 3. MESSAGE BROKER (Kafka + Zookeeper)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.9
+    container_name: pal_zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.9
+    container_name: pal_kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # Setup listener biar bisa diakses dari localhost (laptop) dan dari dalam docker
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  # 4. SEARCH ENGINE (Elasticsearch)
+  elasticsearch:
+    image: elasticsearch:8.19.11
+    container_name: pal_elastic
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false # Matikan security SSL biar dev gampang
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m" # Batasi RAM biar laptop gak meledak
+    volumes:
+      - elastic_data:/usr/share/elasticsearch/data
+
+volumes:
+  postgres_data:
+  redis_data:
+  elastic_data:

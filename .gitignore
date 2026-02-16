@@ -1,0 +1,43 @@
+# --- SYSTEM & IDE ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# --- SECURITY (HARAM MASUK GIT) ---
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+id_rsa
+
+# --- GOLANG ---
+/bin/
+/dist/
+vendor/
+go.work
+
+# --- NODEJS (NEXT.JS) ---
+node_modules/
+.next/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# --- PYTHON (WORKER) ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+
+# --- DOCKER & INFRA ---
+postgres_data/
+redis_data/
+kafka_data/
+elastic_data/
+tmp/
+coverage/
