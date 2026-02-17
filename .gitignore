@@ -42,3 +42,20 @@ kafka_data/
 elastic_data/
 tmp/
 coverage/
+
+# Abaikan folder output build
+/bin/
+/dist/
+/build/
+
+# Abaikan file executable root
+main
+main.exe
+server
+server.exe
+property-service
+property-service.exe
+
+# Abaikan file temp Go
+*.test
+*.out
