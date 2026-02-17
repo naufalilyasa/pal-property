@@ -48,13 +48,15 @@ coverage/
 /dist/
 /build/
 
-# Abaikan file executable root
-main
-main.exe
-server
-server.exe
-property-service
-property-service.exe
+# Abaikan file executable root (Gunakan path spesifik atau folder build)
+/backend/main
+/backend/main.exe
+/backend/server
+/backend/server.exe
+/backend/property-service
+/backend/property-service.exe
+/backend/migrate
+/backend/migrate.exe
 
 # Abaikan file temp Go
 *.test
