@@ -1,20 +1,18 @@
 package service
 
 import (
+	"context"
 	"errors"
 
-	"github.com/gin-gonic/gin"
-	"github.com/markbates/goth/gothic"
+	"github.com/google/uuid"
+	"github.com/markbates/goth"
 	"github.com/username/pal-property-backend/internal/domain"
 	"github.com/username/pal-property-backend/internal/domain/entity"
 	"gorm.io/gorm"
 )
 
 type AuthService interface {
-	// BeginAuth initiates the OAuth2 flow.
-	BeginAuth(c *gin.Context, provider string)
-	// CompleteAuth handles the OAuth2 callback.
-	CompleteAuth(c *gin.Context, provider string) (*entity.User, error)
+	CompleteAuth(ctx context.Context, provider string, gothUser goth.User) (*entity.User, error)
 }
 
 type authService struct {
@@ -25,31 +23,14 @@ func NewAuthService(repo domain.AuthRepository) AuthService {
 	return &authService{repo: repo}
 }
 
-func (s *authService) BeginAuth(c *gin.Context, provider string) {
-	// Add provider to context for Gothic
-	q := c.Request.URL.Query()
-	q.Add("provider", provider)
-	c.Request.URL.RawQuery = q.Encode()
-
-	gothic.BeginAuthHandler(c.Writer, c.Request)
-}
-
-func (s *authService) CompleteAuth(c *gin.Context, provider string) (*entity.User, error) {
-	// Add provider to context for Gothic
-	q := c.Request.URL.Query()
-	q.Add("provider", provider)
-	c.Request.URL.RawQuery = q.Encode()
-
-	gothUser, err := gothic.CompleteUserAuth(c.Writer, c.Request)
-	if err != nil {
-		return nil, err
-	}
+func (s *authService) CompleteAuth(ctx context.Context, provider string, gothUser goth.User) (*entity.User, error) {
 
 	// 1. Check if OAuthAccount exists
-	_, err = s.repo.FindOAuthAccount(c.Request.Context(), provider, gothUser.UserID)
+	// Convert ProviderUserID string to UUID if needed, but in entity it is varchar(255)
+	_, err := s.repo.FindOAuthAccount(ctx, provider, gothUser.UserID)
 	if err == nil {
 		// Account exists, return user
-		user, err := s.repo.FindUserByEmail(c.Request.Context(), gothUser.Email)
+		user, err := s.repo.FindUserByEmail(ctx, gothUser.Email)
 		if err != nil {
 			return nil, errors.New("oauth account exists but user not found")
 		}
@@ -61,16 +42,18 @@ func (s *authService) CompleteAuth(c *gin.Context, provider string) (*entity.Use
 	}
 
 	// 2. Check if User exists by email
-	user, err := s.repo.FindUserByEmail(c.Request.Context(), gothUser.Email)
+	user, err := s.repo.FindUserByEmail(ctx, gothUser.Email)
 	if err == nil {
 		// User exists
-		// TODO: Link OAuth account to existing user here if desired.
-		// For now, just return the user to log them in.
 		return user, nil
 	}
 
 	// 3. User does not exist, create new
+	userID, _ := uuid.NewV7()
 	newUser := &entity.User{
+		BaseEntity: entity.BaseEntity{
+			ID: userID,
+		},
 		Name:       gothUser.Name,
 		Email:      gothUser.Email,
 		AvatarURL:  &gothUser.AvatarURL,
@@ -78,12 +61,20 @@ func (s *authService) CompleteAuth(c *gin.Context, provider string) (*entity.Use
 		IsVerified: true, // OAuth usually verified
 	}
 
+	accountID, _ := uuid.NewV7()
 	newAccount := &entity.OAuthAccount{
+		ID:             accountID,
+		UserID:         userID,
 		Provider:       provider,
 		ProviderUserID: gothUser.UserID,
 		AccessToken:    &gothUser.AccessToken,
 		RefreshToken:   &gothUser.RefreshToken,
 	}
 
-	return s.repo.CreateUserWithOAuth(c.Request.Context(), newUser, newAccount)
+	createdUser, err := s.repo.CreateUserWithOAuth(ctx, newUser, newAccount)
+	if err != nil {
+		return nil, err
+	}
+
+	return createdUser, nil
 }

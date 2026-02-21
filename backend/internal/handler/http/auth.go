@@ -3,9 +3,13 @@ package http
 import (
 	"net/http"
 
-	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/adaptor"
+	"github.com/markbates/goth"
+	"github.com/markbates/goth/gothic"
 	"github.com/username/pal-property-backend/internal/dto/response"
 	"github.com/username/pal-property-backend/internal/service"
+	"github.com/username/pal-property-backend/pkg/utils"
 )
 
 type AuthHandler struct {
@@ -16,30 +20,50 @@ func NewAuthHandler(s service.AuthService) *AuthHandler {
 	return &AuthHandler{service: s}
 }
 
-func (h *AuthHandler) BeginAuth(c *gin.Context) {
-	provider := c.Param("provider")
+func (h *AuthHandler) BeginAuth(c fiber.Ctx) error {
+	provider := c.Params("provider")
 	if provider == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "provider is required"})
-		return
+		return fiber.NewError(fiber.StatusBadRequest, "provider is required")
 	}
-	// Let Goth handle redirect
-	h.service.BeginAuth(c, provider)
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		q.Add("provider", provider)
+		r.URL.RawQuery = q.Encode()
+		gothic.BeginAuthHandler(w, r)
+	})
+
+	return adaptor.HTTPHandler(handler)(c)
 }
 
-func (h *AuthHandler) Callback(c *gin.Context) {
-	provider := c.Param("provider")
+func (h *AuthHandler) Callback(c fiber.Ctx) error {
+	provider := c.Params("provider")
 	if provider == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "provider is required"})
-		return
+		return fiber.NewError(fiber.StatusBadRequest, "provider is required")
 	}
 
-	user, err := h.service.CompleteAuth(c, provider)
+	var gothUser goth.User
+	var errAuth error
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		q.Add("provider", provider)
+		r.URL.RawQuery = q.Encode()
+
+		gothUser, errAuth = gothic.CompleteUserAuth(w, r)
+	})
+
+	if err := adaptor.HTTPHandler(handler)(c); err != nil {
+		return err
+	}
+	if errAuth != nil {
+		return fiber.NewError(fiber.StatusUnauthorized, errAuth.Error())
+	}
+
+	user, err := h.service.CompleteAuth(c.Context(), provider, gothUser)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		return err // Bubbled up to global Fiber error handler
 	}
 
-	// Create simplified response
 	resp := response.AuthResponse{
 		User: response.UserResponse{
 			ID:        user.ID,
@@ -49,8 +73,8 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 			Role:      user.Role,
 			CreatedAt: user.CreatedAt,
 		},
-		Token: "dummy-jwt-token", // In real app, generate JWT here
+		Token: "dummy-jwt-token",
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": resp})
+	return utils.SendResponse(c, fiber.StatusOK, resp)
 }

@@ -58,6 +58,24 @@ services:
     volumes:
       - elastic_data:/usr/share/elasticsearch/data
 
+  # 5. BACKEND API (Golang)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pal_backend
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+      - elasticsearch
+    env_file:
+      - ./backend/.env.docker 
+
 volumes:
   postgres_data:
   redis_data:

@@ -1,41 +1,32 @@
-# --------------------------------------------------------
-# STAGE 1: Builder (Tempat kompilasi codingan Go)
-# --------------------------------------------------------
-FROM golang:1.26.0-alpine AS builder
+# Gunakan image Golang berbasis Debian Trixie
+FROM golang:1.26.0-trixie
 
-# Install git (kadang butuh buat fetch dependency tertentu)
-RUN apk add --no-cache git
+# Update repository dan install git serta tzdata menggunakan apt
+# --no-install-recommends digunakan untuk menjaga ukuran image tetap kecil
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    tzdata \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set zona waktu ke Jakarta
+ENV TZ=Asia/Jakarta
 
 # Set folder kerja di dalam container
 WORKDIR /app
 
-# Copy file dependency dulu (biar dicache sama Docker layer)
+# Install 'air' secara global di dalam container untuk hot-reload
+RUN go install github.com/air-verse/air@latest
+
+# Copy file dependency untuk di-cache
+# Pastikan file go.sum sudah ada di root project pal-property kamu
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy seluruh codingan source code
+# Copy seluruh source code
 COPY . .
 
-# Build aplikasi menjadi binary bernama 'server'
-# CGO_ENABLED=0 artinya kita build pure static binary (biar jalan di Alpine kosong)
-RUN CGO_ENABLED=0 GOOS=linux go build -o server ./cmd/property-service/main.go
-
-# --------------------------------------------------------
-# STAGE 2: Runner (Image asli yang akan dideploy, size kecil)
-# --------------------------------------------------------
-FROM alpine:latest
-
-# Install sertifikat SSL (PENTING: biar bisa request HTTPS ke Google/AWS)
-RUN apk --no-cache add ca-certificates
-
-WORKDIR /root/
-
-# Copy binary 'server' dari Stage 1 tadi
-COPY --from=builder /app/server .
-COPY --from=builder /app/.env.example .env 
-
-# Expose port aplikasi
+# Expose port aplikasi sesuai standar Fiber kamu
 EXPOSE 8080
 
-# Jalankan aplikasi
-CMD ["./server"]
+# Saat container nyala, otomatis jalankan air!
+CMD ["air"]

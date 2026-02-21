@@ -8,7 +8,7 @@ import (
 )
 
 type Category struct {
-	ID        uuid.UUID  `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	ID        uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
 	Name      string     `gorm:"type:varchar(100);not null" json:"name"`
 	Slug      string     `gorm:"type:varchar(100);unique;not null" json:"slug"`
 	ParentID  *uuid.UUID `gorm:"type:uuid" json:"parent_id"`
@@ -52,7 +52,7 @@ type Listing struct {
 }
 
 type ListingImage struct {
-	ID        uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
 	ListingID uuid.UUID `gorm:"type:uuid;not null" json:"listing_id"`
 	URL       string    `gorm:"type:text;not null" json:"url"`
 	IsPrimary bool      `gorm:"default:false" json:"is_primary"`

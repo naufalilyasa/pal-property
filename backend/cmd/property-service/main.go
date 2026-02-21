@@ -1,75 +1,79 @@
 package main
 
 import (
-	"log"
-	"os"
+	"fmt"
 
-	"github.com/gin-gonic/gin"
+	"github.com/bytedance/sonic"
+	"github.com/gofiber/fiber/v3"
 	"github.com/markbates/goth"
-	"github.com/markbates/goth/providers/facebook"
 	"github.com/markbates/goth/providers/google"
 	handler "github.com/username/pal-property-backend/internal/handler/http"
 	"github.com/username/pal-property-backend/internal/repository/postgres"
+	"github.com/username/pal-property-backend/internal/router"
 	"github.com/username/pal-property-backend/internal/service"
-	pgDriver "gorm.io/driver/postgres" // renamed to avoid conflict
+	"github.com/username/pal-property-backend/pkg/config"
+	"github.com/username/pal-property-backend/pkg/logger"
+	"go.uber.org/zap"
+	pgDriver "gorm.io/driver/postgres"
 	gormPkg "gorm.io/gorm"
 )
 
 func main() {
-	// 1. Setup Database
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		dbURL = "postgres://user:password@localhost:5433/pal_db?sslmode=disable"
-	}
+	config.LoadConfig()
+	logger.InitLogger()
 
-	db, err := gormPkg.Open(pgDriver.Open(dbURL), &gormPkg.Config{})
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=%s",
+		config.Env.DBHost, config.Env.DBUser, config.Env.DBPassword,
+		config.Env.DBName, config.Env.DBPort, config.Env.DBSSLMode,
+	)
+
+	db, err := gormPkg.Open(pgDriver.Open(dsn), &gormPkg.Config{})
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		logger.Log.Fatal("Failed to connect to database", zap.Error(err))
 	}
 
-	// Auto Migrate (Optional, but good for dev to ensure consistency if not strictly migration-based)
-	// For production, rely on migrate tool.
-	// We can skip this as we did migration manually.
-
-	// 2. Setup Goth Providers
-	// In production, use os.Getenv for these values
 	goth.UseProviders(
 		google.New(
-			os.Getenv("GOOGLE_KEY"),
-			os.Getenv("GOOGLE_SECRET"),
-			"http://localhost:8080/auth/google/callback",
-		),
-		facebook.New(
-			os.Getenv("FACEBOOK_KEY"),
-			os.Getenv("FACEBOOK_SECRET"),
-			"http://localhost:8080/auth/facebook/callback",
+			config.Env.ClientID,
+			config.Env.ClientSecret,
+			config.Env.CallbackURL,
+			"email", "profile",
 		),
 	)
 
-	// 3. Initialize layers
 	authRepo := postgres.NewAuthRepository(db)
 	authService := service.NewAuthService(authRepo)
 	authHandler := handler.NewAuthHandler(authService)
 
-	// 4. Setup Router
-	r := gin.Default()
+	app := fiber.New(fiber.Config{
+		JSONEncoder: sonic.Marshal,
+		JSONDecoder: sonic.Unmarshal,
+		ErrorHandler: func(c fiber.Ctx, err error) error {
+			code := fiber.StatusInternalServerError
+			if e, ok := err.(*fiber.Error); ok {
+				code = e.Code
+			}
 
-	// Auth Routes
-	r.GET("/auth/:provider", authHandler.BeginAuth)
-	r.GET("/auth/:provider/callback", authHandler.Callback)
+			logger.Log.Error("Fiber trapped error", zap.Error(err), zap.String("path", c.Path()))
 
-	// Health Check
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
+			msg := "An unexpected error occurred"
+			if code < 500 {
+				msg = err.Error()
+			}
+
+			return c.Status(code).JSON(fiber.Map{
+				"success":  false,
+				"message":  msg,
+				"data":     nil,
+				"trace_id": c.Locals("requestid"),
+			})
+		},
 	})
 
-	// 5. Run Server
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-	log.Printf("Server starting on port %s", port)
-	if err := r.Run(":" + port); err != nil {
-		log.Fatalf("Server failed to start: %v", err)
+	router.Register(app, authHandler)
+
+	logger.Log.Info("Server starting", zap.Int("port", config.Env.Port))
+	if err := app.Listen(fmt.Sprintf(":%d", config.Env.Port)); err != nil {
+		logger.Log.Fatal("Server failed to start", zap.Error(err))
 	}
 }

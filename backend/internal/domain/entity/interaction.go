@@ -7,7 +7,7 @@ import (
 )
 
 type Wishlist struct {
-	ID        uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
 	UserID    uuid.UUID `gorm:"type:uuid;not null" json:"user_id"`
 	ListingID uuid.UUID `gorm:"type:uuid;not null" json:"listing_id"`
 	CreatedAt time.Time `gorm:"default:CURRENT_TIMESTAMP" json:"created_at"`
@@ -17,7 +17,7 @@ type Wishlist struct {
 }
 
 type ChatRoom struct {
-	ID        uuid.UUID  `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	ID        uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
 	ListingID *uuid.UUID `gorm:"type:uuid" json:"listing_id"`
 	BuyerID   uuid.UUID  `gorm:"type:uuid;not null" json:"buyer_id"`
 	SellerID  uuid.UUID  `gorm:"type:uuid;not null" json:"seller_id"`
@@ -31,7 +31,7 @@ type ChatRoom struct {
 }
 
 type ChatMessage struct {
-	ID        uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
 	RoomID    uuid.UUID `gorm:"type:uuid;not null" json:"room_id"`
 	SenderID  uuid.UUID `gorm:"type:uuid;not null" json:"sender_id"`
 	Content   string    `gorm:"type:text;not null" json:"content"`
