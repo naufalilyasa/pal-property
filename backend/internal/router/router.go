@@ -21,13 +21,7 @@ func ZapLogger() fiber.Handler {
 		err := c.Next()
 		duration := time.Since(start)
 
-		requestID := c.Locals("requestid")
-		var traceID string
-		if requestID != nil {
-			if idStr, ok := requestID.(string); ok {
-				traceID = idStr
-			}
-		}
+		traceID := requestid.FromContext(c)
 
 		logger.Log.Info("HTTP Request",
 			zap.String("method", c.Method()),

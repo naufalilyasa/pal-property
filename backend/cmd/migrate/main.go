@@ -3,35 +3,39 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/lib/pq"
+	"github.com/username/pal-property-backend/pkg/config"
+	"github.com/username/pal-property-backend/pkg/logger"
+	"go.uber.org/zap"
 )
 
 func main() {
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		// Fallback for development if env not set
-		dbURL = "postgres://user:password@localhost:5433/pal_db?sslmode=disable"
-	}
+	config.LoadConfig()
+	logger.InitLogger()
 
-	db, err := sql.Open("postgres", dbURL)
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
+		config.Env.DBUser, config.Env.DBPassword, config.Env.DBHost,
+		config.Env.DBPort, config.Env.DBName, config.Env.DBSSLMode,
+	)
+
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		log.Fatalf("Could not connect to database: %v", err)
+		logger.Log.Fatal("Could not connect to database", zap.Error(err))
 	}
 	defer db.Close()
 
 	if err = db.Ping(); err != nil {
-		log.Fatalf("Could not ping database: %v", err)
+		logger.Log.Fatal("Could not ping database", zap.Error(err))
 	}
 
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
-		log.Fatalf("Could not create migrate driver: %v", err)
+		logger.Log.Fatal("Could not create migrate driver", zap.Error(err))
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
@@ -40,7 +44,7 @@ func main() {
 		driver,
 	)
 	if err != nil {
-		log.Fatalf("Could not create migrate instance: %v", err)
+		logger.Log.Fatal("Could not create migrate instance", zap.Error(err))
 	}
 
 	cmd := "up"
@@ -50,13 +54,13 @@ func main() {
 
 	if cmd == "down" {
 		if err := m.Down(); err != nil && err != migrate.ErrNoChange {
-			log.Fatalf("Migration down failed: %v", err)
+			logger.Log.Fatal("Migration down failed", zap.Error(err))
 		}
-		fmt.Println("Migration down successful")
+		logger.Log.Info("Migration down successful")
 	} else {
 		if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-			log.Fatalf("Migration up failed: %v", err)
+			logger.Log.Fatal("Migration up failed", zap.Error(err))
 		}
-		fmt.Println("Migration up successful")
+		logger.Log.Info("Migration up successful")
 	}
 }
