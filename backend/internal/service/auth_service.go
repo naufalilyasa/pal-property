@@ -8,19 +8,24 @@ import (
 	"github.com/markbates/goth"
 	"github.com/username/pal-property-backend/internal/domain"
 	"github.com/username/pal-property-backend/internal/domain/entity"
+	"github.com/username/pal-property-backend/internal/dto/response"
+	"github.com/username/pal-property-backend/pkg/config"
+	"github.com/username/pal-property-backend/pkg/utils/jwt"
 	"gorm.io/gorm"
 )
 
 type AuthService interface {
 	CompleteAuth(ctx context.Context, provider string, gothUser goth.User) (*entity.User, error)
+	LoginUser(ctx context.Context, user *entity.User) (*response.AuthTokens, error)
 }
 
 type authService struct {
-	repo domain.AuthRepository
+	repo  domain.AuthRepository
+	cache domain.CacheRepository
 }
 
-func NewAuthService(repo domain.AuthRepository) AuthService {
-	return &authService{repo: repo}
+func NewAuthService(repo domain.AuthRepository, cache domain.CacheRepository) AuthService {
+	return &authService{repo: repo, cache: cache}
 }
 
 func (s *authService) CompleteAuth(ctx context.Context, provider string, gothUser goth.User) (*entity.User, error) {
@@ -77,4 +82,22 @@ func (s *authService) CompleteAuth(ctx context.Context, provider string, gothUse
 	}
 
 	return createdUser, nil
+}
+
+func (s *authService) LoginUser(ctx context.Context, user *entity.User) (*response.AuthTokens, error) {
+	accToken, refToken, jti, err := jwt.GenerateTokens(user.ID)
+	if err != nil {
+		return nil, errors.New("failed to generate tokens: " + err.Error())
+	}
+
+	// Save jti to Redis
+	err = s.cache.SaveRefreshTokenJTI(ctx, jti, user.ID, config.Env.JwtRefreshExpiration)
+	if err != nil {
+		return nil, errors.New("failed to cache refresh token: " + err.Error())
+	}
+
+	return &response.AuthTokens{
+		AccessToken:  accToken,
+		RefreshToken: refToken,
+	}, nil
 }

@@ -7,8 +7,10 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/providers/google"
+	"github.com/redis/go-redis/v9"
 	handler "github.com/username/pal-property-backend/internal/handler/http"
 	"github.com/username/pal-property-backend/internal/repository/postgres"
+	redisRepo "github.com/username/pal-property-backend/internal/repository/redis"
 	"github.com/username/pal-property-backend/internal/router"
 	"github.com/username/pal-property-backend/internal/service"
 	"github.com/username/pal-property-backend/pkg/config"
@@ -21,6 +23,14 @@ import (
 func main() {
 	config.LoadConfig()
 	logger.InitLogger()
+
+	loggerDev, _ := zap.NewDevelopment()
+	defer loggerDev.Sync()
+	sugar := loggerDev.Sugar()
+
+	sugar.Infow("Pemeriksaan Konfigurasi Environment",
+		"jwtprivatekeybase64", config.Env.JwtPrivateKeyBase64,
+	)
 
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=%s",
 		config.Env.DBHost, config.Env.DBUser, config.Env.DBPassword,
@@ -41,8 +51,15 @@ func main() {
 		),
 	)
 
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     config.Env.RedisAddr,
+		Password: config.Env.RedisPassword,
+		DB:       config.Env.RedisDB,
+	})
+	cacheRepo := redisRepo.NewCacheRepository(rdb)
+
 	authRepo := postgres.NewAuthRepository(db)
-	authService := service.NewAuthService(authRepo)
+	authService := service.NewAuthService(authRepo, cacheRepo)
 	authHandler := handler.NewAuthHandler(authService)
 
 	app := fiber.New(fiber.Config{

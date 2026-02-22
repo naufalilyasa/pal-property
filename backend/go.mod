@@ -1,6 +1,6 @@
 module github.com/username/pal-property-backend
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/bytedance/sonic v1.15.0
@@ -18,6 +18,15 @@ require (
 	go.uber.org/zap v1.27.0
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.31.1
+)
+
+require (
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
+	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
+	github.com/mdelapenya/tlscert v0.2.0 // indirect
+	github.com/redis/go-redis/v9 v9.18.0 // indirect
+	github.com/testcontainers/testcontainers-go/modules/redis v0.40.0 // indirect
+	go.uber.org/atomic v1.11.0 // indirect
 )
 
 require (

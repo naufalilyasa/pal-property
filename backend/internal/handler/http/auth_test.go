@@ -1,9 +1,13 @@
 package http_test
 
 import (
-	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,13 +19,17 @@ import (
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
 	"github.com/markbates/goth/providers/faux"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
+	testcontainerRedis "github.com/testcontainers/testcontainers-go/modules/redis"
 	"github.com/testcontainers/testcontainers-go/wait"
 	handler "github.com/username/pal-property-backend/internal/handler/http"
 	repo "github.com/username/pal-property-backend/internal/repository/postgres"
+	redisRepo "github.com/username/pal-property-backend/internal/repository/redis"
 	"github.com/username/pal-property-backend/internal/service"
+	"github.com/username/pal-property-backend/pkg/config"
 	"github.com/username/pal-property-backend/pkg/logger"
 	"go.uber.org/zap"
 	pgDriver "gorm.io/driver/postgres"
@@ -32,11 +40,13 @@ import (
 
 type AuthHandlerTestSuite struct {
 	suite.Suite
-	app          *fiber.App
-	db           *gorm.DB
-	pgContainer  *postgres.PostgresContainer
-	ctx          context.Context
-	fauxProvider *faux.Provider
+	app            *fiber.App
+	db             *gorm.DB
+	pgContainer    *postgres.PostgresContainer
+	redisContainer *testcontainerRedis.RedisContainer
+	rdb            *redis.Client
+	ctx            context.Context
+	fauxProvider   *faux.Provider
 }
 
 // SetupSuite runs once before the tests in the suite
@@ -46,9 +56,27 @@ func (s *AuthHandlerTestSuite) SetupSuite() {
 	// 1. Disable Zap logging during tests
 	logger.Log = zap.NewNop()
 
+	priv, _ := rsa.GenerateKey(rand.Reader, 2048)
+	privBytes := x509.MarshalPKCS1PrivateKey(priv)
+	privPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: privBytes,
+	})
+	config.Env.JwtPrivateKeyBase64 = base64.StdEncoding.EncodeToString(privPEM)
+
+	pubBytes, _ := x509.MarshalPKIXPublicKey(&priv.PublicKey)
+	pubPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: pubBytes,
+	})
+	config.Env.JwtPublicKeyBase64 = base64.StdEncoding.EncodeToString(pubPEM)
+
+	config.Env.JwtAccessExpiration = time.Minute * 15
+	config.Env.JwtRefreshExpiration = time.Hour * 168
+
 	// 2. Setup Testcontainers Postgres (pal_db_test)
 	pgContainer, err := postgres.Run(s.ctx,
-		"postgres:17-alpine",
+		"postgres:17.8-alpine",
 		postgres.WithDatabase("pal_db_test"),
 		postgres.WithUsername("user"),
 		postgres.WithPassword("password"),
@@ -71,6 +99,17 @@ func (s *AuthHandlerTestSuite) SetupSuite() {
 	err = s.db.AutoMigrate(&entity.User{}, &entity.OAuthAccount{})
 	s.Require().NoError(err)
 
+	redisContainer, err := testcontainerRedis.Run(s.ctx, "redis:8.2-alpine")
+	s.Require().NoError(err)
+	s.redisContainer = redisContainer
+
+	redisAddr, err := redisContainer.ConnectionString(s.ctx)
+	s.Require().NoError(err)
+
+	opt, err := redis.ParseURL(redisAddr)
+	s.Require().NoError(err)
+	s.rdb = redis.NewClient(opt)
+
 	// Setup Faux Provider
 	s.fauxProvider = &faux.Provider{}
 	goth.UseProviders(s.fauxProvider)
@@ -85,7 +124,8 @@ func (s *AuthHandlerTestSuite) SetupSuite() {
 
 	// 3. Initialize layers
 	authRepo := repo.NewAuthRepository(s.db)
-	authService := service.NewAuthService(authRepo)
+	cacheRepo := redisRepo.NewCacheRepository(s.rdb)
+	authService := service.NewAuthService(authRepo, cacheRepo)
 	authHandler := handler.NewAuthHandler(authService)
 
 	// 4. Initialize Fiber
@@ -109,10 +149,12 @@ func (s *AuthHandlerTestSuite) SetupSuite() {
 	auth.Get("/:provider/callback", authHandler.Callback)
 }
 
-// TearDownSuite runs once after all tests finish
 func (s *AuthHandlerTestSuite) TearDownSuite() {
 	if s.pgContainer != nil {
 		s.pgContainer.Terminate(s.ctx)
+	}
+	if s.redisContainer != nil {
+		s.redisContainer.Terminate(s.ctx)
 	}
 }
 
@@ -120,6 +162,7 @@ func (s *AuthHandlerTestSuite) TearDownSuite() {
 func (s *AuthHandlerTestSuite) SetupTest() {
 	s.db.Exec("TRUNCATE TABLE users CASCADE")
 	s.db.Exec("TRUNCATE TABLE oauth_accounts CASCADE")
+	s.rdb.FlushDB(s.ctx)
 }
 
 // The Feature Test implementation
@@ -152,36 +195,35 @@ func (s *AuthHandlerTestSuite) TestOAuthCallback_Success() {
 
 	// 4. Verify HTTP and generic properties
 	bodyBytes, _ := io.ReadAll(res.Body)
-	s.Equal(http.StatusOK, res.StatusCode, "Expected 200 OK from Auth Callback, got: "+string(bodyBytes))
-	res.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	s.Equal(http.StatusSeeOther, res.StatusCode, "Expected 303 Redirect from Auth Callback, got: "+string(bodyBytes))
+	s.Equal("http://localhost:3000/dashboard", res.Header.Get("Location"), "Should redirect to frontend dashboard")
 
-	var responseBody struct {
-		Success bool   `json:"success"`
-		Message string `json:"message"`
-		Data    struct {
-			User struct {
-				ID    string `json:"id"`
-				Email string `json:"email"`
-				Name  string `json:"name"`
-			} `json:"user"`
-			Token string `json:"token"`
-		} `json:"data"`
+	// 5. Assert Cookies are set correctly
+	var hasAccessToken, hasRefreshToken bool
+	for _, cookie := range res.Cookies() {
+		if cookie.Name == "access_token" {
+			hasAccessToken = true
+			s.True(cookie.HttpOnly)
+			s.Equal(http.SameSiteLaxMode, cookie.SameSite)
+		}
+		if cookie.Name == "refresh_token" {
+			hasRefreshToken = true
+			s.True(cookie.HttpOnly)
+		}
 	}
-
-	err = json.NewDecoder(res.Body).Decode(&responseBody)
-	s.Require().NoError(err, "Response should be valid JSON matching Opaque Response mapping")
-
-	// 5. Assert body values (Verify Response Format)
-	s.True(responseBody.Success)
-	s.Equal("jack.faux@example.com", responseBody.Data.User.Email)
-	s.Equal("Jack Faux", responseBody.Data.User.Name)
-	s.NotEmpty(responseBody.Data.Token, "Dummy token should be present")
+	s.True(hasAccessToken, "Should set access_token cookie")
+	s.True(hasRefreshToken, "Should set refresh_token cookie")
 
 	// 6. Assert Database record persists the generated user correctly
 	var user entity.User
 	err = s.db.Where("email = ?", "jack.faux@example.com").First(&user).Error
 	s.Require().NoError(err, "User record must exist in DB")
 	s.Equal("jack.faux@example.com", user.Email)
+
+	// 7. Verify Redis Key exists
+	keys, err := s.rdb.Keys(s.ctx, "refresh_token:*").Result()
+	s.Require().NoError(err)
+	s.Len(keys, 1, "Should have exactly 1 refresh token in redis")
 }
 
 func (s *AuthHandlerTestSuite) TestOAuthCallback_Unauthorized() {

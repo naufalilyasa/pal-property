@@ -7,9 +7,8 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/adaptor"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
-	"github.com/username/pal-property-backend/internal/dto/response"
 	"github.com/username/pal-property-backend/internal/service"
-	"github.com/username/pal-property-backend/pkg/utils"
+	"github.com/username/pal-property-backend/pkg/config"
 )
 
 type AuthHandler struct {
@@ -64,17 +63,33 @@ func (h *AuthHandler) Callback(c fiber.Ctx) error {
 		return err // Bubbled up to global Fiber error handler
 	}
 
-	resp := response.AuthResponse{
-		User: response.UserResponse{
-			ID:        user.ID,
-			Name:      user.Name,
-			Email:     user.Email,
-			AvatarURL: user.AvatarURL,
-			Role:      user.Role,
-			CreatedAt: user.CreatedAt,
-		},
-		Token: "dummy-jwt-token",
+	tokens, err := h.service.LoginUser(c.Context(), user)
+	if err != nil {
+		return err // Bubbled up to global Fiber error handler
 	}
 
-	return utils.SendResponse(c, fiber.StatusOK, resp)
+	isSecure := config.Env.AppEnv == "production"
+
+	// Set Access Token Cookie
+	c.Cookie(&fiber.Cookie{
+		Name:     "access_token",
+		Value:    tokens.AccessToken,
+		HTTPOnly: true,
+		Secure:   isSecure,
+		SameSite: "Lax",
+		MaxAge:   int(config.Env.JwtAccessExpiration.Seconds()),
+	})
+
+	// Set Refresh Token Cookie
+	c.Cookie(&fiber.Cookie{
+		Name:     "refresh_token",
+		Value:    tokens.RefreshToken,
+		HTTPOnly: true,
+		Secure:   isSecure,
+		SameSite: "Lax",
+		MaxAge:   int(config.Env.JwtRefreshExpiration.Seconds()),
+	})
+
+	// Redirect back to frontend
+	return c.Redirect().To("http://localhost:3000/dashboard")
 }

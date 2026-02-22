@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -21,7 +22,10 @@ type AppConfig struct {
 	DBPort     int    `mapstructure:"DB_PORT" validate:"required"`
 	DBSSLMode  string `mapstructure:"DB_SSLMODE" validate:"required"`
 
-	// ... (Tambahkan field lain sesuai kebutuhanmu: Redis, Kafka, JWT, dll)
+	// Redis
+	RedisAddr          string        `mapstructure:"REDIS_ADDR" validate:"required"`
+	RedisPassword      string        `mapstructure:"REDIS_PASSWORD"`
+	RedisDB            int           `mapstructure:"REDIS_DB"`
 	CorsAllowedOrigins string        `mapstructure:"CORS_ALLOWED_ORIGINS" validate:"required"`
 	RateLimitMax       int           `mapstructure:"RATE_LIMIT_MAX" validate:"required"`
 	RateLimitExp       time.Duration `mapstructure:"RATE_LIMIT_EXP" validate:"required"`
@@ -30,6 +34,12 @@ type AppConfig struct {
 	ClientID     string `mapstructure:"CLIENT_ID" validate:"required"`
 	ClientSecret string `mapstructure:"CLIENT_SECRET" validate:"required"`
 	CallbackURL  string `mapstructure:"CALLBACK_URL" validate:"required"`
+
+	// JWT
+	JwtPrivateKeyBase64  string        `mapstructure:"JWT_PRIVATE_KEY_BASE64" validate:"required"`
+	JwtPublicKeyBase64   string        `mapstructure:"JWT_PUBLIC_KEY_BASE64" validate:"required"`
+	JwtAccessExpiration  time.Duration `mapstructure:"JWT_ACCESS_EXPIRATION" validate:"required"`
+	JwtRefreshExpiration time.Duration `mapstructure:"JWT_REFRESH_EXPIRATION" validate:"required"`
 }
 
 var Env AppConfig
@@ -40,6 +50,8 @@ func LoadConfig() {
 	viper.AddConfigPath(".")
 	viper.AddConfigPath("..") // Berjaga-jaga kalau run dari cmd/ folder
 
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
 	err := viper.ReadInConfig()
 	if err != nil {
 		log.Println("Warning: .env file not found. Reading entirely from OS Environment Variables...")
@@ -48,7 +60,7 @@ func LoadConfig() {
 	// 2. Baca dari OS Environment (Untuk Docker)
 	viper.AutomaticEnv()
 
-	// 3. 🚨 THE FIX: Otomatis daftarkan semua tag 'mapstructure' agar dibaca dari OS ENV
+	// 3. Otomatis daftarkan semua tag 'mapstructure' agar dibaca dari OS ENV
 	bindStructEnvs(AppConfig{})
 
 	// 4. Masukkan ke Struct
