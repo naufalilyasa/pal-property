@@ -17,6 +17,9 @@ import (
 type AuthService interface {
 	CompleteAuth(ctx context.Context, provider string, gothUser goth.User) (*entity.User, error)
 	LoginUser(ctx context.Context, user *entity.User) (*response.AuthTokens, error)
+	GetMe(ctx context.Context, userID uuid.UUID) (*response.UserResponse, error)
+	RefreshToken(ctx context.Context, refreshToken string) (*response.AuthTokens, error)
+	Logout(ctx context.Context, refreshToken string) error
 }
 
 type authService struct {
@@ -100,4 +103,66 @@ func (s *authService) LoginUser(ctx context.Context, user *entity.User) (*respon
 		AccessToken:  accToken,
 		RefreshToken: refToken,
 	}, nil
+}
+
+func (s *authService) GetMe(ctx context.Context, userID uuid.UUID) (*response.UserResponse, error) {
+	user, err := s.repo.FindUserByID(ctx, userID)
+	if err != nil {
+		return nil, errors.New("user not found")
+	}
+
+	return &response.UserResponse{
+		ID:        user.ID,
+		Name:      user.Name,
+		Email:     user.Email,
+		AvatarURL: user.AvatarURL,
+		Role:      user.Role,
+		CreatedAt: user.CreatedAt,
+	}, nil
+}
+
+func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*response.AuthTokens, error) {
+	// 1. Validate refresh token structure and signature
+	userID, jti, err := jwt.ValidateRefreshToken(refreshToken)
+	if err != nil {
+		return nil, errors.New("invalid refresh token: " + err.Error())
+	}
+
+	// 2. Validate JTI against Redis cache (check if revoked/expired)
+	err = s.cache.ValidateRefreshTokenJTI(ctx, jti, userID)
+	if err != nil {
+		return nil, errors.New("refresh token session expired or revoked")
+	}
+
+	// 3. Delete old JTI from Redis (Refresh token rotation)
+	_ = s.cache.DeleteRefreshTokenJTI(ctx, jti)
+
+	// 4. Generate new tokens
+	accToken, newRefToken, newJTI, err := jwt.GenerateTokens(userID)
+	if err != nil {
+		return nil, errors.New("failed to generate new tokens: " + err.Error())
+	}
+
+	// 5. Save new JTI to Redis
+	err = s.cache.SaveRefreshTokenJTI(ctx, newJTI, userID, config.Env.JwtRefreshExpiration)
+	if err != nil {
+		return nil, errors.New("failed to cache new refresh token: " + err.Error())
+	}
+
+	return &response.AuthTokens{
+		AccessToken:  accToken,
+		RefreshToken: newRefToken,
+	}, nil
+}
+
+func (s *authService) Logout(ctx context.Context, refreshToken string) error {
+	// We only need the jti from the token to invalidate it
+	_, jti, err := jwt.ValidateRefreshToken(refreshToken)
+	if err != nil {
+		// Even if token is invalid, we proceed so the clear cookie runs on handler side
+		return nil
+	}
+
+	// Delete from Redis
+	return s.cache.DeleteRefreshTokenJTI(ctx, jti)
 }

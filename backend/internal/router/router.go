@@ -12,6 +12,7 @@ import (
 	"github.com/naufalilyasa/pal-property-backend/internal/handler/http"
 	"github.com/naufalilyasa/pal-property-backend/pkg/config"
 	"github.com/naufalilyasa/pal-property-backend/pkg/logger"
+	"github.com/naufalilyasa/pal-property-backend/pkg/middleware"
 	"go.uber.org/zap"
 )
 
@@ -65,8 +66,14 @@ func Register(app *fiber.App, authHandler *http.AuthHandler) {
 		return c.Status(200).JSON(fiber.Map{"status": "ok"})
 	})
 
-	// Auth Routes
+	// Auth Routes (Public)
 	auth := app.Group("/auth")
 	auth.Get("/:provider", authHandler.BeginAuth)
 	auth.Get("/:provider/callback", authHandler.Callback)
+	auth.Post("/refresh", authHandler.RefreshToken)
+
+	// Auth Routes (Protected)
+	authProtected := app.Group("/auth", middleware.Protected())
+	authProtected.Get("/me", authHandler.GetMe)
+	authProtected.Post("/logout", authHandler.Logout)
 }

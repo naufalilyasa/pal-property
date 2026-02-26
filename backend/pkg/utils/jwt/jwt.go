@@ -86,3 +86,79 @@ func GenerateTokens(userID uuid.UUID) (accessToken string, refreshToken string, 
 
 	return accessToken, refreshToken, jti, nil
 }
+
+// ValidateAccessToken parses the access token and returns the user ID.
+func ValidateAccessToken(tokenString string) (uuid.UUID, error) {
+	if publicKey == nil {
+		if err := InitKeys(); err != nil {
+			return uuid.Nil, err
+		}
+	}
+
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// Verify signature method
+		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
+		return publicKey, nil
+	})
+
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		subStr, ok := claims["sub"].(string)
+		if !ok {
+			return uuid.Nil, errors.New("invalid 'sub' claim in token")
+		}
+		userID, err := uuid.Parse(subStr)
+		if err != nil {
+			return uuid.Nil, errors.New("invalid user ID format in token")
+		}
+		return userID, nil
+	}
+
+	return uuid.Nil, errors.New("invalid token claims")
+}
+
+// ValidateRefreshToken parses the refresh token and returns the user ID and jti.
+func ValidateRefreshToken(tokenString string) (uuid.UUID, string, error) {
+	if publicKey == nil {
+		if err := InitKeys(); err != nil {
+			return uuid.Nil, "", err
+		}
+	}
+
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// Verify signature method
+		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
+		return publicKey, nil
+	})
+
+	if err != nil {
+		return uuid.Nil, "", err
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		subStr, ok := claims["sub"].(string)
+		if !ok {
+			return uuid.Nil, "", errors.New("invalid 'sub' claim in refresh token")
+		}
+		userID, err := uuid.Parse(subStr)
+		if err != nil {
+			return uuid.Nil, "", errors.New("invalid user ID format in refresh token")
+		}
+
+		jti, ok := claims["jti"].(string)
+		if !ok {
+			return uuid.Nil, "", errors.New("invalid 'jti' claim in refresh token")
+		}
+
+		return userID, jti, nil
+	}
+
+	return uuid.Nil, "", errors.New("invalid refresh token claims")
+}

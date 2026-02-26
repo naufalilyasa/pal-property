@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
 	"github.com/gorilla/sessions"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
@@ -25,6 +26,8 @@ import (
 	"github.com/naufalilyasa/pal-property-backend/internal/service"
 	"github.com/naufalilyasa/pal-property-backend/pkg/config"
 	"github.com/naufalilyasa/pal-property-backend/pkg/logger"
+	"github.com/naufalilyasa/pal-property-backend/pkg/middleware"
+	"github.com/naufalilyasa/pal-property-backend/pkg/utils/jwt"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
@@ -147,6 +150,11 @@ func (s *AuthHandlerTestSuite) SetupSuite() {
 
 	auth := s.app.Group("/auth")
 	auth.Get("/:provider/callback", authHandler.Callback)
+	auth.Post("/refresh", authHandler.RefreshToken)
+
+	authProtected := s.app.Group("/auth", middleware.Protected())
+	authProtected.Get("/me", authHandler.GetMe)
+	authProtected.Post("/logout", authHandler.Logout)
 }
 
 func (s *AuthHandlerTestSuite) TearDownSuite() {
@@ -242,6 +250,165 @@ func (s *AuthHandlerTestSuite) TestOAuthCallback_Unauthorized() {
 	json.NewDecoder(res.Body).Decode(&responseBody)
 	s.Equal(false, responseBody["success"])
 	s.NotNil(responseBody["message"])
+}
+
+func (s *AuthHandlerTestSuite) TestGetMe_Success() {
+	// 1. Setup User in DB directly
+	userID, _ := uuid.NewV7()
+	user := entity.User{
+		BaseEntity: entity.BaseEntity{ID: userID},
+		Name:       "John Doe",
+		Email:      "john@example.com",
+		Role:       "user",
+	}
+	err := s.db.Create(&user).Error
+	s.Require().NoError(err)
+
+	// 2. Generate Access Token using our utility
+	accToken, _, _, err := jwt.GenerateTokens(userID)
+	s.Require().NoError(err)
+
+	// 3. Make request
+	req := httptest.NewRequest(http.MethodGet, "/auth/me", nil)
+	req.AddCookie(&http.Cookie{
+		Name:  "access_token",
+		Value: accToken,
+	})
+
+	res, err := s.app.Test(req, fiber.TestConfig{Timeout: 30 * time.Second})
+	s.Require().NoError(err)
+	s.Equal(http.StatusOK, res.StatusCode)
+
+	var responseBody map[string]interface{}
+	json.NewDecoder(res.Body).Decode(&responseBody)
+	s.Equal(true, responseBody["success"])
+
+	// Assert data
+	data := responseBody["data"].(map[string]interface{})
+	s.Equal("John Doe", data["name"])
+	s.Equal("john@example.com", data["email"])
+	s.Equal(userID.String(), data["id"])
+}
+
+func (s *AuthHandlerTestSuite) TestGetMe_Unauthorized() {
+	// Request without cookie
+	req := httptest.NewRequest(http.MethodGet, "/auth/me", nil)
+
+	res, err := s.app.Test(req, fiber.TestConfig{Timeout: 30 * time.Second})
+	s.Require().NoError(err)
+
+	s.Equal(http.StatusUnauthorized, res.StatusCode)
+}
+
+func (s *AuthHandlerTestSuite) TestRefreshToken_Success() {
+	userID, _ := uuid.NewV7()
+	_, refToken, jti, err := jwt.GenerateTokens(userID)
+	s.Require().NoError(err)
+
+	// Save JTI to Redis manually
+	err = s.rdb.Set(s.ctx, "refresh_token:"+jti, userID.String(), config.Env.JwtRefreshExpiration).Err()
+	s.Require().NoError(err)
+
+	// Make request
+	req := httptest.NewRequest(http.MethodPost, "/auth/refresh", nil)
+	req.AddCookie(&http.Cookie{
+		Name:  "refresh_token",
+		Value: refToken,
+	})
+
+	res, err := s.app.Test(req, fiber.TestConfig{Timeout: 30 * time.Second})
+	s.Require().NoError(err)
+	s.Equal(http.StatusOK, res.StatusCode)
+
+	var responseBody map[string]interface{}
+	json.NewDecoder(res.Body).Decode(&responseBody)
+	s.Equal(true, responseBody["success"])
+
+	// Check that we got back two new cookies (access_token, refresh_token)
+	var hasAccessToken, hasRefreshToken bool
+	for _, cookie := range res.Cookies() {
+		if cookie.Name == "access_token" {
+			hasAccessToken = true
+			s.NotEqual("", cookie.Value)
+		}
+		if cookie.Name == "refresh_token" {
+			hasRefreshToken = true
+			s.NotEqual("", cookie.Value)
+			s.NotEqual(refToken, cookie.Value, "Should generate a new refresh token")
+		}
+	}
+	s.True(hasAccessToken)
+	s.True(hasRefreshToken)
+}
+
+func (s *AuthHandlerTestSuite) TestRefreshToken_Unauthorized() {
+	// 1. Valid Token but Not in Redis (Revoked/Expired)
+	userID, _ := uuid.NewV7()
+	_, refToken, _, err := jwt.GenerateTokens(userID)
+	s.Require().NoError(err)
+	// We do NOT save it to Redis this time
+
+	req1 := httptest.NewRequest(http.MethodPost, "/auth/refresh", nil)
+	req1.AddCookie(&http.Cookie{Name: "refresh_token", Value: refToken})
+
+	res1, err := s.app.Test(req1, fiber.TestConfig{Timeout: 30 * time.Second})
+	s.Require().NoError(err)
+	s.Equal(http.StatusUnauthorized, res1.StatusCode)
+
+	// 2. No Token Provided
+	req2 := httptest.NewRequest(http.MethodPost, "/auth/refresh", nil)
+	res2, err := s.app.Test(req2, fiber.TestConfig{Timeout: 30 * time.Second})
+	s.Require().NoError(err)
+	s.Equal(http.StatusUnauthorized, res2.StatusCode)
+}
+
+func (s *AuthHandlerTestSuite) TestLogout_Success() {
+	userID, _ := uuid.NewV7()
+	accToken, refToken, jti, err := jwt.GenerateTokens(userID)
+	s.Require().NoError(err)
+
+	// Save JTI to Redis manually
+	err = s.rdb.Set(s.ctx, "refresh_token:"+jti, userID.String(), config.Env.JwtRefreshExpiration).Err()
+	s.Require().NoError(err)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/logout", nil)
+	req.AddCookie(&http.Cookie{Name: "access_token", Value: accToken})
+	req.AddCookie(&http.Cookie{Name: "refresh_token", Value: refToken})
+
+	res, err := s.app.Test(req, fiber.TestConfig{Timeout: 30 * time.Second})
+	s.Require().NoError(err)
+	s.Equal(http.StatusOK, res.StatusCode)
+
+	// JTI should be removed from Redis
+	val, err := s.rdb.Get(s.ctx, "refresh_token:"+jti).Result()
+	s.Equal(redis.Nil, err, "Redis key should be deleted")
+	s.Empty(val)
+
+	// Cookies should be cleared
+	var hasAccessToken, hasRefreshToken bool
+	for _, cookie := range res.Cookies() {
+		if cookie.Name == "access_token" && cookie.Value == "" {
+			hasAccessToken = true
+		}
+		if cookie.Name == "refresh_token" && cookie.Value == "" {
+			hasRefreshToken = true
+		}
+	}
+	s.True(hasAccessToken, "access_token cookie should be cleared")
+	s.True(hasRefreshToken, "refresh_token cookie should be cleared")
+}
+
+func (s *AuthHandlerTestSuite) TestLogout_NoRefreshToken() {
+	userID, _ := uuid.NewV7()
+	accToken, _, _, err := jwt.GenerateTokens(userID)
+	s.Require().NoError(err)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/logout", nil)
+	req.AddCookie(&http.Cookie{Name: "access_token", Value: accToken})
+
+	res, err := s.app.Test(req, fiber.TestConfig{Timeout: 30 * time.Second})
+	s.Require().NoError(err)
+	s.Equal(http.StatusOK, res.StatusCode, "Logout should succeed even without refresh token")
 }
 
 func TestAuthHandlerSuite(t *testing.T) {

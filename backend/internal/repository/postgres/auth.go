@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/naufalilyasa/pal-property-backend/internal/domain" // interface
 	"github.com/naufalilyasa/pal-property-backend/internal/domain/entity"
 	"gorm.io/gorm"
@@ -30,6 +31,15 @@ func (r *authRepository) FindOAuthAccount(ctx context.Context, provider, provide
 func (r *authRepository) FindUserByEmail(ctx context.Context, email string) (*entity.User, error) {
 	var user entity.User
 	err := r.db.WithContext(ctx).Where("email = ?", email).First(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (r *authRepository) FindUserByID(ctx context.Context, id uuid.UUID) (*entity.User, error) {
+	var user entity.User
+	err := r.db.WithContext(ctx).Where("id = ?", id).First(&user).Error
 	if err != nil {
 		return nil, err
 	}

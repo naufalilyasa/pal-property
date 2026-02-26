@@ -21,3 +21,20 @@ func (r *cacheRepository) SaveRefreshTokenJTI(ctx context.Context, jti string, u
 	// Store the jti as key, and user ID as value
 	return r.client.Set(ctx, "refresh_token:"+jti, userID.String(), expiration).Err()
 }
+
+func (r *cacheRepository) DeleteRefreshTokenJTI(ctx context.Context, jti string) error {
+	return r.client.Del(ctx, "refresh_token:"+jti).Err()
+}
+
+func (r *cacheRepository) ValidateRefreshTokenJTI(ctx context.Context, jti string, userID uuid.UUID) error {
+	val, err := r.client.Get(ctx, "refresh_token:"+jti).Result()
+	if err != nil {
+		return err // Could be redis.Nil if not found
+	}
+
+	if val != userID.String() {
+		return redis.Nil // Value mismatch, treat as not found/invalid
+	}
+
+	return nil
+}
