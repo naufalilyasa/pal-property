@@ -9,8 +9,8 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/lib/pq"
-	"github.com/username/pal-property-backend/pkg/config"
-	"github.com/username/pal-property-backend/pkg/logger"
+	"github.com/naufalilyasa/pal-property-backend/pkg/config"
+	"github.com/naufalilyasa/pal-property-backend/pkg/logger"
 	"go.uber.org/zap"
 )
 

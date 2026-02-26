@@ -5,16 +5,17 @@ import (
 
 	"github.com/bytedance/sonic"
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/providers/google"
+	handler "github.com/naufalilyasa/pal-property-backend/internal/handler/http"
+	"github.com/naufalilyasa/pal-property-backend/internal/repository/postgres"
+	redisRepo "github.com/naufalilyasa/pal-property-backend/internal/repository/redis"
+	"github.com/naufalilyasa/pal-property-backend/internal/router"
+	"github.com/naufalilyasa/pal-property-backend/internal/service"
+	"github.com/naufalilyasa/pal-property-backend/pkg/config"
+	"github.com/naufalilyasa/pal-property-backend/pkg/logger"
 	"github.com/redis/go-redis/v9"
-	handler "github.com/username/pal-property-backend/internal/handler/http"
-	"github.com/username/pal-property-backend/internal/repository/postgres"
-	redisRepo "github.com/username/pal-property-backend/internal/repository/redis"
-	"github.com/username/pal-property-backend/internal/router"
-	"github.com/username/pal-property-backend/internal/service"
-	"github.com/username/pal-property-backend/pkg/config"
-	"github.com/username/pal-property-backend/pkg/logger"
 	"go.uber.org/zap"
 	pgDriver "gorm.io/driver/postgres"
 	gormPkg "gorm.io/gorm"
@@ -82,7 +83,7 @@ func main() {
 				"success":  false,
 				"message":  msg,
 				"data":     nil,
-				"trace_id": c.Locals("requestid"),
+				"trace_id": requestid.FromContext(c),
 			})
 		},
 	})

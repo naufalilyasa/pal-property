@@ -6,11 +6,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/markbates/goth"
-	"github.com/username/pal-property-backend/internal/domain"
-	"github.com/username/pal-property-backend/internal/domain/entity"
-	"github.com/username/pal-property-backend/internal/dto/response"
-	"github.com/username/pal-property-backend/pkg/config"
-	"github.com/username/pal-property-backend/pkg/utils/jwt"
+	"github.com/naufalilyasa/pal-property-backend/internal/domain"
+	"github.com/naufalilyasa/pal-property-backend/internal/domain/entity"
+	"github.com/naufalilyasa/pal-property-backend/internal/dto/response"
+	"github.com/naufalilyasa/pal-property-backend/pkg/config"
+	"github.com/naufalilyasa/pal-property-backend/pkg/utils/jwt"
 	"gorm.io/gorm"
 )
 

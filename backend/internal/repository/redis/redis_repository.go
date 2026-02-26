@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/naufalilyasa/pal-property-backend/internal/domain"
 	"github.com/redis/go-redis/v9"
-	"github.com/username/pal-property-backend/internal/domain"
 )
 
 type cacheRepository struct {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/username/pal-property-backend/pkg/config"
+	"github.com/naufalilyasa/pal-property-backend/pkg/config"
 )
 
 var (

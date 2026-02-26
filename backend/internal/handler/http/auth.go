@@ -7,8 +7,8 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/adaptor"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
-	"github.com/username/pal-property-backend/internal/service"
-	"github.com/username/pal-property-backend/pkg/config"
+	"github.com/naufalilyasa/pal-property-backend/internal/service"
+	"github.com/naufalilyasa/pal-property-backend/pkg/config"
 )
 
 type AuthHandler struct {

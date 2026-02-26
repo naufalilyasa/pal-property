@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/username/pal-property-backend/pkg/config"
+	"github.com/naufalilyasa/pal-property-backend/pkg/config"
 	"go.uber.org/zap"
 )
 

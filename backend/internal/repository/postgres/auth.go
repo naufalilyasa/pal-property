@@ -3,8 +3,8 @@ package postgres
 import (
 	"context"
 
-	"github.com/username/pal-property-backend/internal/domain" // interface
-	"github.com/username/pal-property-backend/internal/domain/entity"
+	"github.com/naufalilyasa/pal-property-backend/internal/domain" // interface
+	"github.com/naufalilyasa/pal-property-backend/internal/domain/entity"
 	"gorm.io/gorm"
 )
 

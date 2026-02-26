@@ -3,7 +3,7 @@ package domain
 import (
 	"context"
 
-	"github.com/username/pal-property-backend/internal/domain/entity" // Adjust module path if needed
+	"github.com/naufalilyasa/pal-property-backend/internal/domain/entity" // Adjust module path if needed
 )
 
 type AuthRepository interface {

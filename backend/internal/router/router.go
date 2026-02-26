@@ -9,9 +9,9 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/limiter"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/google/uuid"
-	"github.com/username/pal-property-backend/internal/handler/http"
-	"github.com/username/pal-property-backend/pkg/config"
-	"github.com/username/pal-property-backend/pkg/logger"
+	"github.com/naufalilyasa/pal-property-backend/internal/handler/http"
+	"github.com/naufalilyasa/pal-property-backend/pkg/config"
+	"github.com/naufalilyasa/pal-property-backend/pkg/logger"
 	"go.uber.org/zap"
 )
 

@@ -1,4 +1,4 @@
-module github.com/username/pal-property-backend
+module github.com/naufalilyasa/pal-property-backend
 
 go 1.26.0
 
