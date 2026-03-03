@@ -55,9 +55,10 @@ func GenerateTokens(userID uuid.UUID) (accessToken string, refreshToken string, 
 
 	// 1. Generate Access Token
 	accessTokenClaims := jwt.MapClaims{
-		"sub": userID.String(),
-		"exp": time.Now().Add(time.Duration(config.Env.JwtAccessExpiration) * time.Second).Unix(),
-		"iat": time.Now().Unix(),
+		"sub":  userID.String(),
+		"type": "access",
+		"exp":  time.Now().Add(time.Duration(config.Env.JwtAccessExpiration) * time.Second).Unix(),
+		"iat":  time.Now().Unix(),
 	}
 	accToken := jwt.NewWithClaims(jwt.SigningMethodRS256, accessTokenClaims)
 	accessToken, err = accToken.SignedString(privateKey)
@@ -73,11 +74,13 @@ func GenerateTokens(userID uuid.UUID) (accessToken string, refreshToken string, 
 	jti = jtiUUID.String()
 
 	refreshTokenClaims := jwt.MapClaims{
-		"sub": userID.String(),
-		"jti": jti,
-		"exp": time.Now().Add(time.Duration(config.Env.JwtRefreshExpiration) * time.Second).Unix(),
-		"iat": time.Now().Unix(),
+		"sub":  userID.String(),
+		"jti":  jti,
+		"type": "refresh",
+		"exp":  time.Now().Add(time.Duration(config.Env.JwtRefreshExpiration) * time.Second).Unix(),
+		"iat":  time.Now().Unix(),
 	}
+
 	refToken := jwt.NewWithClaims(jwt.SigningMethodRS256, refreshTokenClaims)
 	refreshToken, err = refToken.SignedString(privateKey)
 	if err != nil {
@@ -108,6 +111,9 @@ func ValidateAccessToken(tokenString string) (uuid.UUID, error) {
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		if t, ok := claims["type"].(string); !ok || t != "access" {
+			return uuid.Nil, errors.New("invalid token type")
+		}
 		subStr, ok := claims["sub"].(string)
 		if !ok {
 			return uuid.Nil, errors.New("invalid 'sub' claim in token")
@@ -143,6 +149,9 @@ func ValidateRefreshToken(tokenString string) (uuid.UUID, string, error) {
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		if t, ok := claims["type"].(string); !ok || t != "refresh" {
+			return uuid.Nil, "", errors.New("invalid token type")
+		}
 		subStr, ok := claims["sub"].(string)
 		if !ok {
 			return uuid.Nil, "", errors.New("invalid 'sub' claim in refresh token")
