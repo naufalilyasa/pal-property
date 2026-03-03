@@ -56,7 +56,7 @@ func GenerateTokens(userID uuid.UUID) (accessToken string, refreshToken string, 
 	// 1. Generate Access Token
 	accessTokenClaims := jwt.MapClaims{
 		"sub": userID.String(),
-		"exp": time.Now().Add(config.Env.JwtAccessExpiration).Unix(),
+		"exp": time.Now().Add(time.Duration(config.Env.JwtAccessExpiration) * time.Second).Unix(),
 		"iat": time.Now().Unix(),
 	}
 	accToken := jwt.NewWithClaims(jwt.SigningMethodRS256, accessTokenClaims)
@@ -75,7 +75,7 @@ func GenerateTokens(userID uuid.UUID) (accessToken string, refreshToken string, 
 	refreshTokenClaims := jwt.MapClaims{
 		"sub": userID.String(),
 		"jti": jti,
-		"exp": time.Now().Add(config.Env.JwtRefreshExpiration).Unix(),
+		"exp": time.Now().Add(time.Duration(config.Env.JwtRefreshExpiration) * time.Second).Unix(),
 		"iat": time.Now().Unix(),
 	}
 	refToken := jwt.NewWithClaims(jwt.SigningMethodRS256, refreshTokenClaims)

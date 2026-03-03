@@ -38,8 +38,10 @@ func setupTest() (*mocks.AuthRepository, *mocks.CacheRepository, service.AuthSer
 	})
 	config.Env.JwtPublicKeyBase64 = base64.StdEncoding.EncodeToString(pubPEM)
 
-	config.Env.JwtAccessExpiration = time.Minute * 15
-	config.Env.JwtRefreshExpiration = time.Hour * 168
+	config.Env.JwtAccessExpiration = 900
+	config.Env.JwtRefreshExpiration = 604800
+	config.Env.OAuthTokenEncryptionKey = make([]byte, 32)
+	config.Env.JwtRefreshExpiration = 604800
 
 	mockAuthRepo := new(mocks.AuthRepository)
 	mockCacheRepo := new(mocks.CacheRepository)
@@ -95,7 +97,7 @@ func TestRefreshToken_Success(t *testing.T) {
 	// Mock deleting old JTI
 	mockCache.On("DeleteRefreshTokenJTI", mock.Anything, jti).Return(nil)
 	// Mock saving new JTI
-	mockCache.On("SaveRefreshTokenJTI", mock.Anything, mock.AnythingOfType("string"), userID, config.Env.JwtRefreshExpiration).Return(nil)
+	mockCache.On("SaveRefreshTokenJTI", mock.Anything, mock.AnythingOfType("string"), userID, time.Duration(config.Env.JwtRefreshExpiration)*time.Second).Return(nil)
 
 	res, err := svc.RefreshToken(context.Background(), refToken)
 

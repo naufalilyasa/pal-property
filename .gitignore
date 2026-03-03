@@ -63,3 +63,5 @@ coverage/
 # Abaikan file temp Go
 *.test
 *.out
+
+postman_collection.json

@@ -46,9 +46,6 @@ func Register(app *fiber.App, authHandler *http.AuthHandler) {
 		AllowCredentials: true,
 		MaxAge:           3600,
 	}))
-		AllowOrigins: []string{config.Env.CorsAllowedOrigins},
-		AllowHeaders: []string{"Origin, Content-Type, Accept, Authorization"},
-	}))
 
 	app.Use(limiter.New(limiter.Config{
 		Next: func(c fiber.Ctx) bool {
@@ -56,7 +53,7 @@ func Register(app *fiber.App, authHandler *http.AuthHandler) {
 			return env == "testing" || env == "development"
 		},
 		Max:        config.Env.RateLimitMax,
-		Expiration: config.Env.RateLimitExp,
+		Expiration: time.Duration(config.Env.RateLimitExp) * time.Second,
 	}))
 
 	app.Use(requestid.New(requestid.Config{

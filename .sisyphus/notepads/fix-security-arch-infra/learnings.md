@@ -1,0 +1,4 @@
+- Used `caarlos0/env` to replace `viper` which prevents issues parsing environment variables and makes validation much easier.
+- Learned that RedPanda is a 1-to-1 API compatible Kafka distribution that has better performance characteristics while lacking Zookeeper dependency, which made `docker-compose` cleaner.
+- AES-256-GCM encryption added effectively wraps tokens securely. Key management via environment var is critical here.
+- CORS in Fiber router requires `AllowCredentials: true` to correctly use HTTP-only cookies in a cross-origin setting.

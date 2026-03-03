@@ -74,8 +74,10 @@ func (s *AuthHandlerTestSuite) SetupSuite() {
 	})
 	config.Env.JwtPublicKeyBase64 = base64.StdEncoding.EncodeToString(pubPEM)
 
-	config.Env.JwtAccessExpiration = time.Minute * 15
-	config.Env.JwtRefreshExpiration = time.Hour * 168
+	config.Env.JwtAccessExpiration = 900
+	config.Env.JwtRefreshExpiration = 604800
+	config.Env.OAuthTokenEncryptionKey = make([]byte, 32)
+	config.Env.JwtRefreshExpiration = 604800
 
 	// 2. Setup Testcontainers Postgres (pal_db_test)
 	pgContainer, err := postgres.Run(s.ctx,
@@ -148,13 +150,13 @@ func (s *AuthHandlerTestSuite) SetupSuite() {
 		},
 	})
 
-	auth := s.app.Group("/auth")
-	auth.Get("/:provider/callback", authHandler.Callback)
-	auth.Post("/refresh", authHandler.RefreshToken)
+	authGroup := s.app.Group("/auth")
+	authGroup.Get("/oauth/:provider/callback", authHandler.Callback)
+	authGroup.Post("/refresh", authHandler.RefreshToken)
 
-	authProtected := s.app.Group("/auth", middleware.Protected())
-	authProtected.Get("/me", authHandler.GetMe)
-	authProtected.Post("/logout", authHandler.Logout)
+	apiProtected := authGroup.Group("/", middleware.Protected())
+	apiProtected.Get("/me", authHandler.GetMe)
+	apiProtected.Post("/logout", authHandler.Logout)
 }
 
 func (s *AuthHandlerTestSuite) TearDownSuite() {
@@ -176,7 +178,7 @@ func (s *AuthHandlerTestSuite) SetupTest() {
 // The Feature Test implementation
 func (s *AuthHandlerTestSuite) TestOAuthCallback_Success() {
 	// 1. Setup Request to callback handler
-	req := httptest.NewRequest(http.MethodGet, "/auth/faux/callback?provider=faux", nil)
+	req := httptest.NewRequest(http.MethodGet, "/auth/oauth/faux/callback?provider=faux", nil)
 
 	// Gothic natively extracts the "provider" context key from the request Context.
 	// Since Fiber isn't natively populating this raw *http.Request context for Gothic in the test environment, we must inject it.
@@ -236,7 +238,7 @@ func (s *AuthHandlerTestSuite) TestOAuthCallback_Success() {
 
 func (s *AuthHandlerTestSuite) TestOAuthCallback_Unauthorized() {
 	// Simulating callback WITHOUT setting session cookie
-	req := httptest.NewRequest(http.MethodGet, "/auth/faux/callback?provider=faux", nil)
+	req := httptest.NewRequest(http.MethodGet, "/auth/oauth/faux/callback?provider=faux", nil)
 
 	res, err := s.app.Test(req, fiber.TestConfig{
 		Timeout: 30 * time.Second,
@@ -306,7 +308,7 @@ func (s *AuthHandlerTestSuite) TestRefreshToken_Success() {
 	s.Require().NoError(err)
 
 	// Save JTI to Redis manually
-	err = s.rdb.Set(s.ctx, "refresh_token:"+jti, userID.String(), config.Env.JwtRefreshExpiration).Err()
+	err = s.rdb.Set(s.ctx, "refresh_token:"+jti, userID.String(), time.Duration(config.Env.JwtRefreshExpiration)*time.Second).Err()
 	s.Require().NoError(err)
 
 	// Make request
@@ -368,7 +370,7 @@ func (s *AuthHandlerTestSuite) TestLogout_Success() {
 	s.Require().NoError(err)
 
 	// Save JTI to Redis manually
-	err = s.rdb.Set(s.ctx, "refresh_token:"+jti, userID.String(), config.Env.JwtRefreshExpiration).Err()
+	err = s.rdb.Set(s.ctx, "refresh_token:"+jti, userID.String(), time.Duration(config.Env.JwtRefreshExpiration)*time.Second).Err()
 	s.Require().NoError(err)
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/logout", nil)

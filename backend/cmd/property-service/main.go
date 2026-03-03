@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/bytedance/sonic"
 	"github.com/gofiber/fiber/v3"
@@ -10,19 +11,21 @@ import (
 	"github.com/markbates/goth/providers/google"
 	handler "github.com/naufalilyasa/pal-property-backend/internal/handler/http"
 	"github.com/naufalilyasa/pal-property-backend/internal/repository/postgres"
-	redisRepo "github.com/naufalilyasa/pal-property-backend/internal/repository/redis"
+	"github.com/naufalilyasa/pal-property-backend/internal/repository/redis"
 	"github.com/naufalilyasa/pal-property-backend/internal/router"
 	"github.com/naufalilyasa/pal-property-backend/internal/service"
 	"github.com/naufalilyasa/pal-property-backend/pkg/config"
 	"github.com/naufalilyasa/pal-property-backend/pkg/logger"
-	"github.com/redis/go-redis/v9"
+	goRedis "github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	pgDriver "gorm.io/driver/postgres"
 	gormPkg "gorm.io/gorm"
 )
 
 func main() {
-	config.LoadConfig()
+	if err := config.LoadConfig(); err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
 	logger.InitLogger()
 
 	loggerDev, _ := zap.NewDevelopment()
@@ -33,7 +36,7 @@ func main() {
 		"jwtprivatekeybase64", config.Env.JwtPrivateKeyBase64,
 	)
 
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=%s",
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
 		config.Env.DBHost, config.Env.DBUser, config.Env.DBPassword,
 		config.Env.DBName, config.Env.DBPort, config.Env.DBSSLMode,
 	)
@@ -45,19 +48,19 @@ func main() {
 
 	goth.UseProviders(
 		google.New(
-			config.Env.ClientID,
-			config.Env.ClientSecret,
-			config.Env.CallbackURL,
+			config.Env.OAuthClientID,
+			config.Env.OAuthClientSecret,
+			config.Env.OAuthCallbackURL,
 			"email", "profile",
 		),
 	)
 
-	rdb := redis.NewClient(&redis.Options{
+	rdb := goRedis.NewClient(&goRedis.Options{
 		Addr:     config.Env.RedisAddr,
 		Password: config.Env.RedisPassword,
 		DB:       config.Env.RedisDB,
 	})
-	cacheRepo := redisRepo.NewCacheRepository(rdb)
+	cacheRepo := redis.NewCacheRepository(rdb)
 
 	authRepo := postgres.NewAuthRepository(db)
 	authService := service.NewAuthService(authRepo, cacheRepo)
@@ -90,8 +93,8 @@ func main() {
 
 	router.Register(app, authHandler)
 
-	logger.Log.Info("Server starting", zap.Int("port", config.Env.Port))
-	if err := app.Listen(fmt.Sprintf(":%d", config.Env.Port)); err != nil {
+	logger.Log.Info("Server starting", zap.String("port", config.Env.Port))
+	if err := app.Listen(fmt.Sprintf(":%s", config.Env.Port)); err != nil {
 		logger.Log.Fatal("Server failed to start", zap.Error(err))
 	}
 }
