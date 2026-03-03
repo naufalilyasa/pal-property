@@ -37,7 +37,13 @@ func ZapLogger() fiber.Handler {
 	}
 }
 
-func Register(app *fiber.App, db *gorm.DB, authHandler *http.AuthHandler, listingHandler *http.ListingHandler) {
+func Register(
+	app *fiber.App,
+	db *gorm.DB,
+	authHandler *http.AuthHandler,
+	listingHandler *http.ListingHandler,
+	categoryHandler *http.CategoryHandler,
+) {
 	// Global Middlewares
 	app.Use(helmet.New())
 	app.Use(cors.New(cors.Config{
@@ -107,4 +113,20 @@ func Register(app *fiber.App, db *gorm.DB, authHandler *http.AuthHandler, listin
 	listingProtected.Delete("/:id", listingHandler.Delete)
 
 	apiProtected.Get("/me/listings", listingHandler.ListByUserID)
+	// ==========================================
+	// 5. Category Routes (Public)
+	// ==========================================
+	api.Get("/categories", categoryHandler.List)
+	api.Get("/categories/:slug", categoryHandler.GetBySlug)
+
+	// ==========================================
+	// 6. Category Routes (Admin Protected)
+	// ==========================================
+	categoryAdmin := api.Group("/categories",
+		middleware.Protected(db),
+		middleware.RequireRole("admin"),
+	)
+	categoryAdmin.Post("/", categoryHandler.Create)
+	categoryAdmin.Put("/:id", categoryHandler.Update)
+	categoryAdmin.Delete("/:id", categoryHandler.Delete)
 }

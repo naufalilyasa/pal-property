@@ -10,7 +10,8 @@ import (
 type ListingResponse struct {
 	ID               uuid.UUID      `json:"id"`
 	UserID           uuid.UUID      `json:"user_id"`
-	CategoryID       *uuid.UUID     `json:"category_id"`
+	CategoryID       *uuid.UUID              `json:"category_id"`
+	Category         *CategoryShortResponse  `json:"category,omitempty"`
 	Title            string         `json:"title"`
 	Slug             string         `json:"slug"`
 	Description      *string        `json:"description"`

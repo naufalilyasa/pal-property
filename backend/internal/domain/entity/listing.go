@@ -5,8 +5,8 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
-
 type Category struct {
 	ID        uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
 	Name      string     `gorm:"type:varchar(100);not null" json:"name"`
@@ -19,6 +19,17 @@ type Category struct {
 	Children []Category `gorm:"foreignKey:ParentID" json:"children,omitempty"`
 	Listings []Listing  `gorm:"foreignKey:CategoryID" json:"listings,omitempty"`
 }
+func (c *Category) BeforeCreate(tx *gorm.DB) error {
+	if c.ID == uuid.Nil {
+		id, err := uuid.NewV7()
+		if err != nil {
+			return err
+		}
+		c.ID = id
+	}
+	return nil
+}
+
 
 type Listing struct {
 	BaseEntity

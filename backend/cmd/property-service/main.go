@@ -72,6 +72,10 @@ func main() {
 	listingService := service.NewListingService(listingRepo)
 	listingHandler := handler.NewListingHandler(listingService)
 
+	categoryRepo := postgres.NewCategoryRepository(db)
+	categoryService := service.NewCategoryService(categoryRepo)
+	categoryHandler := handler.NewCategoryHandler(categoryService)
+
 	app := fiber.New(fiber.Config{
 		JSONEncoder: sonic.Marshal,
 		JSONDecoder: sonic.Unmarshal,
@@ -106,7 +110,7 @@ func main() {
 		},
 	})
 
-	router.Register(app, db, authHandler, listingHandler)
+	router.Register(app, db, authHandler, listingHandler, categoryHandler)
 
 	logger.Log.Info("Server starting", zap.String("port", config.Env.Port))
 	if err := app.Listen(fmt.Sprintf(":%s", config.Env.Port)); err != nil {

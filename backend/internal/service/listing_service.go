@@ -239,6 +239,17 @@ func (s *listingService) mapToResponse(l *entity.Listing) *response.ListingRespo
 		IsFeatured:       l.IsFeatured,
 		Specifications:   l.Specifications,
 		ViewCount:        l.ViewCount,
+		Category: func() *response.CategoryShortResponse {
+			if l.Category == nil {
+				return nil
+			}
+			return &response.CategoryShortResponse{
+				ID:      l.Category.ID,
+				Name:    l.Category.Name,
+				Slug:    l.Category.Slug,
+				IconURL: l.Category.IconURL,
+			}
+		}(),
 		CreatedAt:        l.CreatedAt,
 		UpdatedAt:        l.UpdatedAt,
 	}

@@ -95,6 +95,92 @@
             ]
         },
         {
+            "name": "Categories",
+            "description": "Category management. GET endpoints are public. POST/PUT/DELETE require admin access_token cookie.",
+            "item": [
+                {
+                    "name": "1. List All Categories (Public)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/categories",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "categories"]
+                        },
+                        "description": "Returns all root categories with their children nested. Public endpoint — no auth required."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "2. Get Category by Slug (Public)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/categories/{{categorySlug}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "categories", "{{categorySlug}}"]
+                        },
+                        "description": "Fetch a single category by slug, including its parent (for breadcrumbs) and children. Returns 404 if not found."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "3. Create Category (Admin)",
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"Kondominium\",\n  \"parent_id\": \"11111111-0000-7000-8000-000000000001\",\n  \"icon_url\": null\n}",
+                            "options": {"raw": {"language": "json"}}
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/categories/",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "categories", ""]
+                        },
+                        "description": "Create a new category. Requires admin access_token cookie. Slug is auto-generated from name. parent_id is optional (null = root category)."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "4. Update Category (Admin)",
+                    "request": {
+                        "method": "PUT",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"Kondominium Mewah\"\n}",
+                            "options": {"raw": {"language": "json"}}
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/categories/{{categoryId}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "categories", "{{categoryId}}"]
+                        },
+                        "description": "Update a category name and/or icon_url. Slug is locked after creation and cannot be changed. Requires admin cookie."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "5. Delete Category (Admin)",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/categories/{{categoryId}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "categories", "{{categoryId}}"]
+                        },
+                        "description": "Hard-delete a category. Blocked (409 Conflict) if category has children or is referenced by active listings. Requires admin cookie."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
             "name": "Listings",
             "description": "CRUD endpoints for property listings. Create/Update/Delete require a valid access_token cookie. List and Get are public.",
             "item": [
@@ -307,6 +393,12 @@
             "value": "",
             "type": "string",
             "description": "UUID of the category — available after Category Management is implemented"
+        },
+        {
+            "key": "categorySlug",
+            "value": "",
+            "type": "string",
+            "description": "Slug of a category — e.g. rumah, apartemen"
         }
     ]
 }

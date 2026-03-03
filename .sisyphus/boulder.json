@@ -1,9 +1,11 @@
 {
-  "active_plan": "/mnt/data/Projects/pal-property/.sisyphus/plans/crud-listing.md",
-  "started_at": "2026-03-03T16:26:02.421Z",
+  "active_plan": "/mnt/data/Projects/pal-property/.sisyphus/plans/category-management.md",
+  "started_at": "2026-03-03T23:36:11.562Z",
   "session_ids": [
-    "ses_354bdb74cffeITe0xEzSlurPtT"
+    "ses_354bdb74cffeITe0xEzSlurPtT",
+    "ses_34a6e83c0ffefVjuFGLxtnHRwd"
   ],
-  "plan_name": "crud-listing",
+  "plan_name": "category-management",
+  "worktree_path": "/mnt/data/Projects/pal-property",
   "agent": "atlas"
 }
