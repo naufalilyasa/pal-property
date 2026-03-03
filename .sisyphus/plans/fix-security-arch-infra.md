@@ -556,14 +556,14 @@ If tests use config, they may need `OAUTH_TOKEN_ENCRYPTION_KEY` set. Update test
 
 ## Final Verification Wave
 
-- [ ] `domain/errors.go` exists with 5 sentinel errors
-- [ ] `pkg/crypto/aes.go` exists with Encrypt/Decrypt using stdlib only (no external dep)
-- [ ] `pkg/config/config.go` uses `caarlos0/env`, no Viper import anywhere in pkg/config/
-- [ ] `repository/postgres/auth.go` translates to `domain.ErrNotFound`, no raw gorm errors returned
-- [ ] `service/auth_service.go` has NO `gorm.io/gorm` import
-- [ ] `router.go` CORS has `AllowCredentials: true`, `AllowMethods`, `AllowHeaders`
-- [ ] `docker-compose.yml` has NO zookeeper, NO cp-kafka — only redpanda single service
-- [ ] `entity/listing.go` Price field is `int64`
-- [ ] `go build ./...` exits 0
-- [ ] `go vet ./...` exits 0
-- [ ] `.env-example` has `OAUTH_TOKEN_ENCRYPTION_KEY` entry
+- [x] `domain/errors.go` exists with 5 sentinel errors
+- [x] `pkg/crypto/aes.go` exists with Encrypt/Decrypt using stdlib only (no external dep)
+- [x] `pkg/config/config.go` uses `caarlos0/env`, no Viper import anywhere in pkg/config/
+- [x] `repository/postgres/auth.go` translates to `domain.ErrNotFound`, no raw gorm errors returned
+- [x] `service/auth_service.go` has NO `gorm.io/gorm` import
+- [x] `router.go` CORS has `AllowCredentials: true`, `AllowMethods`, `AllowHeaders`
+- [x] `docker-compose.yml` has NO zookeeper, NO cp-kafka — only redpanda single service
+- [x] `entity/listing.go` Price field is `int64`
+- [x] `go build ./...` exits 0
+- [x] `go vet ./...` exits 0
+- [x] `.env-example` has `OAUTH_TOKEN_ENCRYPTION_KEY` entry
