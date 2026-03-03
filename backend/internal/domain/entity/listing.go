@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgtype"
+	"gorm.io/datatypes"
 )
 
 type Category struct {
@@ -27,7 +27,9 @@ type Listing struct {
 	Title       string     `gorm:"type:varchar(255);not null" json:"title"`
 	Slug        string     `gorm:"type:varchar(255);unique;not null" json:"slug"`
 	Description *string    `gorm:"type:text" json:"description"`
-	Price       float64    `gorm:"type:decimal(18,2);not null" json:"price"`
+	// Price is stored in the smallest currency unit (Indonesian Rupiah, no decimal).
+	// Example: Rp 500.000.000 is stored as 500000000.
+	Price int64 `gorm:"not null" json:"price"`
 	Currency    string     `gorm:"type:varchar(3);default:'IDR'" json:"currency"`
 
 	LocationCity     *string `gorm:"type:varchar(100)" json:"location_city"`
@@ -42,7 +44,7 @@ type Listing struct {
 	Status     string `gorm:"type:varchar(20);default:'active'" json:"status"`
 	IsFeatured bool   `gorm:"default:false" json:"is_featured"`
 
-	Specifications pgtype.JSONB `gorm:"type:jsonb;default:'{}'" json:"specifications"`
+	Specifications datatypes.JSON `gorm:"type:jsonb;default:'{}'" json:"specifications"`
 
 	ViewCount int `gorm:"default:0" json:"view_count"`
 

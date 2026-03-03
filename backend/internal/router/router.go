@@ -40,6 +40,12 @@ func Register(app *fiber.App, authHandler *http.AuthHandler) {
 	// Global Middlewares
 	app.Use(helmet.New())
 	app.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{config.Env.CorsAllowedOrigins},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowCredentials: true,
+		MaxAge:           3600,
+	}))
 		AllowOrigins: []string{config.Env.CorsAllowedOrigins},
 		AllowHeaders: []string{"Origin, Content-Type, Accept, Authorization"},
 	}))
@@ -66,14 +72,24 @@ func Register(app *fiber.App, authHandler *http.AuthHandler) {
 		return c.Status(200).JSON(fiber.Map{"status": "ok"})
 	})
 
-	// Auth Routes (Public)
-	auth := app.Group("/auth")
-	auth.Get("/:provider", authHandler.BeginAuth)
-	auth.Get("/:provider/callback", authHandler.Callback)
-	auth.Post("/refresh", authHandler.RefreshToken)
+	// Buat SATU base group untuk auth
+	authGroup := app.Group("/auth")
 
-	// Auth Routes (Protected)
-	authProtected := app.Group("/auth", middleware.Protected())
-	authProtected.Get("/me", authHandler.GetMe)
-	authProtected.Post("/logout", authHandler.Logout)
+	// ==========================================
+	// 1. Auth Routes (Public)
+	// ==========================================
+	// Tambahkan prefix spesifik (misal /oauth) untuk provider
+	// agar terhindar dari tabrakan dengan route "/me" atau route statis lain ke depannya.
+	authGroup.Get("/oauth/:provider", authHandler.BeginAuth)
+	authGroup.Get("/oauth/:provider/callback", authHandler.Callback)
+	authGroup.Post("/refresh", authHandler.RefreshToken)
+
+	// ==========================================
+	// 2. Auth Routes (Protected)
+	// ==========================================
+	// Buat sub-group dari authGroup, dan pasang middleware Protected() di sini.
+	// Semua route di bawah apiProtected otomatis membutuhkan autentikasi.
+	apiProtected := authGroup.Group("/", middleware.Protected())
+	apiProtected.Get("/me", authHandler.GetMe)
+	apiProtected.Post("/logout", authHandler.Logout)
 }
