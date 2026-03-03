@@ -14,6 +14,7 @@ import (
 	"github.com/naufalilyasa/pal-property-backend/pkg/logger"
 	"github.com/naufalilyasa/pal-property-backend/pkg/middleware"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 func ZapLogger() fiber.Handler {
@@ -36,7 +37,7 @@ func ZapLogger() fiber.Handler {
 	}
 }
 
-func Register(app *fiber.App, authHandler *http.AuthHandler, listingHandler *http.ListingHandler) {
+func Register(app *fiber.App, db *gorm.DB, authHandler *http.AuthHandler, listingHandler *http.ListingHandler) {
 	// Global Middlewares
 	app.Use(helmet.New())
 	app.Use(cors.New(cors.Config{
@@ -86,7 +87,7 @@ func Register(app *fiber.App, authHandler *http.AuthHandler, listingHandler *htt
 	// ==========================================
 	// Buat sub-group dari authGroup, dan pasang middleware Protected() di sini.
 	// Semua route di bawah apiProtected otomatis membutuhkan autentikasi.
-	apiProtected := authGroup.Group("/", middleware.Protected())
+	apiProtected := authGroup.Group("/", middleware.Protected(db))
 	apiProtected.Get("/me", authHandler.GetMe)
 	apiProtected.Post("/logout", authHandler.Logout)
 	// ==========================================
@@ -100,7 +101,7 @@ func Register(app *fiber.App, authHandler *http.AuthHandler, listingHandler *htt
 	// ==========================================
 	// 4. Listing Routes (Protected)
 	// ==========================================
-	listingProtected := api.Group("/listings", middleware.Protected())
+	listingProtected := api.Group("/listings", middleware.Protected(db))
 	listingProtected.Post("/", listingHandler.Create)
 	listingProtected.Put("/:id", listingHandler.Update)
 	listingProtected.Delete("/:id", listingHandler.Delete)

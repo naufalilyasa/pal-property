@@ -32,6 +32,10 @@ func NewListingService(repo domain.ListingRepository) ListingService {
 }
 
 func (s *listingService) Create(ctx context.Context, userID uuid.UUID, req *request.CreateListingRequest) (*response.ListingResponse, error) {
+	if req.Title == "" || req.Price <= 0 || req.Status == "" {
+		return nil, domain.ErrInvalidCredential
+	}
+	// Generate unique slug
 	// Generate unique slug
 	listingSlug := slug.GenerateUnique(req.Title, func(candidate string) bool {
 		exists, _ := s.repo.ExistsBySlug(ctx, candidate)
@@ -73,6 +77,10 @@ func (s *listingService) GetByID(ctx context.Context, id uuid.UUID) (*response.L
 
 	// Increment view count atomically
 	_ = s.repo.IncrementViewCount(ctx, id)
+	listing.ViewCount++ // Update local object for response mapping
+
+	return s.mapToResponse(listing), nil
+	_ = s.repo.IncrementViewCount(ctx, id)
 
 	return s.mapToResponse(listing), nil
 }
@@ -84,6 +92,10 @@ func (s *listingService) GetBySlug(ctx context.Context, slugStr string) (*respon
 	}
 
 	// Increment view count atomically
+	_ = s.repo.IncrementViewCount(ctx, listing.ID)
+	listing.ViewCount++ // Update local object for response mapping
+
+	return s.mapToResponse(listing), nil
 	_ = s.repo.IncrementViewCount(ctx, listing.ID)
 
 	return s.mapToResponse(listing), nil

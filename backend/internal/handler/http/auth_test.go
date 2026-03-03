@@ -154,7 +154,7 @@ func (s *AuthHandlerTestSuite) SetupSuite() {
 	authGroup.Get("/oauth/:provider/callback", authHandler.Callback)
 	authGroup.Post("/refresh", authHandler.RefreshToken)
 
-	apiProtected := authGroup.Group("/", middleware.Protected())
+	apiProtected := authGroup.Group("/", middleware.Protected(s.db))
 	apiProtected.Get("/me", authHandler.GetMe)
 	apiProtected.Post("/logout", authHandler.Logout)
 }
@@ -366,6 +366,12 @@ func (s *AuthHandlerTestSuite) TestRefreshToken_Unauthorized() {
 
 func (s *AuthHandlerTestSuite) TestLogout_Success() {
 	userID, _ := uuid.NewV7()
+
+	// Insert user into DB so middleware.Protected can resolve it
+	testUser := entity.User{Email: "logout-success@test.com", Name: "Logout User", Role: "user"}
+	testUser.ID = userID
+	s.Require().NoError(s.db.Create(&testUser).Error)
+
 	accToken, refToken, jti, err := jwt.GenerateTokens(userID)
 	s.Require().NoError(err)
 
@@ -402,6 +408,12 @@ func (s *AuthHandlerTestSuite) TestLogout_Success() {
 
 func (s *AuthHandlerTestSuite) TestLogout_NoRefreshToken() {
 	userID, _ := uuid.NewV7()
+
+	// Insert user into DB so middleware.Protected can resolve it
+	testUser := entity.User{Email: "logout-notoken@test.com", Name: "Logout No Token", Role: "user"}
+	testUser.ID = userID
+	s.Require().NoError(s.db.Create(&testUser).Error)
+
 	accToken, _, _, err := jwt.GenerateTokens(userID)
 	s.Require().NoError(err)
 

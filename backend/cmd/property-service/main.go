@@ -106,7 +106,7 @@ func main() {
 		},
 	})
 
-	router.Register(app, authHandler, listingHandler)
+	router.Register(app, db, authHandler, listingHandler)
 
 	logger.Log.Info("Server starting", zap.String("port", config.Env.Port))
 	if err := app.Listen(fmt.Sprintf(":%s", config.Env.Port)); err != nil {

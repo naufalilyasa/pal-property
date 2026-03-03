@@ -1,0 +1,312 @@
+{
+    "info": {
+        "_postman_id": "eb0a0614-747d-419b-b467-36e6def09e0a",
+        "name": "PAL Property API",
+        "description": "Collection of API endpoints for the PAL Property Backend. Covers Authentication and Listing CRUD.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Authentication",
+            "description": "Endpoints governing user authentication and session management.",
+            "item": [
+                {
+                    "name": "1. Begin OAuth Login (Google)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/auth/oauth/google",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["auth", "oauth", "google"]
+                        },
+                        "description": "Redirects the user to the Google OAuth consent screen. Open this in your browser rather than Postman because it requires user interaction."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "2. OAuth Callback",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/auth/oauth/google/callback?state=xyz&code=abc",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["auth", "oauth", "google", "callback"],
+                            "query": [
+                                {
+                                    "key": "state",
+                                    "value": "xyz",
+                                    "description": "OAuth state parameter"
+                                },
+                                {
+                                    "key": "code",
+                                    "value": "abc",
+                                    "description": "OAuth authorization code"
+                                }
+                            ]
+                        },
+                        "description": "Google redirects back to this endpoint after the user consents. Returns HTTP-only cookies (access_token and refresh_token)."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "3. Get Profile (Me)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/auth/me",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["auth", "me"]
+                        },
+                        "description": "Fetches the current user's profile. Requires a valid access_token HTTP-only cookie."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "4. Refresh Token",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/auth/refresh",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["auth", "refresh"]
+                        },
+                        "description": "Rotates the access and refresh tokens. Requires a valid refresh_token HTTP-only cookie."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "5. Logout",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/auth/logout",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["auth", "logout"]
+                        },
+                        "description": "Logs the user out by invalidating the refresh session in Redis and clearing both HTTP-only cookies."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Listings",
+            "description": "CRUD endpoints for property listings. Create/Update/Delete require a valid access_token cookie. List and Get are public.",
+            "item": [
+                {
+                    "name": "1. List Listings (Public)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/listings?page=1&limit=10",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "listings"],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1",
+                                    "description": "Page number (default: 1)"
+                                },
+                                {
+                                    "key": "limit",
+                                    "value": "10",
+                                    "description": "Items per page (default: 10, max: 100)"
+                                },
+                                {
+                                    "key": "status",
+                                    "value": "active",
+                                    "description": "Filter by status: active | inactive | sold",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "city",
+                                    "value": "Jakarta",
+                                    "description": "Filter by city name (case-insensitive partial match)",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "category_id",
+                                    "value": "{{categoryId}}",
+                                    "description": "Filter by category UUID",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "price_min",
+                                    "value": "500000000",
+                                    "description": "Minimum price in IDR (int64)",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "price_max",
+                                    "value": "2000000000",
+                                    "description": "Maximum price in IDR (int64)",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "Returns a paginated list of listings. Supports filtering by status, city, category_id, price_min, price_max. Public endpoint — no auth required."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "2. Get Listing by ID (Public)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/listings/{{listingId}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "listings", "{{listingId}}"]
+                        },
+                        "description": "Fetch a single listing by its UUID. Also increments the view_count asynchronously. Returns 404 if not found."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "3. Get Listing by Slug (Public)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/listings/slug/{{listingSlug}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "listings", "slug", "{{listingSlug}}"]
+                        },
+                        "description": "Fetch a single listing by its URL-friendly slug. Also increments the view_count asynchronously. Returns 404 if not found."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "4. Create Listing (Auth)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"title\": \"Rumah Minimalis 3 Kamar di Depok\",\n  \"description\": \"Rumah dengan desain modern minimalis, 3 kamar tidur, 2 kamar mandi, dekat tol.\",\n  \"price\": 850000000,\n  \"status\": \"active\",\n  \"location_city\": \"Depok\",\n  \"location_district\": \"Beji\",\n  \"address_detail\": \"Jl. Margonda Raya No. 123\",\n  \"category_id\": null,\n  \"specifications\": {\n    \"bedrooms\": 3,\n    \"bathrooms\": 2,\n    \"land_area_sqm\": 120,\n    \"building_area_sqm\": 90\n  }\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/listings/",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "listings", ""]
+                        },
+                        "description": "Create a new property listing. Requires access_token cookie. Slug is auto-generated from the title. Price is in IDR (int64, must be > 0). Status: active | inactive | sold."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "5. Update Listing (Auth — Owner or Admin)",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"title\": \"Rumah Minimalis 3 Kamar di Depok - Updated\",\n  \"price\": 900000000,\n  \"status\": \"active\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/listings/{{listingId}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "listings", "{{listingId}}"]
+                        },
+                        "description": "Partially update a listing. Only provided fields are updated (PATCH semantics despite PUT method). Only the listing owner or an admin can update. Returns 403 Forbidden for non-owners."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "6. Delete Listing (Auth — Owner or Admin)",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/listings/{{listingId}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "listings", "{{listingId}}"]
+                        },
+                        "description": "Soft-delete a listing (sets deleted_at). Only the listing owner or an admin can delete. Returns 403 Forbidden for non-owners."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "7. My Listings (Auth)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/auth/me/listings?page=1&limit=10",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["auth", "me", "listings"],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1"
+                                },
+                                {
+                                    "key": "limit",
+                                    "value": "10"
+                                },
+                                {
+                                    "key": "status",
+                                    "value": "active",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "Returns a paginated list of listings belonging to the currently authenticated user. Requires access_token cookie."
+                    },
+                    "response": []
+                }
+            ]
+        }
+    ],
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:8080",
+            "type": "string"
+        },
+        {
+            "key": "listingId",
+            "value": "",
+            "type": "string",
+            "description": "UUID of the listing — copy from Create response"
+        },
+        {
+            "key": "listingSlug",
+            "value": "",
+            "type": "string",
+            "description": "Slug of the listing — copy from Create response"
+        },
+        {
+            "key": "categoryId",
+            "value": "",
+            "type": "string",
+            "description": "UUID of the category — available after Category Management is implemented"
+        }
+    ]
+}
