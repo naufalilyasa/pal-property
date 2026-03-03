@@ -303,26 +303,26 @@ ALTER TABLE listings ALTER COLUMN price TYPE DECIMAL(18,2) USING price::DECIMAL(
 
 ## Final Verification Wave
 
-- [ ] `go get github.com/gosimple/slug` added to go.mod
-- [ ] Migration 000003 applies cleanly (`go run ./cmd/migrate/main.go`)
-- [ ] `domain.ErrForbidden` maps to HTTP 403 in global error handler
-- [ ] `go build ./...` exits 0
-- [ ] `go vet ./...` exits 0
-- [ ] `go test ./...` exits 0 (no regressions on auth tests)
-- [ ] POST /api/v1/listings (no auth) → 401
-- [ ] POST /api/v1/listings (auth) → 201, slug auto-generated
-- [ ] Two listings with same title get different slugs
-- [ ] GET /api/v1/listings/slug/x registered before GET /api/v1/listings/:id
-- [ ] GET /api/v1/listings/:id increments view_count atomically
-- [ ] GET /api/v1/listings?price_min=X&price_max=Y → all results in range
-- [ ] GET /api/v1/listings?location_city=jakarta → ILIKE match
-- [ ] PUT /api/v1/listings/:id by owner → 200
-- [ ] PUT /api/v1/listings/:id by other user → 403
-- [ ] PUT /api/v1/listings/:id by admin → 200
-- [ ] PUT with `{"is_featured":true}` by owner → is_featured unchanged
-- [ ] DELETE /api/v1/listings/:id → 200, subsequent GET → 404
-- [ ] GET /api/v1/listings/:id with invalid UUID → 400
-- [ ] GET /api/v1/me/listings → only authenticated user's listings
+- [x] `go get github.com/gosimple/slug` added to go.mod
+- [x] Migration 000003 applies cleanly (`go run ./cmd/migrate/main.go`)
+- [x] `domain.ErrForbidden` maps to HTTP 403 in global error handler
+- [x] `go build ./...` exits 0
+- [x] `go vet ./...` exits 0
+- [x] `go test ./...` exits 0 (no regressions on auth tests)
+- [x] POST /api/v1/listings (no auth) → 401
+- [x] POST /api/v1/listings (auth) → 201, slug auto-generated
+- [x] Two listings with same title get different slugs
+- [x] GET /api/v1/listings/slug/x registered before GET /api/v1/listings/:id
+- [x] GET /api/v1/listings/:id increments view_count atomically
+- [x] GET /api/v1/listings?price_min=X&price_max=Y → all results in range
+- [x] GET /api/v1/listings?location_city=jakarta → ILIKE match
+- [x] PUT /api/v1/listings/:id by owner → 200
+- [x] PUT /api/v1/listings/:id by other user → 403
+- [x] PUT /api/v1/listings/:id by admin → 200
+- [x] PUT with `{"is_featured":true}` by owner → is_featured unchanged
+- [x] DELETE /api/v1/listings/:id → 200, subsequent GET → 404
+- [x] GET /api/v1/listings/:id with invalid UUID → 400
+- [x] GET /api/v1/me/listings → only authenticated user's listings
 
 ---
 
