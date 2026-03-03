@@ -341,6 +341,6 @@ ALTER TABLE listings ALTER COLUMN price TYPE DECIMAL(18,2) USING price::DECIMAL(
 - [x] **T11** — Create `internal/handler/http/listing.go` with `ListingHandler` (7 methods)
 - [x] **T12** — Update `internal/router/router.go`: update `Register()` signature, add listing routes (slug before :id)
 - [x] **T13** — Update `cmd/property-service/main.go`: wire `listingRepo`, `listingSvc`, `listingHandler`
-- [ ] **T14** — Run migration: `go run ./cmd/migrate/main.go` — verify exits 0
-- [ ] **T15** — `go build ./... && go vet ./...` — verify exits 0
-- [ ] **T16** — `go test ./... -count=1` — verify all pass (no regressions)
+- [x] **T14** — Run migration: `go run ./cmd/migrate/main.go` — verify exits 0
+- [x] **T15** — `go build ./... && go vet ./...` — verify exits 0
+- [x] **T16** — `go test ./... -count=1` — verify all pass (no regressions)
