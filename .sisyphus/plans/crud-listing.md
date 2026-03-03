@@ -335,7 +335,7 @@ ALTER TABLE listings ALTER COLUMN price TYPE DECIMAL(18,2) USING price::DECIMAL(
 - [x] **T05** — Create `internal/dto/request/listing_request.go` with `CreateListingRequest`, `UpdateListingRequest`, `Specifications` struct
 - [x] **T06** — Create `internal/dto/response/listing_response.go` with `ListingResponse` and `PaginatedListings`
 - [x] **T07** — Generate mock: `mockery --name=ListingRepository --dir=internal/domain --output=internal/domain/mocks --outpkg=mocks`
-- [ ] **T08** — Create `internal/repository/postgres/listing.go` implementing `ListingRepository` (all 8 methods). Follow auth.go error translation pattern exactly.
+- [x] **T08** — Create `internal/repository/postgres/listing.go` implementing `ListingRepository` (all 8 methods). Follow auth.go error translation pattern exactly.
 - [ ] **T09** — Create `internal/service/listing_service.go` with `ListingService` interface + `listingService` struct. No gorm import. Owner check with admin bypass.
 - [ ] **T10** — Check global error handler in `router.go` — verify/add `ErrForbidden → 403` mapping
 - [ ] **T11** — Create `internal/handler/http/listing.go` with `ListingHandler` (7 methods)
