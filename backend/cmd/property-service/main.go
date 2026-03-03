@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"errors"
 	"log"
 
 	"github.com/bytedance/sonic"
@@ -9,6 +10,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/providers/google"
+	"github.com/naufalilyasa/pal-property-backend/internal/domain"
 	handler "github.com/naufalilyasa/pal-property-backend/internal/handler/http"
 	"github.com/naufalilyasa/pal-property-backend/internal/repository/postgres"
 	"github.com/naufalilyasa/pal-property-backend/internal/repository/redis"
@@ -66,11 +68,24 @@ func main() {
 	authService := service.NewAuthService(authRepo, cacheRepo)
 	authHandler := handler.NewAuthHandler(authService)
 
+	listingRepo := postgres.NewListingRepository(db)
+	listingService := service.NewListingService(listingRepo)
+	listingHandler := handler.NewListingHandler(listingService)
+
 	app := fiber.New(fiber.Config{
 		JSONEncoder: sonic.Marshal,
 		JSONDecoder: sonic.Unmarshal,
 		ErrorHandler: func(c fiber.Ctx, err error) error {
 			code := fiber.StatusInternalServerError
+			if errors.Is(err, domain.ErrNotFound) {
+				code = fiber.StatusNotFound
+			} else if errors.Is(err, domain.ErrForbidden) {
+				code = fiber.StatusForbidden
+			} else if errors.Is(err, domain.ErrUnauthorized) {
+				code = fiber.StatusUnauthorized
+			} else if errors.Is(err, domain.ErrConflict) {
+				code = fiber.StatusConflict
+			}
 			if e, ok := err.(*fiber.Error); ok {
 				code = e.Code
 			}
@@ -91,7 +106,7 @@ func main() {
 		},
 	})
 
-	router.Register(app, authHandler)
+	router.Register(app, authHandler, listingHandler)
 
 	logger.Log.Info("Server starting", zap.String("port", config.Env.Port))
 	if err := app.Listen(fmt.Sprintf(":%s", config.Env.Port)); err != nil {

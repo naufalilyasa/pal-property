@@ -36,7 +36,7 @@ func ZapLogger() fiber.Handler {
 	}
 }
 
-func Register(app *fiber.App, authHandler *http.AuthHandler) {
+func Register(app *fiber.App, authHandler *http.AuthHandler, listingHandler *http.ListingHandler) {
 	// Global Middlewares
 	app.Use(helmet.New())
 	app.Use(cors.New(cors.Config{
@@ -89,4 +89,21 @@ func Register(app *fiber.App, authHandler *http.AuthHandler) {
 	apiProtected := authGroup.Group("/", middleware.Protected())
 	apiProtected.Get("/me", authHandler.GetMe)
 	apiProtected.Post("/logout", authHandler.Logout)
+	// ==========================================
+	// 3. Listing Routes (Public)
+	// ==========================================
+	api := app.Group("/api")
+	api.Get("/listings", listingHandler.List)
+	api.Get("/listings/slug/:slug", listingHandler.GetBySlug)
+	api.Get("/listings/:id", listingHandler.GetByID)
+
+	// ==========================================
+	// 4. Listing Routes (Protected)
+	// ==========================================
+	listingProtected := api.Group("/listings", middleware.Protected())
+	listingProtected.Post("/", listingHandler.Create)
+	listingProtected.Put("/:id", listingHandler.Update)
+	listingProtected.Delete("/:id", listingHandler.Delete)
+
+	apiProtected.Get("/me/listings", listingHandler.ListByUserID)
 }

@@ -337,10 +337,10 @@ ALTER TABLE listings ALTER COLUMN price TYPE DECIMAL(18,2) USING price::DECIMAL(
 - [x] **T07** — Generate mock: `mockery --name=ListingRepository --dir=internal/domain --output=internal/domain/mocks --outpkg=mocks`
 - [x] **T08** — Create `internal/repository/postgres/listing.go` implementing `ListingRepository` (all 8 methods). Follow auth.go error translation pattern exactly.
 - [x] **T09** — Create `internal/service/listing_service.go` with `ListingService` interface + `listingService` struct. No gorm import. Owner check with admin bypass.
-- [ ] **T10** — Check global error handler in `router.go` — verify/add `ErrForbidden → 403` mapping
-- [ ] **T11** — Create `internal/handler/http/listing.go` with `ListingHandler` (7 methods)
-- [ ] **T12** — Update `internal/router/router.go`: update `Register()` signature, add listing routes (slug before :id)
-- [ ] **T13** — Update `cmd/property-service/main.go`: wire `listingRepo`, `listingSvc`, `listingHandler`
+- [x] **T10** — Check global error handler in `router.go` — verify/add `ErrForbidden → 403` mapping
+- [x] **T11** — Create `internal/handler/http/listing.go` with `ListingHandler` (7 methods)
+- [x] **T12** — Update `internal/router/router.go`: update `Register()` signature, add listing routes (slug before :id)
+- [x] **T13** — Update `cmd/property-service/main.go`: wire `listingRepo`, `listingSvc`, `listingHandler`
 - [ ] **T14** — Run migration: `go run ./cmd/migrate/main.go` — verify exits 0
 - [ ] **T15** — `go build ./... && go vet ./...` — verify exits 0
 - [ ] **T16** — `go test ./... -count=1` — verify all pass (no regressions)
