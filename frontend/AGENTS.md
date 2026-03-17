@@ -2,40 +2,48 @@
 
 ## OVERVIEW
 
-Next.js 16 + React 19 + Tailwind v4, TypeScript 5. App Router. Bare scaffold — no features implemented yet.
+Next.js 16 + React 19 + Tailwind v4 + TypeScript app-router project. It is still default scaffold content, not the real property product UI yet.
 
 ## STRUCTURE
 
 ```
 frontend/
-├── app/              # Next.js App Router pages
-│   ├── layout.tsx    # Root layout
-│   ├── page.tsx      # Home page
-│   └── globals.css   # Global styles (Tailwind v4 @import)
-├── public/           # Static assets
-├── next.config.ts    # Next.js config
-├── tsconfig.json     # Strict TS
-└── eslint.config.mjs # ESLint 9 flat config
+├── app/
+│   ├── layout.tsx      # root layout + default metadata/fonts
+│   ├── page.tsx        # create-next-app landing page
+│   └── globals.css     # Tailwind v4 import + global theme vars
+├── public/             # static assets
+├── next.config.ts      # stock Next config
+├── tsconfig.json       # strict TS + @/* path alias
+├── eslint.config.mjs   # Next core-web-vitals + TS rules
+└── package.json        # npm scripts and dependencies
 ```
+
+## CURRENT REALITY
+
+- `app/page.tsx` is still the default create-next-app screen.
+- `app/layout.tsx` still uses default `Create Next App` metadata and Geist fonts.
+- No data-fetching library, state library, API client layer, or tests are installed.
+- Backend auth is cookie-based, so future frontend API calls should use credentialed requests.
 
 ## CONVENTIONS
 
-- **Tailwind v4**: configured via `@import "tailwindcss"` in CSS (no `tailwind.config.js`)
-- **App Router only**: no `pages/` directory
-- **Server Components by default**: add `"use client"` only when needed
-- **API communication**: backend at `http://localhost:8080`, auth via httpOnly cookies (no localStorage tokens)
-
-## NOTES
-
-- No state management library installed yet — use React 19 native patterns first
-- No data fetching library yet — consider TanStack Query when implementing features
-- `NEXT_PUBLIC_API_URL` env var pattern expected for backend URL
-- Auth cookies are set by backend — frontend just needs to make credentialed requests: `fetch(url, { credentials: "include" })`
+- App Router only; no `pages/` directory.
+- Server Components by default; add `"use client"` only when needed.
+- Tailwind v4 is configured via `@import "tailwindcss"` in CSS.
+- TypeScript is strict, with path alias `@/*` mapped to the frontend root.
 
 ## COMMANDS
 
 ```bash
-cd frontend && npm run dev    # dev server (port 3000)
-cd frontend && npm run build  # production build
-cd frontend && npm run lint   # ESLint
+cd frontend && npm run dev
+cd frontend && npm run build
+cd frontend && npm run start
+cd frontend && npm run lint
 ```
+
+## ANTI-PATTERNS
+
+- **NEVER** describe the frontend as feature-complete; it is still scaffold-level.
+- **NEVER** store auth tokens in localStorage; backend is designed for httpOnly cookies.
+- **NEVER** invent a frontend state/query stack in docs unless it is actually installed.
