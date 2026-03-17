@@ -12,4 +12,8 @@ var (
 	ErrInvalidCredential = errors.New("invalid credentials")
 	ErrUnauthorized      = errors.New("unauthorized")
 	ErrForbidden         = errors.New("forbidden")
+	ErrInvalidImageFile  = errors.New("invalid image file")
+	ErrImageLimitReached = errors.New("listing image limit reached")
+	ErrImageOrderInvalid = errors.New("invalid listing image order")
+	ErrImageStorageUnset = errors.New("listing image storage is not configured")
 )
