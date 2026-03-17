@@ -2,64 +2,43 @@
 
 ## OVERVIEW
 
-Core contracts of the application. Defines what exists (entities), what's possible (interfaces), and what can go wrong (errors). Everything else depends on this package — it depends on nothing internal.
+Core contracts for the backend: entities, repository/storage interfaces, filters, and sentinel errors.
 
 ## FILES
 
 | File | Purpose |
 |------|---------|
-| `errors.go` | 5 sentinel errors for all layers |
-| `repository.go` | `AuthRepository` interface |
-| `cache_repository.go` | `CacheRepository` interface |
-| `entity/` | GORM-tagged structs |
-| `mocks/` | testify/mock generated implementations |
+| `errors.go` | Shared sentinel errors, including listing-image errors |
+| `listing_repository.go` | listing + listing image persistence contract (`ListingRepository`) |
+| `listing_image_storage.go` | provider-agnostic listing image storage port (`ListingImageStorage`) using `pkg/mediaasset` types |
+| `category_repository.go` | category repository contract |
+| `repository.go` | auth repository contract (`AuthRepository`) |
+| `cache_repository.go` | refresh-token cache contract |
+| `entity/` | GORM-tagged entity structs |
+| `mocks/` | generated test doubles |
 
 ## SENTINEL ERRORS
 
-```go
-var (
-    ErrNotFound          = errors.New("not found")
-    ErrConflict          = errors.New("conflict")
-    ErrInvalidCredential = errors.New("invalid credential")
-    ErrUnauthorized      = errors.New("unauthorized")
-    ErrForbidden         = errors.New("forbidden")
-)
-```
+- `ErrNotFound`
+- `ErrConflict`
+- `ErrInvalidCredential`
+- `ErrUnauthorized`
+- `ErrForbidden`
+- `ErrInvalidImageFile`
+- `ErrImageLimitReached`
+- `ErrImageOrderInvalid`
+- `ErrImageStorageUnset`
 
-Map these to HTTP in the global error handler (`router.go`), NOT in handlers.
+Map these in the global Fiber error handler, not in handlers.
 
-## ENTITY CONVENTIONS
+## ENTITY + CONTRACT RULES
 
-**BaseEntity** (embed in all entities):
-```go
-type BaseEntity struct {
-    ID        uuid.UUID      `gorm:"type:uuid;primaryKey"`
-    CreatedAt time.Time
-    UpdatedAt time.Time
-    DeletedAt gorm.DeletedAt `gorm:"index"`
-}
-// BeforeCreate auto-assigns uuid.NewV7()
-```
-
-**Rules**:
-- Price/money fields → `int64` (IDR rupiah, no decimals)
-- Nullable fields → pointer types (`*string`, `*uuid.UUID`)
-- JSON columns → `datatypes.JSON` (from `gorm.io/datatypes`) — NOT `pgtype.JSONB`
-- Sensitive fields (OAuth tokens) → stored encrypted, tagged `json:"-"` on raw value
-
-## ADDING A NEW REPOSITORY INTERFACE
-
-```go
-// In repository.go — add to existing file or create new domain file
-type ListingRepository interface {
-    Create(ctx context.Context, listing *entity.Listing) (*entity.Listing, error)
-    FindByID(ctx context.Context, id uuid.UUID) (*entity.Listing, error)
-    // ...
-}
-```
+- Price fields stay `int64`.
+- Optional DB fields use pointer types.
+- `Listing.Images` projections should reflect active, ordered rows only.
+- Domain storage ports stay provider-agnostic; Cloudinary details belong in `pkg/`, not here.
 
 ## ANTI-PATTERNS
 
-- **NEVER** import any internal package here (no service, no handler, no pkg)
-- **NEVER** import `gorm.io/gorm` here (except inside `entity/` structs for tags)
-- **NEVER** add HTTP or DB logic here — interfaces only
+- **NEVER** import non-domain `internal/` packages here; domain contracts may reference `internal/domain/entity` when the interface shape requires entities.
+- **NEVER** add HTTP or provider-specific logic here.

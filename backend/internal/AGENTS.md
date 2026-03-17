@@ -2,61 +2,38 @@
 
 ## OVERVIEW
 
-All domain-specific Go code. Strictly private to the backend module. Seven packages with hard layer boundaries.
+Private application code for the backend module. Layer boundaries are strict, but listing images add one more domain port (`ListingImageStorage`) alongside the repository contracts.
 
 ## PACKAGES
 
-| Package | Role | Key Files |
-|---------|------|-----------|
-| `domain/` | Contracts + entities + errors | `repository.go`, `cache_repository.go`, `errors.go`, `entity/` |
-| `handler/http/` | Fiber HTTP handlers | One file per domain (e.g., `auth.go`) |
-| `service/` | Business logic | One file per domain + `_test.go` |
-| `repository/postgres/` | GORM implementations | One file per domain |
-| `repository/redis/` | Redis cache impl | `cache.go` |
-| `router/` | Route + middleware registration | `router.go` |
-| `dto/` | Request/response structs | `request/` + `response/` |
-| `middleware/` | Custom Fiber middleware | (currently empty) |
+| Package | Role | Notes |
+|---------|------|-------|
+| `domain/` | Contracts, entities, errors | includes `listing_repository.go` and `listing_image_storage.go` (uses provider-agnostic `pkg/mediaasset` types at the port boundary) |
+| `handler/http/` | Fiber transport | JSON + multipart parsing, auth locals, response writing |
+| `service/` | Business logic | listings, categories, auth, image orchestration |
+| `repository/postgres/` | GORM persistence | listings, categories, auth, listing_images |
+| `repository/redis/` | Refresh-token cache | auth/session support |
+| `router/` | Route registration | public + protected routes |
+| `dto/` | Request/response payloads | includes listing-image reorder DTOs |
 
-## STRICT RULES
+## IMPORT GRAPH
 
-**Import graph** (violations are bugs, not style):
-```
-handler → service (via interface)
-service → domain interfaces only (NO gorm, NO redis)
-repository → domain interfaces + gorm/redis
-domain → stdlib only
+```text
+handler -> service (interfaces)
+service -> domain interfaces/entities + selected pkg helpers
+repository -> domain interfaces/entities + gorm/redis
+domain -> entities/contracts/errors; may use provider-agnostic shared pkg types only through domain ports (for example `pkg/mediaasset` in `listing_image_storage.go`), and must never depend on concrete provider implementations
 ```
 
-**Error translation** (mandatory in every repository method):
-```go
-if errors.Is(err, gorm.ErrRecordNotFound) {
-    return nil, domain.ErrNotFound
-}
-```
+## CURRENT CONVENTIONS
 
-**Service error checking**:
-```go
-if errors.Is(err, domain.ErrNotFound) { ... }  // CORRECT
-if errors.Is(err, gorm.ErrRecordNotFound) { ... }  // FORBIDDEN in service
-```
+- Handlers extract auth state from `c.Locals(...)` and pass `c.Context()` downstream.
+- Listing-image upload stays in the handler layer only for multipart extraction via `c.FormFile("file")`.
+- Services enforce ownership and image ordering rules.
+- Repositories own transactional image mutations and read projections.
 
-## MOCK GENERATION
+## ANTI-PATTERNS
 
-Mocks live in `domain/mocks/`. Generated via mockery v2:
-```bash
-mockery --name=AuthRepository --dir=internal/domain --output=internal/domain/mocks
-```
-
-## ADDING NEW HANDLER
-
-```go
-type ListingHandler struct { svc service.ListingService }
-
-func (h *ListingHandler) Create(c fiber.Ctx) error {
-    var req dto.CreateListingRequest
-    if err := c.Bind().JSON(&req); err != nil { return err }
-    // call service, return response
-}
-```
-- Extract user ID from `c.Locals("user_id").(uuid.UUID)`
-- Never return raw errors — map to HTTP status + message
+- **NEVER** call repositories from handlers.
+- **NEVER** import `gorm.io/gorm` in services for error handling.
+- **NEVER** let domain-layer contracts depend on concrete Cloudinary code.

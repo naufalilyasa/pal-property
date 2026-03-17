@@ -2,57 +2,24 @@
 
 ## OVERVIEW
 
-Fiber v3 HTTP handlers. Thin layer — validate input, call service, return response. No business logic.
-
-## PATTERN
-
-```go
-type AuthHandler struct {
-    svc service.AuthService  // interface, not concrete
-}
-
-func NewAuthHandler(svc service.AuthService) *AuthHandler {
-    return &AuthHandler{svc: svc}
-}
-
-func (h *AuthHandler) GetMe(c fiber.Ctx) error {
-    userID := c.Locals("user_id").(uuid.UUID)
-    user, err := h.svc.GetMe(c.Context(), userID)
-    if err != nil {
-        return err  // global error handler maps domain errors → HTTP status
-    }
-    return c.JSON(fiber.Map{"success": true, "data": user})
-}
-```
+Fiber v3 HTTP handlers. Thin transport only: parse params/body/files, read auth locals, call the service, return the shared response envelope.
 
 ## CONVENTIONS
 
-- **Extract user ID**: `c.Locals("user_id").(uuid.UUID)` — set by `middleware.Protected()`
-- **Return errors**: `return err` — global error handler in `router.go` maps `domain.Err*` → HTTP codes
-- **Cookies**: set via `c.Cookie(&fiber.Cookie{Name: "access_token", HTTPOnly: true, SameSite: "Lax", Secure: isProduction})`
-- **Bind JSON**: `c.Bind().JSON(&req)` (Fiber v3 binder API)
-- **OAuth bridge**: `adaptor.HTTPHandlerFunc(gothic.BeginAuthHandler)` wraps net/http handlers for Fiber
-
-## RESPONSE SHAPE
-
-Success:
-```json
-{"success": true, "data": {...}}
-```
-Error (via global handler):
-```json
-{"success": false, "message": "...", "data": null, "trace_id": "uuid"}
-```
+- Extract auth state from `c.Locals("user_id")` and `c.Locals("user_role")`.
+- Pass `c.Context()` into services.
+- Bind JSON with `c.Bind().JSON(&req)`.
+- For listing-image upload, read multipart input with `c.FormFile("file")` and delegate all validation/storage behavior to `ListingService.UploadImage`.
+- Return domain errors directly so the global Fiber error handler can map them.
 
 ## TEST PATTERN
 
-- Suite: `type AuthHandlerSuite struct { suite.Suite }`
-- Uses `testcontainers-go` for real Postgres + Redis
-- Config injected via `config.Env = config.AppConfig{...}` in `SetupSuite()`
-- Run: `go test ./internal/handler/http/... -run TestAuthHandlerSuite -v`
+- `testify/suite` + testcontainers Postgres.
+- Manual route registration in tests is acceptable when the suite only needs one handler family.
+- Listing image coverage should use fake storage instead of live Cloudinary.
 
 ## ANTI-PATTERNS
 
-- **NEVER** call repository directly from handler
-- **NEVER** put `if/else` business logic here — delegate to service
-- **NEVER** construct domain entities here — use DTOs
+- **NEVER** call repositories directly.
+- **NEVER** put ownership or reorder business rules here.
+- **NEVER** stream files to Cloudinary directly from handlers.
