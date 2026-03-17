@@ -2,7 +2,7 @@
     "info": {
         "_postman_id": "eb0a0614-747d-419b-b467-36e6def09e0a",
         "name": "PAL Property API",
-        "description": "Collection of API endpoints for the PAL Property Backend. Covers Authentication and Listing CRUD.",
+        "description": "Collection of API endpoints for the PAL Property Backend. Covers Authentication, Categories, Listing CRUD, and Cloudinary-backed listing image management.",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "item": [
@@ -366,6 +366,87 @@
                         "description": "Returns a paginated list of listings belonging to the currently authenticated user. Requires access_token cookie."
                     },
                     "response": []
+                },
+                {
+                    "name": "8. Upload Listing Image (Auth — Owner or Admin)",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "file",
+                                    "type": "file",
+                                    "src": "",
+                                    "description": "Image file field name must be `file`. Accepts typical image extensions/content types and stores metadata from Cloudinary in the returned `images` array."
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/listings/{{listingId}}/images",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "listings", "{{listingId}}", "images"]
+                        },
+                        "description": "Upload one image to a listing. Requires access_token cookie and listing ownership (admin bypasses ownership). Response returns the full listing projection with ordered `images` including Cloudinary delivery URL, dimensions, bytes, format, original_filename, primary flag, and sort_order."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "9. Delete Listing Image (Auth — Owner or Admin)",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/listings/{{listingId}}/images/{{listingImageId}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "listings", "{{listingId}}", "images", "{{listingImageId}}"]
+                        },
+                        "description": "Soft-delete one active listing image and remove its Cloudinary asset. If the deleted image was primary, the next ordered image becomes primary automatically. Returns the full listing projection with the updated `images` array."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "10. Set Primary Listing Image (Auth — Owner or Admin)",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/listings/{{listingId}}/images/{{listingImageId}}/primary",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "listings", "{{listingId}}", "images", "{{listingImageId}}", "primary"]
+                        },
+                        "description": "Patch the selected active image into the primary slot without changing the current sort order. Requires access_token cookie plus ownership (admin bypass). Returns the full listing projection so you can verify `images[].is_primary`."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "11. Reorder Listing Images (Auth — Owner or Admin)",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"ordered_image_ids\": [\n    \"{{listingImageId}}\",\n    \"11111111-0000-7000-8000-000000000002\",\n    \"11111111-0000-7000-8000-000000000003\"\n  ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/listings/{{listingId}}/images/reorder",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "listings", "{{listingId}}", "images", "reorder"]
+                        },
+                        "description": "Patch the active image ordering for a listing. `ordered_image_ids` must contain every active image ID exactly once. Requires access_token cookie plus ownership (admin bypass). Response returns the full listing projection with normalized `sort_order` values starting at 0."
+                    },
+                    "response": []
                 }
             ]
         }
@@ -389,10 +470,16 @@
             "description": "Slug of the listing — copy from Create response"
         },
         {
+            "key": "listingImageId",
+            "value": "",
+            "type": "string",
+            "description": "UUID of a listing image — copy from any listing response `images[].id` value"
+        },
+        {
             "key": "categoryId",
             "value": "",
             "type": "string",
-            "description": "UUID of the category — available after Category Management is implemented"
+            "description": "UUID of the category — copy from Create Category or Get Category responses"
         },
         {
             "key": "categorySlug",
