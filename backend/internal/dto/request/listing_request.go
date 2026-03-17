@@ -32,3 +32,7 @@ type UpdateListingRequest struct {
 	Status           *string         `json:"status" validate:"omitempty,oneof=active inactive sold"`
 	Specifications   *Specifications `json:"specifications"`
 }
+
+type ReorderListingImagesRequest struct {
+	OrderedImageIDs []uuid.UUID `json:"ordered_image_ids"`
+}

@@ -119,6 +119,102 @@ func (h *ListingHandler) Delete(c fiber.Ctx) error {
 	return utils.SendResponse(c, fiber.StatusOK, fiber.Map{"message": "listing deleted successfully"})
 }
 
+func (h *ListingHandler) UploadImage(c fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid listing id")
+	}
+
+	userID, ok := c.Locals("user_id").(uuid.UUID)
+	if !ok {
+		return fiber.NewError(fiber.StatusUnauthorized, "unauthorized")
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "file is required")
+	}
+
+	res, err := h.svc.UploadImage(c.Context(), id, userID, h.userRole(c), file)
+	if err != nil {
+		return err
+	}
+
+	return utils.SendResponse(c, fiber.StatusOK, res)
+}
+
+func (h *ListingHandler) DeleteImage(c fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid listing id")
+	}
+
+	imageID, err := uuid.Parse(c.Params("imageId"))
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid image id")
+	}
+
+	userID, ok := c.Locals("user_id").(uuid.UUID)
+	if !ok {
+		return fiber.NewError(fiber.StatusUnauthorized, "unauthorized")
+	}
+
+	res, err := h.svc.DeleteImage(c.Context(), id, imageID, userID, h.userRole(c))
+	if err != nil {
+		return err
+	}
+
+	return utils.SendResponse(c, fiber.StatusOK, res)
+}
+
+func (h *ListingHandler) SetPrimaryImage(c fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid listing id")
+	}
+
+	imageID, err := uuid.Parse(c.Params("imageId"))
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid image id")
+	}
+
+	userID, ok := c.Locals("user_id").(uuid.UUID)
+	if !ok {
+		return fiber.NewError(fiber.StatusUnauthorized, "unauthorized")
+	}
+
+	res, err := h.svc.SetPrimaryImage(c.Context(), id, imageID, userID, h.userRole(c))
+	if err != nil {
+		return err
+	}
+
+	return utils.SendResponse(c, fiber.StatusOK, res)
+}
+
+func (h *ListingHandler) ReorderImages(c fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid listing id")
+	}
+
+	userID, ok := c.Locals("user_id").(uuid.UUID)
+	if !ok {
+		return fiber.NewError(fiber.StatusUnauthorized, "unauthorized")
+	}
+
+	var req request.ReorderListingImagesRequest
+	if err := c.Bind().JSON(&req); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid request body: "+err.Error())
+	}
+
+	res, err := h.svc.ReorderImages(c.Context(), id, userID, h.userRole(c), req.OrderedImageIDs)
+	if err != nil {
+		return err
+	}
+
+	return utils.SendResponse(c, fiber.StatusOK, res)
+}
+
 func (h *ListingHandler) List(c fiber.Ctx) error {
 	filter := h.parseFilter(c)
 	res, err := h.svc.List(c.Context(), filter)
@@ -142,6 +238,15 @@ func (h *ListingHandler) ListByUserID(c fiber.Ctx) error {
 	}
 
 	return utils.SendResponse(c, fiber.StatusOK, res)
+}
+
+func (h *ListingHandler) userRole(c fiber.Ctx) string {
+	userRole := "user"
+	if role, ok := c.Locals("user_role").(string); ok {
+		userRole = role
+	}
+
+	return userRole
 }
 
 func (h *ListingHandler) parseFilter(c fiber.Ctx) domain.ListingFilter {

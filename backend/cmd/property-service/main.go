@@ -1,8 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"errors"
+	"fmt"
 	"log"
 
 	"github.com/bytedance/sonic"
@@ -16,6 +16,7 @@ import (
 	"github.com/naufalilyasa/pal-property-backend/internal/repository/redis"
 	"github.com/naufalilyasa/pal-property-backend/internal/router"
 	"github.com/naufalilyasa/pal-property-backend/internal/service"
+	"github.com/naufalilyasa/pal-property-backend/pkg/cloudinary"
 	"github.com/naufalilyasa/pal-property-backend/pkg/config"
 	"github.com/naufalilyasa/pal-property-backend/pkg/logger"
 	goRedis "github.com/redis/go-redis/v9"
@@ -29,14 +30,6 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 	logger.InitLogger()
-
-	loggerDev, _ := zap.NewDevelopment()
-	defer loggerDev.Sync()
-	sugar := loggerDev.Sugar()
-
-	sugar.Infow("Pemeriksaan Konfigurasi Environment",
-		"jwtprivatekeybase64", config.Env.JwtPrivateKeyBase64,
-	)
 
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
 		config.Env.DBHost, config.Env.DBUser, config.Env.DBPassword,
@@ -64,12 +57,24 @@ func main() {
 	})
 	cacheRepo := redis.NewCacheRepository(rdb)
 
+	var listingImageStorage domain.ListingImageStorage
+	if config.Env.CloudinaryEnabled {
+		listingImageStorage, err = cloudinary.New(cloudinary.Config{
+			CloudName: config.Env.CloudinaryCloudName,
+			APIKey:    config.Env.CloudinaryAPIKey,
+			APISecret: config.Env.CloudinaryAPISecret,
+		})
+		if err != nil {
+			logger.Log.Fatal("Failed to initialize Cloudinary storage", zap.Error(err))
+		}
+	}
+
 	authRepo := postgres.NewAuthRepository(db)
 	authService := service.NewAuthService(authRepo, cacheRepo)
 	authHandler := handler.NewAuthHandler(authService)
 
 	listingRepo := postgres.NewListingRepository(db)
-	listingService := service.NewListingService(listingRepo)
+	listingService := service.NewListingService(listingRepo, listingImageStorage)
 	listingHandler := handler.NewListingHandler(listingService)
 
 	categoryRepo := postgres.NewCategoryRepository(db)
@@ -89,6 +94,12 @@ func main() {
 				code = fiber.StatusUnauthorized
 			} else if errors.Is(err, domain.ErrConflict) {
 				code = fiber.StatusConflict
+			} else if errors.Is(err, domain.ErrInvalidImageFile) || errors.Is(err, domain.ErrImageOrderInvalid) {
+				code = fiber.StatusBadRequest
+			} else if errors.Is(err, domain.ErrImageLimitReached) {
+				code = fiber.StatusConflict
+			} else if errors.Is(err, domain.ErrImageStorageUnset) {
+				code = fiber.StatusServiceUnavailable
 			}
 			if e, ok := err.(*fiber.Error); ok {
 				code = e.Code

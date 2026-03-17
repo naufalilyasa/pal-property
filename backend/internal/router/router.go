@@ -111,6 +111,10 @@ func Register(
 	listingProtected.Post("/", listingHandler.Create)
 	listingProtected.Put("/:id", listingHandler.Update)
 	listingProtected.Delete("/:id", listingHandler.Delete)
+	listingProtected.Post("/:id/images", listingHandler.UploadImage)
+	listingProtected.Delete("/:id/images/:imageId", listingHandler.DeleteImage)
+	listingProtected.Patch("/:id/images/:imageId/primary", listingHandler.SetPrimaryImage)
+	listingProtected.Patch("/:id/images/reorder", listingHandler.ReorderImages)
 
 	apiProtected.Get("/me/listings", listingHandler.ListByUserID)
 	// ==========================================
