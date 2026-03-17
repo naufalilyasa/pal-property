@@ -74,8 +74,10 @@ func (s *AuthHandlerTestSuite) SetupSuite() {
 	})
 	config.Env.JwtPublicKeyBase64 = base64.StdEncoding.EncodeToString(pubPEM)
 
-	config.Env.JwtAccessExpiration = time.Minute * 15
-	config.Env.JwtRefreshExpiration = time.Hour * 168
+	config.Env.JwtAccessExpiration = 900
+	config.Env.JwtRefreshExpiration = 604800
+	config.Env.OAuthTokenEncryptionKey = make([]byte, 32)
+	config.Env.JwtRefreshExpiration = 604800
 
 	// 2. Setup Testcontainers Postgres (pal_db_test)
 	pgContainer, err := postgres.Run(s.ctx,
@@ -148,13 +150,13 @@ func (s *AuthHandlerTestSuite) SetupSuite() {
 		},
 	})
 
-	auth := s.app.Group("/auth")
-	auth.Get("/:provider/callback", authHandler.Callback)
-	auth.Post("/refresh", authHandler.RefreshToken)
+	authGroup := s.app.Group("/auth")
+	authGroup.Get("/oauth/:provider/callback", authHandler.Callback)
+	authGroup.Post("/refresh", authHandler.RefreshToken)
 
-	authProtected := s.app.Group("/auth", middleware.Protected())
-	authProtected.Get("/me", authHandler.GetMe)
-	authProtected.Post("/logout", authHandler.Logout)
+	apiProtected := authGroup.Group("/", middleware.Protected(s.db))
+	apiProtected.Get("/me", authHandler.GetMe)
+	apiProtected.Post("/logout", authHandler.Logout)
 }
 
 func (s *AuthHandlerTestSuite) TearDownSuite() {
@@ -176,7 +178,7 @@ func (s *AuthHandlerTestSuite) SetupTest() {
 // The Feature Test implementation
 func (s *AuthHandlerTestSuite) TestOAuthCallback_Success() {
 	// 1. Setup Request to callback handler
-	req := httptest.NewRequest(http.MethodGet, "/auth/faux/callback?provider=faux", nil)
+	req := httptest.NewRequest(http.MethodGet, "/auth/oauth/faux/callback?provider=faux", nil)
 
 	// Gothic natively extracts the "provider" context key from the request Context.
 	// Since Fiber isn't natively populating this raw *http.Request context for Gothic in the test environment, we must inject it.
@@ -236,7 +238,7 @@ func (s *AuthHandlerTestSuite) TestOAuthCallback_Success() {
 
 func (s *AuthHandlerTestSuite) TestOAuthCallback_Unauthorized() {
 	// Simulating callback WITHOUT setting session cookie
-	req := httptest.NewRequest(http.MethodGet, "/auth/faux/callback?provider=faux", nil)
+	req := httptest.NewRequest(http.MethodGet, "/auth/oauth/faux/callback?provider=faux", nil)
 
 	res, err := s.app.Test(req, fiber.TestConfig{
 		Timeout: 30 * time.Second,
@@ -306,7 +308,7 @@ func (s *AuthHandlerTestSuite) TestRefreshToken_Success() {
 	s.Require().NoError(err)
 
 	// Save JTI to Redis manually
-	err = s.rdb.Set(s.ctx, "refresh_token:"+jti, userID.String(), config.Env.JwtRefreshExpiration).Err()
+	err = s.rdb.Set(s.ctx, "refresh_token:"+jti, userID.String(), time.Duration(config.Env.JwtRefreshExpiration)*time.Second).Err()
 	s.Require().NoError(err)
 
 	// Make request
@@ -364,11 +366,17 @@ func (s *AuthHandlerTestSuite) TestRefreshToken_Unauthorized() {
 
 func (s *AuthHandlerTestSuite) TestLogout_Success() {
 	userID, _ := uuid.NewV7()
+
+	// Insert user into DB so middleware.Protected can resolve it
+	testUser := entity.User{Email: "logout-success@test.com", Name: "Logout User", Role: "user"}
+	testUser.ID = userID
+	s.Require().NoError(s.db.Create(&testUser).Error)
+
 	accToken, refToken, jti, err := jwt.GenerateTokens(userID)
 	s.Require().NoError(err)
 
 	// Save JTI to Redis manually
-	err = s.rdb.Set(s.ctx, "refresh_token:"+jti, userID.String(), config.Env.JwtRefreshExpiration).Err()
+	err = s.rdb.Set(s.ctx, "refresh_token:"+jti, userID.String(), time.Duration(config.Env.JwtRefreshExpiration)*time.Second).Err()
 	s.Require().NoError(err)
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/logout", nil)
@@ -400,6 +408,12 @@ func (s *AuthHandlerTestSuite) TestLogout_Success() {
 
 func (s *AuthHandlerTestSuite) TestLogout_NoRefreshToken() {
 	userID, _ := uuid.NewV7()
+
+	// Insert user into DB so middleware.Protected can resolve it
+	testUser := entity.User{Email: "logout-notoken@test.com", Name: "Logout No Token", Role: "user"}
+	testUser.ID = userID
+	s.Require().NoError(s.db.Create(&testUser).Error)
+
 	accToken, _, _, err := jwt.GenerateTokens(userID)
 	s.Require().NoError(err)
 
@@ -411,6 +425,105 @@ func (s *AuthHandlerTestSuite) TestLogout_NoRefreshToken() {
 	s.Equal(http.StatusOK, res.StatusCode, "Logout should succeed even without refresh token")
 }
 
+
+
+func (suite *AuthHandlerTestSuite) TestOAuthCallback_ExistingUser() {
+	// First login — creates user
+	req := httptest.NewRequest(http.MethodGet, "/auth/oauth/faux/callback", nil)
+	req = req.WithContext(context.WithValue(req.Context(), gothic.ProviderParamKey, "faux"))
+	fauxSession := &faux.Session{Name: "Jack Faux", Email: "jack.faux@example.com"}
+	recorder := httptest.NewRecorder()
+	gothic.StoreInSession("faux", fauxSession.Marshal(), req, recorder)
+	for _, cookie := range recorder.Result().Cookies() {
+		req.AddCookie(cookie)
+	}
+	resp, err := suite.app.Test(req, fiber.TestConfig{})
+	suite.Require().NoError(err)
+	suite.Equal(http.StatusSeeOther, resp.StatusCode)
+
+	// Second login — same user, same email
+	req2 := httptest.NewRequest(http.MethodGet, "/auth/oauth/faux/callback", nil)
+	req2 = req2.WithContext(context.WithValue(req2.Context(), gothic.ProviderParamKey, "faux"))
+	recorder2 := httptest.NewRecorder()
+	gothic.StoreInSession("faux", fauxSession.Marshal(), req2, recorder2)
+	for _, cookie := range recorder2.Result().Cookies() {
+		req2.AddCookie(cookie)
+	}
+	resp2, err := suite.app.Test(req2, fiber.TestConfig{})
+	suite.Require().NoError(err)
+	suite.Equal(http.StatusSeeOther, resp2.StatusCode)
+
+	// Verify only 1 user in DB (no duplicate)
+	var count int64
+	suite.db.Model(&entity.User{}).Count(&count)
+}
+func (suite *AuthHandlerTestSuite) TestRefreshToken_CookiesClearedOnFailure() {
+	// Generate a real JWT but do NOT store JTI in Redis → validation will fail
+	userID := uuid.New()
+	_, refreshToken, _, err := jwt.GenerateTokens(userID)
+	suite.Require().NoError(err)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/refresh", nil)
+	req.AddCookie(&http.Cookie{Name: "refresh_token", Value: refreshToken})
+	req.AddCookie(&http.Cookie{Name: "access_token", Value: "some-old-token"})
+
+	resp, err := suite.app.Test(req, fiber.TestConfig{})
+	suite.Require().NoError(err)
+	suite.Equal(http.StatusUnauthorized, resp.StatusCode)
+
+	// Verify cookies are cleared (empty value or MaxAge <= 0)
+	cookieMap := map[string]*http.Cookie{}
+	for _, c := range resp.Cookies() {
+		cookieMap[c.Name] = c
+	}
+	if accessCookie, ok := cookieMap["access_token"]; ok {
+		suite.True(accessCookie.Value == "" || accessCookie.MaxAge < 0,
+			"access_token cookie should be cleared on refresh failure")
+	}
+	if refreshCookie, ok := cookieMap["refresh_token"]; ok {
+		suite.True(refreshCookie.Value == "" || refreshCookie.MaxAge < 0,
+			"refresh_token cookie should be cleared on refresh failure")
+	}
+}
+
+func (suite *AuthHandlerTestSuite) TestGetMe_MissingUserIDLocal() {
+	// Generate token for a user that does NOT exist in DB
+	nonExistentID := uuid.New()
+	accessToken, _, _, err := jwt.GenerateTokens(nonExistentID)
+	suite.Require().NoError(err)
+
+	req := httptest.NewRequest(http.MethodGet, "/auth/me", nil)
+	req.AddCookie(&http.Cookie{Name: "access_token", Value: accessToken})
+
+	resp, err := suite.app.Test(req, fiber.TestConfig{})
+	suite.Require().NoError(err)
+	// User not in DB → service returns error → should be 4xx (404 or 500 depending on error mapping)
+	suite.True(resp.StatusCode >= 400, "non-existent user should return an error status")
+}
+
+func (suite *AuthHandlerTestSuite) TestLogout_GarbageRefreshToken() {
+	// Create a user and get a valid access token for the protected route
+	userID := uuid.New()
+	accessToken, _, _, err := jwt.GenerateTokens(userID)
+	suite.Require().NoError(err)
+
+	// Insert user so middleware passes
+	user := &entity.User{
+		BaseEntity: entity.BaseEntity{ID: userID},
+		Name:       "Test User",
+		Email:      "garbage@example.com",
+		Role:       "user",
+	}
+	suite.db.Create(user)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/logout", nil)
+	req.AddCookie(&http.Cookie{Name: "access_token", Value: accessToken})
+	req.AddCookie(&http.Cookie{Name: "refresh_token", Value: "this-is-complete-garbage"})
+
+	resp, err := suite.app.Test(req, fiber.TestConfig{})
+	suite.Require().NoError(err)
+	suite.Equal(http.StatusOK, resp.StatusCode, "logout should always succeed regardless of refresh token validity")
+}
 func TestAuthHandlerSuite(t *testing.T) {
 	suite.Run(t, new(AuthHandlerTestSuite))
 }

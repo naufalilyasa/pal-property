@@ -1,94 +1,131 @@
 package config
 
 import (
-	"log"
-	"reflect"
-	"strings"
-	"time"
+	"encoding/base64"
+	"fmt"
 
+	"github.com/caarlos0/env/v11"
 	"github.com/go-playground/validator/v10"
-	"github.com/spf13/viper"
 )
 
+// AppConfig holds all application configuration loaded from environment variables.
 type AppConfig struct {
-	AppEnv  string `mapstructure:"APP_ENV" validate:"required,oneof=development production testing"`
-	Port    int    `mapstructure:"PORT" validate:"required"`
-	AppName string `mapstructure:"APP_NAME"`
+	AppEnv  string `env:"APP_ENV" envDefault:"development"`
+	Port    string `env:"PORT"    envDefault:"8080"`
+	AppName string `env:"APP_NAME" envDefault:"pal-property"`
 
-	DBHost     string `mapstructure:"DB_HOST" validate:"required"`
-	DBUser     string `mapstructure:"DB_USER" validate:"required"`
-	DBPassword string `mapstructure:"DB_PASSWORD"`
-	DBName     string `mapstructure:"DB_NAME" validate:"required"`
-	DBPort     int    `mapstructure:"DB_PORT" validate:"required"`
-	DBSSLMode  string `mapstructure:"DB_SSLMODE" validate:"required"`
+	// Database
+	DBHost     string `env:"DB_HOST"     validate:"required"`
+	DBUser     string `env:"DB_USER"     validate:"required"`
+	DBPassword string `env:"DB_PASSWORD" validate:"required"`
+	DBName     string `env:"DB_NAME"     validate:"required"`
+	DBPort     string `env:"DB_PORT"     envDefault:"5432"`
+	DBSSLMode  string `env:"DB_SSL_MODE" envDefault:"disable"`
 
 	// Redis
-	RedisAddr          string        `mapstructure:"REDIS_ADDR" validate:"required"`
-	RedisPassword      string        `mapstructure:"REDIS_PASSWORD"`
-	RedisDB            int           `mapstructure:"REDIS_DB"`
-	CorsAllowedOrigins string        `mapstructure:"CORS_ALLOWED_ORIGINS" validate:"required"`
-	RateLimitMax       int           `mapstructure:"RATE_LIMIT_MAX" validate:"required"`
-	RateLimitExp       time.Duration `mapstructure:"RATE_LIMIT_EXP" validate:"required"`
+	RedisAddr     string `env:"REDIS_ADDR"     validate:"required"`
+	RedisPassword string `env:"REDIS_PASSWORD"`
+	RedisDB       int    `env:"REDIS_DB"       envDefault:"0"`
 
-	// Contoh Auth
-	ClientID     string `mapstructure:"CLIENT_ID" validate:"required"`
-	ClientSecret string `mapstructure:"CLIENT_SECRET" validate:"required"`
-	CallbackURL  string `mapstructure:"CALLBACK_URL" validate:"required"`
+	// CORS
+	CorsAllowedOrigins string `env:"CORS_ALLOWED_ORIGINS" envDefault:"http://localhost:3000"`
 
-	// JWT
-	JwtPrivateKeyBase64  string        `mapstructure:"JWT_PRIVATE_KEY_BASE64" validate:"required"`
-	JwtPublicKeyBase64   string        `mapstructure:"JWT_PUBLIC_KEY_BASE64" validate:"required"`
-	JwtAccessExpiration  time.Duration `mapstructure:"JWT_ACCESS_EXPIRATION" validate:"required"`
-	JwtRefreshExpiration time.Duration `mapstructure:"JWT_REFRESH_EXPIRATION" validate:"required"`
+	// Rate Limiting
+	RateLimitMax int `env:"RATE_LIMIT_MAX" envDefault:"100"`
+	RateLimitExp int `env:"RATE_LIMIT_EXP" envDefault:"60"` // seconds
+
+	// OAuth
+	OAuthClientID     string `env:"OAUTH_CLIENT_ID"     validate:"required"`
+	OAuthClientSecret string `env:"OAUTH_CLIENT_SECRET" validate:"required"`
+	OAuthCallbackURL  string `env:"OAUTH_CALLBACK_URL"  validate:"required"`
+
+	// JWT — RS256, keys stored base64-encoded
+	JwtPrivateKeyBase64  string `env:"JWT_PRIVATE_KEY_BASE64" validate:"required"`
+	JwtPublicKeyBase64   string `env:"JWT_PUBLIC_KEY_BASE64"  validate:"required"`
+	JwtAccessExpiration  int    `env:"JWT_ACCESS_EXPIRATION"  envDefault:"900"`    // seconds
+	JwtRefreshExpiration int    `env:"JWT_REFRESH_EXPIRATION" envDefault:"604800"` // seconds
+
+	// Encryption key for OAuth provider tokens stored in DB (AES-256 = 32 bytes, base64-encoded)
+	OAuthTokenEncryptionKeyBase64 string `env:"OAUTH_TOKEN_ENCRYPTION_KEY" validate:"required"`
+
+	// Cloudinary
+	CloudinaryEnabled   bool   `env:"CLOUDINARY_ENABLED"    envDefault:"false"`
+	CloudinaryCloudName string `env:"CLOUDINARY_CLOUD_NAME"`
+	CloudinaryAPIKey    string `env:"CLOUDINARY_API_KEY"`
+	CloudinaryAPISecret string `env:"CLOUDINARY_API_SECRET"`
+
+	// Parsed (not from env directly — populated in LoadConfig)
+	JwtPrivateKeyPEM        []byte `env:"-"`
+	JwtPublicKeyPEM         []byte `env:"-"`
+	OAuthTokenEncryptionKey []byte `env:"-"` // decoded 32-byte key
 }
 
+// Env is the global config singleton populated by LoadConfig.
 var Env AppConfig
 
-func LoadConfig() {
-	// 1. Cari file .env (Untuk development pakai 'air' di laptop)
-	viper.SetConfigFile(".env")
-	viper.AddConfigPath(".")
-	viper.AddConfigPath("..") // Berjaga-jaga kalau run dari cmd/ folder
+// LoadConfig parses environment variables into AppConfig, validates required fields,
+// and decodes base64 PEM keys.
+func LoadConfig() error {
+	cfg := AppConfig{}
 
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-
-	err := viper.ReadInConfig()
-	if err != nil {
-		log.Println("Warning: .env file not found. Reading entirely from OS Environment Variables...")
+	if err := env.Parse(&cfg); err != nil {
+		return fmt.Errorf("config: failed to parse env vars: %w", err)
 	}
 
-	// 2. Baca dari OS Environment (Untuk Docker)
-	viper.AutomaticEnv()
-
-	// 3. Otomatis daftarkan semua tag 'mapstructure' agar dibaca dari OS ENV
-	bindStructEnvs(AppConfig{})
-
-	// 4. Masukkan ke Struct
-	if err := viper.Unmarshal(&Env); err != nil {
-		log.Fatalf("Environment can't be loaded: %v", err)
-	}
-
-	// 5. Validasi Struct
 	validate := validator.New()
-	if err := validate.Struct(&Env); err != nil {
-		log.Fatalf("Environment configuration validation failed: %v", err)
+	if err := validate.Struct(cfg); err != nil {
+		return fmt.Errorf("config: validation failed: %w", err)
 	}
 
-	log.Println("✅ Configuration loaded successfully!")
+	// Decode base64 JWT keys
+	privKey, err := base64.StdEncoding.DecodeString(cfg.JwtPrivateKeyBase64)
+	if err != nil {
+		return fmt.Errorf("config: invalid JWT_PRIVATE_KEY_BASE64: %w", err)
+	}
+	cfg.JwtPrivateKeyPEM = privKey
+
+	pubKey, err := base64.StdEncoding.DecodeString(cfg.JwtPublicKeyBase64)
+	if err != nil {
+		return fmt.Errorf("config: invalid JWT_PUBLIC_KEY_BASE64: %w", err)
+	}
+	cfg.JwtPublicKeyPEM = pubKey
+
+	// Decode AES encryption key (must decode to exactly 32 bytes)
+	encKey, err := base64.StdEncoding.DecodeString(cfg.OAuthTokenEncryptionKeyBase64)
+	if err != nil {
+		return fmt.Errorf("config: invalid OAUTH_TOKEN_ENCRYPTION_KEY: %w", err)
+	}
+	if len(encKey) != 32 {
+		return fmt.Errorf("config: OAUTH_TOKEN_ENCRYPTION_KEY must decode to exactly 32 bytes (got %d)", len(encKey))
+	}
+	cfg.OAuthTokenEncryptionKey = encKey
+
+	if err := validateCloudinaryConfig(cfg); err != nil {
+		return err
+	}
+
+	Env = cfg
+	return nil
 }
 
-// bindStructEnvs adalah fungsi helper untuk mengatasi masalah Viper di Docker
-func bindStructEnvs(v interface{}) {
-	t := reflect.TypeOf(v)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-		tag := field.Tag.Get("mapstructure")
-		if tag != "" {
-			// Kasih tau Viper: "Tolong cari environment variable dengan nama ini"
-			viper.BindEnv(tag)
+func validateCloudinaryConfig(cfg AppConfig) error {
+	provided := 0
+	for _, value := range []string{cfg.CloudinaryCloudName, cfg.CloudinaryAPIKey, cfg.CloudinaryAPISecret} {
+		if value != "" {
+			provided++
 		}
 	}
+
+	if !cfg.CloudinaryEnabled {
+		if provided > 0 && provided < 3 {
+			return fmt.Errorf("config: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET must all be set together")
+		}
+		return nil
+	}
+
+	if provided < 3 {
+		return fmt.Errorf("config: CLOUDINARY_ENABLED requires CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET")
+	}
+
+	return nil
 }

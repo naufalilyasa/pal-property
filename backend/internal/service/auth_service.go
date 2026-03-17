@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/markbates/goth"
@@ -11,7 +12,6 @@ import (
 	"github.com/naufalilyasa/pal-property-backend/internal/dto/response"
 	"github.com/naufalilyasa/pal-property-backend/pkg/config"
 	"github.com/naufalilyasa/pal-property-backend/pkg/utils/jwt"
-	"gorm.io/gorm"
 )
 
 type AuthService interface {
@@ -45,7 +45,7 @@ func (s *authService) CompleteAuth(ctx context.Context, provider string, gothUse
 		return user, nil
 	}
 
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
+	if !errors.Is(err, domain.ErrNotFound) {
 		return nil, err // DB Error
 	}
 
@@ -94,7 +94,7 @@ func (s *authService) LoginUser(ctx context.Context, user *entity.User) (*respon
 	}
 
 	// Save jti to Redis
-	err = s.cache.SaveRefreshTokenJTI(ctx, jti, user.ID, config.Env.JwtRefreshExpiration)
+	err = s.cache.SaveRefreshTokenJTI(ctx, jti, user.ID, time.Duration(config.Env.JwtRefreshExpiration)*time.Second)
 	if err != nil {
 		return nil, errors.New("failed to cache refresh token: " + err.Error())
 	}
@@ -144,7 +144,7 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*r
 	}
 
 	// 5. Save new JTI to Redis
-	err = s.cache.SaveRefreshTokenJTI(ctx, newJTI, userID, config.Env.JwtRefreshExpiration)
+	err = s.cache.SaveRefreshTokenJTI(ctx, newJTI, userID, time.Duration(config.Env.JwtRefreshExpiration)*time.Second)
 	if err != nil {
 		return nil, errors.New("failed to cache new refresh token: " + err.Error())
 	}
