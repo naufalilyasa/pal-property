@@ -1,143 +1,89 @@
 # AGENTS.md — pal-property
 
-**Generated:** 2026-03-04
+**Generated:** 2026-03-17
 **Branch:** main
 
 ## OVERVIEW
 
-Property listing platform (Indonesia). Go REST API backend, Next.js frontend, event-driven workers (Redpanda/Kafka). Auth + Listing CRUD are fully implemented end-to-end.
+Property listing platform for Indonesia. Active implementation is concentrated in the Go backend; the Next.js frontend is still scaffold-level, while workers/infra/deploy remain mostly placeholders.
 
-**Stack:** Go 1.26 + Fiber v3 (Sonic JSON) + GORM + PostgreSQL 17 | Next.js 16 + React 19 + Tailwind v4 | Redpanda (Kafka-compat) | Redis | Elasticsearch 8
+**Stack:** Go 1.26 + Fiber v3 (Sonic JSON) + GORM + PostgreSQL 17 + Redis + Goth OAuth | Next.js 16 + React 19 + Tailwind v4 | Cloudinary for listing images | Redpanda and Elasticsearch provisioned for later work
 
-**Config:** `caarlos0/env` v11 (struct tags, no Viper). All config lives in `backend/pkg/config/config.go` as a single `Config` struct.
-
-**Implemented:** Auth (OAuth2/Google, JWT RS256, refresh rotation), Listing CRUD (create/read/update/delete/list/filter, soft delete, view count)
-**Planned (not yet impl):** RBAC/Casbin, Redpanda producers/consumers, Elasticsearch indexing, Image upload (S3/R2)
+**Implemented:** Auth (Google OAuth, JWT RS256, refresh rotation), Listing CRUD (create/read/update/delete/list/filter, soft delete, view count), Category management, Listing image management (upload/delete/set-primary/reorder with Cloudinary-backed storage)
+**Planned:** RBAC/Casbin, Redpanda producers/consumers, Elasticsearch indexing, non-scaffold frontend screens
 
 ## STRUCTURE
 
-```
+```text
 pal-property/
-├── backend/           # Go REST API (only active service)
-│   ├── cmd/           # Entrypoints (property-service, migrate)
-│   ├── internal/      # Domain logic (NOT importable externally)
-│   ├── pkg/           # Shared utilities (config, crypto, jwt, kafka, logger)
-│   ├── db/migrations/ # golang-migrate SQL files
-│   └── certs/         # RSA keys for JWT (RS256)
-├── frontend/          # Next.js App Router (bare scaffold)
-├── workers/           # scraper + syndicator (planned, empty)
-├── infra/             # k8s manifests + kafka config (planned, empty)
-├── deploy/            # deploy scripts (empty)
-└── docker-compose.yml # Full local dev stack
+├── backend/                  # active Go service
+│   ├── cmd/                  # property-service + migrate entrypoints
+│   ├── internal/             # handlers, services, repositories, domain, DTOs, router
+│   ├── pkg/                  # config, crypto, cloudinary, mediaasset, middleware, utils
+│   ├── db/migrations/        # golang-migrate SQL files
+│   └── postman_collection.json
+├── frontend/                 # Next.js App Router scaffold
+├── workers/                  # planned, currently empty
+├── infra/                    # planned, currently empty
+├── deploy/                   # planned, currently empty
+└── docker-compose.yml        # local infra + backend container
 ```
 
 ## WHERE TO LOOK
 
-| Task | Location |
-|------|----------|
-| Add new feature | `backend/internal/` → domain → service → handler → router |
-| New config var | `backend/pkg/config/config.go` + `backend/.env-example` |
-| New migration | `backend/db/migrations/` (golang-migrate naming: `NNNNNN_desc.up.sql`) |
-| Auth logic | `backend/internal/service/auth_service.go` |
-| JWT utilities | `backend/pkg/utils/jwt/jwt.go` |
-| Encrypt sensitive data | `backend/pkg/crypto/aes.go` |
-| CORS/middleware | `backend/internal/router/router.go` |
-| Domain contracts | `backend/internal/domain/` |
+| Task | Location | Notes |
+|------|----------|-------|
+| Add backend feature | `backend/internal/` | flow = domain -> repository -> service -> handler -> router |
+| Startup wiring | `backend/cmd/property-service/main.go` | DI + Fiber config + global error mapping |
+| Listing image transport | `backend/internal/handler/http/listing.go` | multipart upload + JSON mutation endpoints |
+| Listings + images business logic | `backend/internal/service/listing_service.go` | ownership, upload, delete, reorder, primary selection |
+| Listing persistence | `backend/internal/repository/postgres/listing.go` | listing + listing_images queries and transactions |
+| Config/env vars | `backend/pkg/config/config.go` | `config.LoadConfig()` populates global `config.Env` |
+| Cloudinary adapter | `backend/pkg/cloudinary/adapter.go` | concrete storage implementation for listing images |
 
 ## COMMANDS
 
 ```bash
-# Dev
-cd backend && air                              # hot reload (requires Air)
-cd backend && go run ./cmd/property-service    # without hot reload
+# Backend dev
+cd backend && air
+cd backend && go run ./cmd/property-service
 
 # Migrations
 cd backend && go run ./cmd/migrate/main.go
+cd backend && go run ./cmd/migrate/main.go down
 
-# Test
+# Backend verification
 cd backend && go test ./... -count=1
-cd backend && go test ./... -count=1 -run TestAuthHandlerSuite -v  # integration
-cd backend && go test ./... -count=1 -run TestListingHandlerSuite -v  # listing integration
-
-# Build
+cd backend && go test ./... -count=1 -run TestListingHandlerSuite -v
 cd backend && go build ./...
 cd backend && go vet ./...
 
-# Infra (local dev)
-docker compose up                             # all services
-docker compose up postgres redis              # only DB + cache
+# Frontend
+cd frontend && npm run dev
+cd frontend && npm run build
+cd frontend && npm run lint
 ```
-
-## INFRA SERVICES (docker-compose)
-
-| Service | Image | Port | Note |
-|---------|-------|------|------|
-| postgres | 17.8-alpine | 5433:5432 | host port 5433 (not 5432) |
-| redis | 8.2-alpine | 6379 | |
-| redpanda | v25.3.9 | 9092 | Kafka-compatible, no Zookeeper |
-| elasticsearch | 8.19.11 | 9200 | xpack.security disabled (dev only) |
-| backend | local build | 8080 | |
 
 ## KEY CONVENTIONS
 
-- **Price/money**: always `int64`, unit = Indonesian Rupiah (IDR). No float, no decimal lib.
-- **UUIDs**: always `uuid.UUID` (google/uuid), generated via `uuid.NewV7()` in `BeforeCreate`.
-- **Sensitive DB columns**: encrypt before write, decrypt after read (AES-256-GCM via `pkg/crypto`).
-- **Error response shape**: `{"success": false, "message": "...", "data": null, "trace_id": "uuid"}`.
-- **Auth tokens**: httpOnly cookies (`access_token`, `refresh_token`), SameSite:Lax.
-- **JSON encoder**: Fiber is initialized with `sonic.Marshal` / `sonic.Unmarshal` — do not swap to `encoding/json`.
-- **Context propagation**: always pass `c.UserContext()` from handler to service — never `context.Background()`.
-- **Goroutine safety**: always copy variables before passing to goroutines (zero-allocation, avoid closure capture bugs).
-- **Zap logger**: dev → stdout + file (`tmp/logs/app.log`); prod → stdout only. Tests → `logger.Log = zap.NewNop()`.
-- **Rate limiter**: skipped automatically when `config.Env.AppEnv == "testing" || "development"` (see `router.go`).
-
-## ANTI-PATTERNS (THIS PROJECT)
-
-- **NEVER** import `gorm.io/gorm` in service layer — use `domain.ErrNotFound` etc.
-- **NEVER** return raw `gorm.ErrRecordNotFound` from repository — translate to `domain.ErrNotFound`.
-- **NEVER** store sensitive tokens (OAuth access/refresh) as plaintext — use `pkg/crypto.Encrypt`.
-- **NEVER** use `float64` for money/price fields.
-- **NEVER** add config fields without updating `.env-example`.
-- **NEVER** bypass the layer boundary (handler → service → repository → domain).
-- **NEVER** use `context.Background()` in handlers — always `c.UserContext()` so request cancellation propagates.
-- **NEVER** pass goroutine captures without copying first — loop vars and Fiber ctx are unsafe across goroutine boundaries.
-- **NEVER** spin up Redpanda/Kafka testcontainers in integration tests — mock the producer/consumer interface instead.
-- **NEVER** use `viper` — project uses `caarlos0/env` for all config (struct tags on `pkg/config/config.go`).
+- **Money**: always `int64`, unit = IDR.
+- **UUIDs**: use `uuid.UUID`; entities generate IDs with `uuid.NewV7()` in hooks.
+- **JSON**: Fiber app uses `sonic.Marshal` / `sonic.Unmarshal`.
+- **Context propagation**: handlers pass `c.Context()` into services; do not use `context.Background()` in request flow.
+- **Errors**: repositories translate `gorm.ErrRecordNotFound` to domain errors; the Fiber global handler maps domain errors to the standard JSON envelope.
+- **Auth**: access + refresh tokens are httpOnly cookies with `SameSite=Lax`; refresh JTIs live in Redis.
+- **Listing images**: tests use fake storage implementations; production uses the Cloudinary adapter behind the `domain.ListingImageStorage` interface.
+- **Cloudinary config**: `CLOUDINARY_ENABLED=false` keeps image upload wiring optional; once enabled, all three credentials must be present together.
 
 ## TESTING RULES
 
-- **Pyramid**: unit tests (mocks via `testify/mock`) + integration tests (real DB via `testcontainers-go`).
-- **Target coverage**: 70–80% meaningful coverage. No coverage-padding tests.
-- **Unit tests**: flat `TestXxx` functions, package `*_test`, use `mocks.NewXxx(t)` constructors.
-- **Integration tests**: `testify/suite`, spin up `postgres:17-alpine` (and `redis:8.2-alpine` if needed) via testcontainers.
-- **Test setup required** in `SetupSuite`:
-  ```go
-  logger.Log = zap.NewNop()      // silence logs
-  config.Env.AppEnv = "testing"  // bypass rate limiter
-  ```
-- **Kafka/Redpanda**: always mock in tests — do NOT use testcontainer for message broker.
-- **Truncate between tests**: `SetupTest` must TRUNCATE all relevant tables + flush Redis to ensure test isolation.
-- **Run integration tests**: `go test ./... -count=1 -run TestXxxSuite -v -timeout 120s`
-
-## NEW FEATURE WORKFLOW
-
-For every new backend feature, follow this order:
-1. **Entity** — add/update struct in `domain/entity/`
-2. **Domain interface** — add methods to `domain/xxx_repository.go`
-3. **Repository** — implement in `repository/postgres/xxx.go`
-4. **DTO** — add request/response in `dto/request/` and `dto/response/`
-5. **Service** — implement business logic in `service/xxx_service.go`
-6. **Handler** — add HTTP handler in `handler/http/xxx.go`
-7. **Router** — register routes in `router/router.go`
-8. **Config** — if new env var needed, update `pkg/config/config.go` + `.env-example`
-9. **Unit tests** — `service/xxx_service_test.go` (mocks)
-10. **Integration tests** — `handler/http/xxx_test.go` (testcontainers)
+- `backend/internal/service/*_test.go`: `package service_test`, `testify/mock`, flat `TestXxx` functions.
+- `backend/internal/handler/http/*_test.go`: `testify/suite` + testcontainers Postgres, with `logger.Log = zap.NewNop()` in setup.
+- Listing image handler coverage should inject fake storage into `service.NewListingService(listingRepo, fakeStorage)`; never hit live Cloudinary in tests.
+- `config.Env.AppEnv = "testing"` keeps the rate limiter out of integration-test request paths.
 
 ## NOTES
 
-- `OAUTH_TOKEN_ENCRYPTION_KEY`: base64-encoded 32-byte AES key. Generate: `openssl rand -base64 32`
-- JWT keys are RS256 PEM stored as base64 in env vars (`JWT_PRIVATE_KEY_BASE64`, `JWT_PUBLIC_KEY_BASE64`)
-- Postgres exposed on host port **5433** (not 5432) to avoid conflicts
-- workers/ and infra/ are empty — Redpanda and Elasticsearch are provisioned but not yet consumed
-- No graceful shutdown implemented in main.go yet
-- RBAC (Casbin) is planned but not yet implemented — current auth is simple role string on User entity (`role varchar default 'user'`)
+- Host Postgres port is `5433`, not `5432`.
+- `backend/postman_collection.json` covers Authentication, Categories, Listings, and listing-image routes.
+- Frontend files still contain create-next-app placeholder content.
