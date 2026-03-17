@@ -3,6 +3,8 @@ package service_test
 import (
 	"context"
 	"encoding/json"
+	"mime/multipart"
+	"net/textproto"
 	"testing"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	"github.com/naufalilyasa/pal-property-backend/internal/domain/mocks"
 	"github.com/naufalilyasa/pal-property-backend/internal/dto/request"
 	"github.com/naufalilyasa/pal-property-backend/internal/service"
+	"github.com/naufalilyasa/pal-property-backend/pkg/mediaasset"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gorm.io/datatypes"
@@ -428,6 +431,352 @@ func TestListingService_Update_OnlySpecifications(t *testing.T) {
 	var s request.Specifications
 	_ = json.Unmarshal(res.Specifications, &s)
 	assert.Equal(t, 5, s.Bedrooms)
+}
+
+func TestListingService_UploadImage_Success(t *testing.T) {
+	repo := mocks.NewListingRepository(t)
+	storage := newFakeListingImageStorage()
+	storage.uploadResult = &mediaasset.UploadResult{
+		AssetID:          "asset-123",
+		PublicID:         "listing-asset-123",
+		Version:          12,
+		SecureURL:        "https://cdn.example.com/listing-asset-123.jpg",
+		ResourceType:     mediaasset.DefaultResourceType,
+		DeliveryType:     mediaasset.DefaultDeliveryType,
+		Format:           "jpg",
+		Bytes:            2048,
+		Width:            1200,
+		Height:           800,
+		OriginalFilename: "villa.jpg",
+	}
+	svc := service.NewListingService(repo, storage)
+
+	listingID := uuid.New()
+	userID := uuid.New()
+	createdImageID := uuid.New()
+	file := testListingImageFileHeader("villa.jpg", "image/jpeg")
+
+	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: listingID},
+		UserID:     userID,
+	}, nil).Once()
+	repo.On("CreateImage", mock.Anything, mock.MatchedBy(func(img *entity.ListingImage) bool {
+		return img.ListingID == listingID &&
+			img.URL == storage.uploadResult.SecureURL &&
+			img.PublicID != nil && *img.PublicID == storage.uploadResult.PublicID
+	})).Return(&entity.ListingImage{ID: createdImageID}, nil).Once()
+	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: listingID},
+		UserID:     userID,
+		Images: []entity.ListingImage{{
+			ID:        createdImageID,
+			URL:       storage.uploadResult.SecureURL,
+			IsPrimary: true,
+			SortOrder: 0,
+		}},
+	}, nil).Once()
+
+	res, err := svc.UploadImage(context.Background(), listingID, userID, "user", file)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.Len(t, res.Images, 1)
+	assert.Equal(t, createdImageID, res.Images[0].ID)
+	assert.True(t, res.Images[0].IsPrimary)
+	assert.Equal(t, storage.uploadResult.SecureURL, res.Images[0].URL)
+	assert.Len(t, storage.uploadCalls, 1)
+	assert.Equal(t, file, storage.uploadCalls[0].File)
+	assert.Equal(t, "listings/"+listingID.String(), storage.uploadCalls[0].Folder)
+	assert.Equal(t, mediaasset.DefaultResourceType, storage.uploadCalls[0].ResourceType)
+	assert.Equal(t, mediaasset.DefaultDeliveryType, storage.uploadCalls[0].DeliveryType)
+	assert.NotEmpty(t, storage.uploadCalls[0].PublicID)
+	assert.Len(t, storage.destroyCalls, 0)
+	repo.AssertNotCalled(t, "ListActiveImagesByListingID", mock.Anything, mock.Anything)
+}
+
+func TestListingService_UploadImage_InvalidFile(t *testing.T) {
+	repo := mocks.NewListingRepository(t)
+	storage := newFakeListingImageStorage()
+	svc := service.NewListingService(repo, storage)
+
+	res, err := svc.UploadImage(context.Background(), uuid.New(), uuid.New(), "user", nil)
+
+	assert.ErrorIs(t, err, domain.ErrInvalidImageFile)
+	assert.Nil(t, res)
+	assert.Len(t, storage.uploadCalls, 0)
+	repo.AssertNotCalled(t, "FindByID", mock.Anything, mock.Anything)
+}
+
+func TestListingService_UploadImage_StorageUnset(t *testing.T) {
+	repo := mocks.NewListingRepository(t)
+	svc := service.NewListingService(repo)
+
+	res, err := svc.UploadImage(context.Background(), uuid.New(), uuid.New(), "user", testListingImageFileHeader("unit.jpg", "image/jpeg"))
+
+	assert.ErrorIs(t, err, domain.ErrImageStorageUnset)
+	assert.Nil(t, res)
+	repo.AssertNotCalled(t, "FindByID", mock.Anything, mock.Anything)
+}
+
+func TestListingService_UploadImage_OverLimitFromRepository_DestroysUploadedAsset(t *testing.T) {
+	repo := mocks.NewListingRepository(t)
+	storage := newFakeListingImageStorage()
+	svc := service.NewListingService(repo, storage)
+
+	listingID := uuid.New()
+	userID := uuid.New()
+
+	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: listingID},
+		UserID:     userID,
+	}, nil).Once()
+	repo.On("CreateImage", mock.Anything, mock.MatchedBy(func(img *entity.ListingImage) bool {
+		return img.ListingID == listingID &&
+			img.PublicID != nil && *img.PublicID == storage.uploadResult.PublicID
+	})).Return(nil, domain.ErrImageLimitReached).Once()
+
+	res, err := svc.UploadImage(context.Background(), listingID, userID, "user", testListingImageFileHeader("unit.jpg", "image/jpeg"))
+
+	assert.ErrorIs(t, err, domain.ErrImageLimitReached)
+	assert.Nil(t, res)
+	assert.Len(t, storage.uploadCalls, 1)
+	assert.Len(t, storage.destroyCalls, 1)
+	assert.Equal(t, storage.uploadResult.PublicID, storage.destroyCalls[0].PublicID)
+	repo.AssertNotCalled(t, "ListActiveImagesByListingID", mock.Anything, mock.Anything)
+}
+
+func TestListingService_UploadImage_Forbidden(t *testing.T) {
+	repo := mocks.NewListingRepository(t)
+	storage := newFakeListingImageStorage()
+	svc := service.NewListingService(repo, storage)
+
+	listingID := uuid.New()
+	ownerID := uuid.New()
+	otherUserID := uuid.New()
+
+	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: listingID},
+		UserID:     ownerID,
+	}, nil).Once()
+
+	res, err := svc.UploadImage(context.Background(), listingID, otherUserID, "user", testListingImageFileHeader("unit.jpg", "image/jpeg"))
+
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+	assert.Nil(t, res)
+	assert.Len(t, storage.uploadCalls, 0)
+}
+
+func TestListingService_UploadImage_CreateImageFails_DestroysUploadedAsset(t *testing.T) {
+	repo := mocks.NewListingRepository(t)
+	storage := newFakeListingImageStorage()
+	storage.uploadResult = &mediaasset.UploadResult{
+		PublicID:  "orphaned-upload",
+		SecureURL: "https://cdn.example.com/orphaned-upload.jpg",
+	}
+	svc := service.NewListingService(repo, storage)
+
+	listingID := uuid.New()
+	userID := uuid.New()
+
+	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: listingID},
+		UserID:     userID,
+	}, nil).Once()
+	repo.On("CreateImage", mock.Anything, mock.Anything).Return(nil, domain.ErrConflict).Once()
+
+	res, err := svc.UploadImage(context.Background(), listingID, userID, "user", testListingImageFileHeader("unit.jpg", "image/jpeg"))
+
+	assert.ErrorIs(t, err, domain.ErrConflict)
+	assert.Nil(t, res)
+	assert.Len(t, storage.uploadCalls, 1)
+	assert.Len(t, storage.destroyCalls, 1)
+	assert.Equal(t, "orphaned-upload", storage.destroyCalls[0].PublicID)
+	assert.Equal(t, mediaasset.DefaultResourceType, storage.destroyCalls[0].ResourceType)
+	assert.Equal(t, mediaasset.DefaultDeliveryType, storage.destroyCalls[0].DeliveryType)
+	assert.True(t, storage.destroyCalls[0].Invalidate)
+	repo.AssertNotCalled(t, "ListActiveImagesByListingID", mock.Anything, mock.Anything)
+}
+
+func TestListingService_DeleteImage_Success(t *testing.T) {
+	repo := mocks.NewListingRepository(t)
+	storage := newFakeListingImageStorage()
+	svc := service.NewListingService(repo, storage)
+
+	listingID := uuid.New()
+	imageID := uuid.New()
+	userID := uuid.New()
+	publicID := "listing-image-public-id"
+	resourceType := "image"
+	deliveryType := "upload"
+
+	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: listingID},
+		UserID:     userID,
+	}, nil).Once()
+	repo.On("FindImageByID", mock.Anything, imageID).Return(&entity.ListingImage{
+		ID:           imageID,
+		ListingID:    listingID,
+		PublicID:     &publicID,
+		ResourceType: &resourceType,
+		Type:         &deliveryType,
+	}, nil).Once()
+	repo.On("DeleteImage", mock.Anything, listingID, imageID).Return(nil).Once()
+	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: listingID},
+		UserID:     userID,
+		Images:     []entity.ListingImage{},
+	}, nil).Once()
+
+	res, err := svc.DeleteImage(context.Background(), listingID, imageID, userID, "user")
+
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.Len(t, storage.destroyCalls, 1)
+	assert.Equal(t, publicID, storage.destroyCalls[0].PublicID)
+	assert.Equal(t, resourceType, storage.destroyCalls[0].ResourceType)
+	assert.Equal(t, deliveryType, storage.destroyCalls[0].DeliveryType)
+	assert.True(t, storage.destroyCalls[0].Invalidate)
+}
+
+func TestListingService_SetPrimaryImage_Success(t *testing.T) {
+	repo := mocks.NewListingRepository(t)
+	svc := service.NewListingService(repo)
+
+	listingID := uuid.New()
+	imageID := uuid.New()
+	userID := uuid.New()
+
+	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: listingID},
+		UserID:     userID,
+	}, nil).Once()
+	repo.On("FindImageByID", mock.Anything, imageID).Return(&entity.ListingImage{
+		ID:        imageID,
+		ListingID: listingID,
+	}, nil).Once()
+	repo.On("SetPrimaryImage", mock.Anything, listingID, imageID).Return(nil).Once()
+	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: listingID},
+		UserID:     userID,
+		Images: []entity.ListingImage{{
+			ID:        imageID,
+			IsPrimary: true,
+			SortOrder: 0,
+		}},
+	}, nil).Once()
+
+	res, err := svc.SetPrimaryImage(context.Background(), listingID, imageID, userID, "user")
+
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.Len(t, res.Images, 1)
+	assert.Equal(t, imageID, res.Images[0].ID)
+	assert.True(t, res.Images[0].IsPrimary)
+}
+
+func TestListingService_ReorderImages_Success(t *testing.T) {
+	repo := mocks.NewListingRepository(t)
+	svc := service.NewListingService(repo)
+
+	listingID := uuid.New()
+	userID := uuid.New()
+	imageA := uuid.New()
+	imageB := uuid.New()
+	ordered := []uuid.UUID{imageB, imageA}
+
+	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: listingID},
+		UserID:     userID,
+	}, nil).Once()
+	repo.On("ListActiveImagesByListingID", mock.Anything, listingID).Return([]*entity.ListingImage{
+		{ID: imageA, ListingID: listingID, SortOrder: 0},
+		{ID: imageB, ListingID: listingID, SortOrder: 1},
+	}, nil).Once()
+	repo.On("ReorderImages", mock.Anything, listingID, ordered).Return(nil).Once()
+	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: listingID},
+		UserID:     userID,
+		Images: []entity.ListingImage{
+			{ID: imageB, SortOrder: 0, CreatedAt: time.Now().Add(-time.Minute)},
+			{ID: imageA, SortOrder: 1, CreatedAt: time.Now()},
+		},
+	}, nil).Once()
+
+	res, err := svc.ReorderImages(context.Background(), listingID, userID, "user", ordered)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.Len(t, res.Images, 2)
+	assert.Equal(t, imageB, res.Images[0].ID)
+	assert.Equal(t, imageA, res.Images[1].ID)
+}
+
+func TestListingService_ReorderImages_InvalidPayload(t *testing.T) {
+	repo := mocks.NewListingRepository(t)
+	svc := service.NewListingService(repo)
+
+	listingID := uuid.New()
+	userID := uuid.New()
+	imageA := uuid.New()
+	imageB := uuid.New()
+
+	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: listingID},
+		UserID:     userID,
+	}, nil).Once()
+	repo.On("ListActiveImagesByListingID", mock.Anything, listingID).Return([]*entity.ListingImage{
+		{ID: imageA, ListingID: listingID, SortOrder: 0},
+		{ID: imageB, ListingID: listingID, SortOrder: 1},
+	}, nil).Once()
+
+	res, err := svc.ReorderImages(context.Background(), listingID, userID, "user", []uuid.UUID{imageA})
+
+	assert.ErrorIs(t, err, domain.ErrImageOrderInvalid)
+	assert.Nil(t, res)
+	repo.AssertNotCalled(t, "ReorderImages", mock.Anything, mock.Anything, mock.Anything)
+}
+
+type fakeListingImageStorage struct {
+	uploadResult  *mediaasset.UploadResult
+	uploadErr     error
+	destroyResult *mediaasset.DestroyResult
+	destroyErr    error
+	uploadCalls   []mediaasset.UploadInput
+	destroyCalls  []mediaasset.DestroyInput
+}
+
+func newFakeListingImageStorage() *fakeListingImageStorage {
+	return &fakeListingImageStorage{
+		uploadResult: &mediaasset.UploadResult{
+			PublicID:     "test-public-id",
+			SecureURL:    "https://cdn.example.com/test-public-id.jpg",
+			ResourceType: mediaasset.DefaultResourceType,
+			DeliveryType: mediaasset.DefaultDeliveryType,
+		},
+		destroyResult: &mediaasset.DestroyResult{Result: "ok"},
+	}
+}
+
+func (f *fakeListingImageStorage) UploadListingImage(_ context.Context, input mediaasset.UploadInput) (*mediaasset.UploadResult, error) {
+	f.uploadCalls = append(f.uploadCalls, input)
+	return f.uploadResult, f.uploadErr
+}
+
+func (f *fakeListingImageStorage) DestroyListingImage(_ context.Context, input mediaasset.DestroyInput) (*mediaasset.DestroyResult, error) {
+	f.destroyCalls = append(f.destroyCalls, input)
+	return f.destroyResult, f.destroyErr
+}
+
+func testListingImageFileHeader(filename, contentType string) *multipart.FileHeader {
+	header := textproto.MIMEHeader{}
+	if contentType != "" {
+		header.Set("Content-Type", contentType)
+	}
+
+	return &multipart.FileHeader{
+		Filename: filename,
+		Header:   header,
+	}
 }
 
 func ptr[T any](v T) *T {
