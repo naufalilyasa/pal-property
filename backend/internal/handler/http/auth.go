@@ -79,7 +79,7 @@ func (h *AuthHandler) Callback(c fiber.Ctx) error {
 		HTTPOnly: true,
 		Secure:   isSecure,
 		SameSite: "Lax",
-		MaxAge:   int(config.Env.JwtAccessExpiration.Seconds()),
+		MaxAge:   config.Env.JwtAccessExpiration,
 	})
 
 	// Set Refresh Token Cookie
@@ -89,7 +89,7 @@ func (h *AuthHandler) Callback(c fiber.Ctx) error {
 		HTTPOnly: true,
 		Secure:   isSecure,
 		SameSite: "Lax",
-		MaxAge:   int(config.Env.JwtRefreshExpiration.Seconds()),
+		MaxAge:   config.Env.JwtRefreshExpiration,
 	})
 
 	// Redirect back to frontend
@@ -141,7 +141,7 @@ func (h *AuthHandler) RefreshToken(c fiber.Ctx) error {
 		HTTPOnly: true,
 		Secure:   isSecure,
 		SameSite: "Lax",
-		MaxAge:   int(config.Env.JwtAccessExpiration.Seconds()),
+		MaxAge:   config.Env.JwtAccessExpiration,
 	})
 
 	// 4. Set new Refresh Token Cookie
@@ -151,7 +151,7 @@ func (h *AuthHandler) RefreshToken(c fiber.Ctx) error {
 		HTTPOnly: true,
 		Secure:   isSecure,
 		SameSite: "Lax",
-		MaxAge:   int(config.Env.JwtRefreshExpiration.Seconds()),
+		MaxAge:   config.Env.JwtRefreshExpiration,
 	})
 
 	return utils.SendResponse(c, fiber.StatusOK, fiber.Map{"message": "token refreshed successfully"})

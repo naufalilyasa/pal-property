@@ -18,7 +18,7 @@ func main() {
 	config.LoadConfig()
 	logger.InitLogger()
 
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
 		config.Env.DBUser, config.Env.DBPassword, config.Env.DBHost,
 		config.Env.DBPort, config.Env.DBName, config.Env.DBSSLMode,
 	)

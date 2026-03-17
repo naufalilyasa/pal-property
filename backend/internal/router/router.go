@@ -14,6 +14,7 @@ import (
 	"github.com/naufalilyasa/pal-property-backend/pkg/logger"
 	"github.com/naufalilyasa/pal-property-backend/pkg/middleware"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 func ZapLogger() fiber.Handler {
@@ -36,12 +37,21 @@ func ZapLogger() fiber.Handler {
 	}
 }
 
-func Register(app *fiber.App, authHandler *http.AuthHandler) {
+func Register(
+	app *fiber.App,
+	db *gorm.DB,
+	authHandler *http.AuthHandler,
+	listingHandler *http.ListingHandler,
+	categoryHandler *http.CategoryHandler,
+) {
 	// Global Middlewares
 	app.Use(helmet.New())
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: []string{config.Env.CorsAllowedOrigins},
-		AllowHeaders: []string{"Origin, Content-Type, Accept, Authorization"},
+		AllowOrigins:     []string{config.Env.CorsAllowedOrigins},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowCredentials: true,
+		MaxAge:           3600,
 	}))
 
 	app.Use(limiter.New(limiter.Config{
@@ -50,7 +60,7 @@ func Register(app *fiber.App, authHandler *http.AuthHandler) {
 			return env == "testing" || env == "development"
 		},
 		Max:        config.Env.RateLimitMax,
-		Expiration: config.Env.RateLimitExp,
+		Expiration: time.Duration(config.Env.RateLimitExp) * time.Second,
 	}))
 
 	app.Use(requestid.New(requestid.Config{
@@ -66,14 +76,61 @@ func Register(app *fiber.App, authHandler *http.AuthHandler) {
 		return c.Status(200).JSON(fiber.Map{"status": "ok"})
 	})
 
-	// Auth Routes (Public)
-	auth := app.Group("/auth")
-	auth.Get("/:provider", authHandler.BeginAuth)
-	auth.Get("/:provider/callback", authHandler.Callback)
-	auth.Post("/refresh", authHandler.RefreshToken)
+	// Buat SATU base group untuk auth
+	authGroup := app.Group("/auth")
 
-	// Auth Routes (Protected)
-	authProtected := app.Group("/auth", middleware.Protected())
-	authProtected.Get("/me", authHandler.GetMe)
-	authProtected.Post("/logout", authHandler.Logout)
+	// ==========================================
+	// 1. Auth Routes (Public)
+	// ==========================================
+	// Tambahkan prefix spesifik (misal /oauth) untuk provider
+	// agar terhindar dari tabrakan dengan route "/me" atau route statis lain ke depannya.
+	authGroup.Get("/oauth/:provider", authHandler.BeginAuth)
+	authGroup.Get("/oauth/:provider/callback", authHandler.Callback)
+	authGroup.Post("/refresh", authHandler.RefreshToken)
+
+	// ==========================================
+	// 2. Auth Routes (Protected)
+	// ==========================================
+	// Buat sub-group dari authGroup, dan pasang middleware Protected() di sini.
+	// Semua route di bawah apiProtected otomatis membutuhkan autentikasi.
+	apiProtected := authGroup.Group("/", middleware.Protected(db))
+	apiProtected.Get("/me", authHandler.GetMe)
+	apiProtected.Post("/logout", authHandler.Logout)
+	// ==========================================
+	// 3. Listing Routes (Public)
+	// ==========================================
+	api := app.Group("/api")
+	api.Get("/listings", listingHandler.List)
+	api.Get("/listings/slug/:slug", listingHandler.GetBySlug)
+	api.Get("/listings/:id", listingHandler.GetByID)
+
+	// ==========================================
+	// 4. Listing Routes (Protected)
+	// ==========================================
+	listingProtected := api.Group("/listings", middleware.Protected(db))
+	listingProtected.Post("/", listingHandler.Create)
+	listingProtected.Put("/:id", listingHandler.Update)
+	listingProtected.Delete("/:id", listingHandler.Delete)
+	listingProtected.Post("/:id/images", listingHandler.UploadImage)
+	listingProtected.Delete("/:id/images/:imageId", listingHandler.DeleteImage)
+	listingProtected.Patch("/:id/images/:imageId/primary", listingHandler.SetPrimaryImage)
+	listingProtected.Patch("/:id/images/reorder", listingHandler.ReorderImages)
+
+	apiProtected.Get("/me/listings", listingHandler.ListByUserID)
+	// ==========================================
+	// 5. Category Routes (Public)
+	// ==========================================
+	api.Get("/categories", categoryHandler.List)
+	api.Get("/categories/:slug", categoryHandler.GetBySlug)
+
+	// ==========================================
+	// 6. Category Routes (Admin Protected)
+	// ==========================================
+	categoryAdmin := api.Group("/categories",
+		middleware.Protected(db),
+		middleware.RequireRole("admin"),
+	)
+	categoryAdmin.Post("/", categoryHandler.Create)
+	categoryAdmin.Put("/:id", categoryHandler.Update)
+	categoryAdmin.Delete("/:id", categoryHandler.Delete)
 }

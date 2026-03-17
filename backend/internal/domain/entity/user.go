@@ -25,9 +25,11 @@ type OAuthAccount struct {
 	UserID         uuid.UUID `gorm:"type:uuid;not null" json:"user_id"`
 	Provider       string    `gorm:"type:varchar(50);not null" json:"provider"`
 	ProviderUserID string    `gorm:"type:varchar(255);not null" json:"provider_user_id"`
-	AccessToken    *string   `gorm:"type:text" json:"-"`
-	RefreshToken   *string   `gorm:"type:text" json:"-"`
-	CreatedAt      time.Time `gorm:"default:CURRENT_TIMESTAMP" json:"created_at"`
+	// AccessToken and RefreshToken are AES-256-GCM encrypted before storage.
+	// Use pkg/crypto.Decrypt(value, key) to read the plaintext.
+	AccessToken  *string   `gorm:"type:text" json:"-"`
+	RefreshToken *string   `gorm:"type:text" json:"-"`
+	CreatedAt    time.Time `gorm:"default:CURRENT_TIMESTAMP" json:"created_at"`
 }
 
 func (OAuthAccount) TableName() string {
