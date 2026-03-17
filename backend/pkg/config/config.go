@@ -48,6 +48,12 @@ type AppConfig struct {
 	// Encryption key for OAuth provider tokens stored in DB (AES-256 = 32 bytes, base64-encoded)
 	OAuthTokenEncryptionKeyBase64 string `env:"OAUTH_TOKEN_ENCRYPTION_KEY" validate:"required"`
 
+	// Cloudinary
+	CloudinaryEnabled   bool   `env:"CLOUDINARY_ENABLED"    envDefault:"false"`
+	CloudinaryCloudName string `env:"CLOUDINARY_CLOUD_NAME"`
+	CloudinaryAPIKey    string `env:"CLOUDINARY_API_KEY"`
+	CloudinaryAPISecret string `env:"CLOUDINARY_API_SECRET"`
+
 	// Parsed (not from env directly — populated in LoadConfig)
 	JwtPrivateKeyPEM        []byte `env:"-"`
 	JwtPublicKeyPEM         []byte `env:"-"`
@@ -94,6 +100,32 @@ func LoadConfig() error {
 	}
 	cfg.OAuthTokenEncryptionKey = encKey
 
+	if err := validateCloudinaryConfig(cfg); err != nil {
+		return err
+	}
+
 	Env = cfg
+	return nil
+}
+
+func validateCloudinaryConfig(cfg AppConfig) error {
+	provided := 0
+	for _, value := range []string{cfg.CloudinaryCloudName, cfg.CloudinaryAPIKey, cfg.CloudinaryAPISecret} {
+		if value != "" {
+			provided++
+		}
+	}
+
+	if !cfg.CloudinaryEnabled {
+		if provided > 0 && provided < 3 {
+			return fmt.Errorf("config: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET must all be set together")
+		}
+		return nil
+	}
+
+	if provided < 3 {
+		return fmt.Errorf("config: CLOUDINARY_ENABLED requires CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET")
+	}
+
 	return nil
 }
