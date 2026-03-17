@@ -48,6 +48,36 @@ func (_m *ListingRepository) Create(ctx context.Context, listing *entity.Listing
 	return r0, r1
 }
 
+// CreateImage provides a mock function with given fields: ctx, image
+func (_m *ListingRepository) CreateImage(ctx context.Context, image *entity.ListingImage) (*entity.ListingImage, error) {
+	ret := _m.Called(ctx, image)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateImage")
+	}
+
+	var r0 *entity.ListingImage
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *entity.ListingImage) (*entity.ListingImage, error)); ok {
+		return rf(ctx, image)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *entity.ListingImage) *entity.ListingImage); ok {
+		r0 = rf(ctx, image)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*entity.ListingImage)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *entity.ListingImage) error); ok {
+		r1 = rf(ctx, image)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Delete provides a mock function with given fields: ctx, id
 func (_m *ListingRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	ret := _m.Called(ctx, id)
@@ -59,6 +89,24 @@ func (_m *ListingRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) error); ok {
 		r0 = rf(ctx, id)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// DeleteImage provides a mock function with given fields: ctx, listingID, imageID
+func (_m *ListingRepository) DeleteImage(ctx context.Context, listingID uuid.UUID, imageID uuid.UUID) error {
+	ret := _m.Called(ctx, listingID, imageID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteImage")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID, uuid.UUID) error); ok {
+		r0 = rf(ctx, listingID, imageID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -112,6 +160,36 @@ func (_m *ListingRepository) FindByID(ctx context.Context, id uuid.UUID) (*entit
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*entity.Listing)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// FindImageByID provides a mock function with given fields: ctx, id
+func (_m *ListingRepository) FindImageByID(ctx context.Context, id uuid.UUID) (*entity.ListingImage, error) {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindImageByID")
+	}
+
+	var r0 *entity.ListingImage
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) (*entity.ListingImage, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) *entity.ListingImage); ok {
+		r0 = rf(ctx, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*entity.ListingImage)
 		}
 	}
 
@@ -244,6 +322,72 @@ func (_m *ListingRepository) List(ctx context.Context, filter domain.ListingFilt
 	}
 
 	return r0, r1, r2
+}
+
+// ListActiveImagesByListingID provides a mock function with given fields: ctx, listingID
+func (_m *ListingRepository) ListActiveImagesByListingID(ctx context.Context, listingID uuid.UUID) ([]*entity.ListingImage, error) {
+	ret := _m.Called(ctx, listingID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListActiveImagesByListingID")
+	}
+
+	var r0 []*entity.ListingImage
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) ([]*entity.ListingImage, error)); ok {
+		return rf(ctx, listingID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) []*entity.ListingImage); ok {
+		r0 = rf(ctx, listingID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*entity.ListingImage)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
+		r1 = rf(ctx, listingID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ReorderImages provides a mock function with given fields: ctx, listingID, orderedImageIDs
+func (_m *ListingRepository) ReorderImages(ctx context.Context, listingID uuid.UUID, orderedImageIDs []uuid.UUID) error {
+	ret := _m.Called(ctx, listingID, orderedImageIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReorderImages")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID, []uuid.UUID) error); ok {
+		r0 = rf(ctx, listingID, orderedImageIDs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetPrimaryImage provides a mock function with given fields: ctx, listingID, imageID
+func (_m *ListingRepository) SetPrimaryImage(ctx context.Context, listingID uuid.UUID, imageID uuid.UUID) error {
+	ret := _m.Called(ctx, listingID, imageID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetPrimaryImage")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID, uuid.UUID) error); ok {
+		r0 = rf(ctx, listingID, imageID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // Update provides a mock function with given fields: ctx, listing, fields
