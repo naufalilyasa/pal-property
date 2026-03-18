@@ -1,4 +1,5 @@
-import { apiRequest } from "@/lib/api/client";
+import { browserFetch } from "@/lib/api/browser-fetch";
+import { serverFetch } from "@/lib/api/server-fetch";
 import { ApiError } from "@/lib/api/envelope";
 
 export type SellerSessionUser = {
@@ -37,13 +38,22 @@ export async function bootstrapSellerSession(
   }
 
   try {
-    const response = await apiRequest<SellerSessionUser>("/auth/me", {
-      method: "GET",
-      cache: "no-store",
-      baseUrl: options.baseUrl,
-      fetch: options.fetch,
-      headers,
-    });
+    const response = options.cookieHeader
+      ? await serverFetch<SellerSessionUser>("/auth/me", {
+          method: "GET",
+          cache: "no-store",
+          baseUrl: options.baseUrl,
+          fetch: options.fetch,
+          headers,
+          cookieHeader: options.cookieHeader,
+        })
+      : await browserFetch<SellerSessionUser>("/auth/me", {
+          method: "GET",
+          cache: "no-store",
+          baseUrl: options.baseUrl,
+          fetch: options.fetch,
+          headers,
+        });
 
     return {
       status: "authenticated",

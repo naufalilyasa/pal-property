@@ -1,15 +1,19 @@
-import {
-  bootstrapSellerSession,
-  type BootstrapSellerSessionOptions,
-  type SellerSession,
-} from "@/lib/session/bootstrap";
-import { getRequestCookieHeader } from "@/lib/server/cookies";
+import { getOptionalUser } from "@/features/auth/server/current-user";
+import type { SellerSession } from "@/lib/session/bootstrap";
 
-export async function getSellerSession(
-  options: Omit<BootstrapSellerSessionOptions, "cookieHeader"> = {},
-): Promise<SellerSession> {
-  return bootstrapSellerSession({
-    ...options,
-    cookieHeader: await getRequestCookieHeader(),
-  });
+export async function getSellerSession(): Promise<SellerSession> {
+  const user = await getOptionalUser();
+
+  if (!user) {
+    return {
+      status: "unauthenticated",
+      user: null,
+    };
+  }
+
+  return {
+    status: "authenticated",
+    user,
+    traceId: "server-session",
+  };
 }
