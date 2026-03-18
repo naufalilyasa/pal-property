@@ -193,10 +193,14 @@ func (s *ListingHandlerTestSuite) SetupSuite() {
 
 	err = s.db.AutoMigrate(&entity.User{}, &entity.Category{}, &entity.Listing{}, &entity.ListingImage{})
 	s.Require().NoError(err)
+	err = setupAuthzTestState(s.db)
+	s.Require().NoError(err)
 
 	s.storage = &fakeListingImageStorage{}
 	listingRepo := repo.NewListingRepository(s.db)
-	listingService := service.NewListingService(listingRepo, s.storage)
+	authzService, err := newAuthzService(s.db)
+	s.Require().NoError(err)
+	listingService := service.NewListingServiceWithAuthz(listingRepo, service.NewAuthzService(authzService), s.storage)
 	listingHandler := handler.NewListingHandler(listingService)
 
 	s.app = fiber.New(fiber.Config{
@@ -238,7 +242,7 @@ func (s *ListingHandlerTestSuite) SetupSuite() {
 	api.Get("/listings/slug/:slug", listingHandler.GetBySlug)
 	api.Get("/listings/:id", listingHandler.GetByID)
 
-	listingProtected := api.Group("/listings", middleware.Protected(s.db))
+	listingProtected := api.Group("/listings", middleware.Protected(s.db, authzService))
 	listingProtected.Post("/", listingHandler.Create)
 	listingProtected.Put("/:id", listingHandler.Update)
 	listingProtected.Delete("/:id", listingHandler.Delete)
@@ -247,7 +251,7 @@ func (s *ListingHandlerTestSuite) SetupSuite() {
 	listingProtected.Patch("/:id/images/:imageId/primary", listingHandler.SetPrimaryImage)
 	listingProtected.Patch("/:id/images/reorder", listingHandler.ReorderImages)
 
-	authProtected := s.app.Group("/auth", middleware.Protected(s.db))
+	authProtected := s.app.Group("/auth", middleware.Protected(s.db, authzService))
 	authProtected.Get("/me/listings", listingHandler.ListByUserID)
 }
 
