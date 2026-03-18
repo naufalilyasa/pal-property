@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api/client";
+import { browserFetch } from "@/lib/api/browser-fetch";
 import { ApiError } from "@/lib/api/envelope";
 
 export type ListingSpecifications = {
@@ -89,7 +89,7 @@ export type ListingFormApiOptions = {
 export async function getListingCategories(
   options: ListingFormApiOptions = {},
 ): Promise<ListingCategoryOption[]> {
-  const response = await apiRequest<ListingCategory[]>("/api/categories", {
+  const response = await browserFetch<ListingCategory[]>("/api/categories", {
     method: "GET",
     cache: "no-store",
     baseUrl: options.baseUrl,
@@ -103,7 +103,7 @@ export async function getListingById(
   listingId: string,
   options: ListingFormApiOptions = {},
 ): Promise<ListingRecord> {
-  const response = await apiRequest<ListingRecord>(`/api/listings/${listingId}`, {
+  const response = await browserFetch<ListingRecord>(`/api/listings/${listingId}`, {
     method: "GET",
     cache: "no-store",
     baseUrl: options.baseUrl,
@@ -117,7 +117,7 @@ export async function createSellerListing(
   payload: ListingFormRequest,
   options: ListingFormApiOptions = {},
 ): Promise<ListingRecord> {
-  const response = await apiRequest<ListingRecord>("/api/listings", {
+  const response = await browserFetch<ListingRecord>("/api/listings", {
     method: "POST",
     cache: "no-store",
     baseUrl: options.baseUrl,
@@ -136,7 +136,7 @@ export async function updateSellerListing(
   payload: ListingFormRequest,
   options: ListingFormApiOptions = {},
 ): Promise<ListingRecord> {
-  const response = await apiRequest<ListingRecord>(`/api/listings/${listingId}`, {
+  const response = await browserFetch<ListingRecord>(`/api/listings/${listingId}`, {
     method: "PUT",
     cache: "no-store",
     baseUrl: options.baseUrl,
@@ -158,7 +158,7 @@ export async function uploadListingImage(
   const body = new FormData();
   body.set("file", file);
 
-  const response = await apiRequest<ListingRecord>(`/api/listings/${listingId}/images`, {
+  const response = await browserFetch<ListingRecord>(`/api/listings/${listingId}/images`, {
     method: "POST",
     cache: "no-store",
     baseUrl: options.baseUrl,
@@ -174,7 +174,7 @@ export async function deleteListingImage(
   imageId: string,
   options: ListingFormApiOptions = {},
 ): Promise<ListingRecord> {
-  const response = await apiRequest<ListingRecord>(`/api/listings/${listingId}/images/${imageId}`, {
+  const response = await browserFetch<ListingRecord>(`/api/listings/${listingId}/images/${imageId}`, {
     method: "DELETE",
     cache: "no-store",
     baseUrl: options.baseUrl,
@@ -189,7 +189,7 @@ export async function setPrimaryListingImage(
   imageId: string,
   options: ListingFormApiOptions = {},
 ): Promise<ListingRecord> {
-  const response = await apiRequest<ListingRecord>(`/api/listings/${listingId}/images/${imageId}/primary`, {
+  const response = await browserFetch<ListingRecord>(`/api/listings/${listingId}/images/${imageId}/primary`, {
     method: "PATCH",
     cache: "no-store",
     baseUrl: options.baseUrl,
@@ -204,7 +204,7 @@ export async function reorderListingImages(
   orderedImageIds: string[],
   options: ListingFormApiOptions = {},
 ): Promise<ListingRecord> {
-  const response = await apiRequest<ListingRecord>(`/api/listings/${listingId}/images/reorder`, {
+  const response = await browserFetch<ListingRecord>(`/api/listings/${listingId}/images/reorder`, {
     method: "PATCH",
     cache: "no-store",
     baseUrl: options.baseUrl,
