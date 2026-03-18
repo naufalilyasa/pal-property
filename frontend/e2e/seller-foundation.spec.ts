@@ -184,7 +184,7 @@ test("seller foundation shell loads", async ({ page }) => {
 
 test("unauthenticated users are redirected away from the dashboard subtree", async ({ page }) => {
   responder = (request) => {
-    if (request.path === "/auth/me") {
+    if (request.path === "/auth/me" || request.path === "/auth/me/listings") {
       expect(request.method).toBe("GET");
       return {
         status: 401,
@@ -200,17 +200,12 @@ test("unauthenticated users are redirected away from the dashboard subtree", asy
 
   await page.goto("/dashboard");
 
-  await expect(page).toHaveURL(/\/$/);
-  await expect(
-    page.getByRole("heading", {
-      level: 1,
-      name: /a calm workspace for sellers to prepare listing operations/i,
-    }),
-  ).toBeVisible();
-  await expect(page.getByRole("heading", { level: 1, name: /your listings/i })).toHaveCount(0);
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByTestId("login-google-button")).toBeVisible();
+  await expect(page.getByTestId("dashboard-shell")).toHaveCount(0);
 });
 
-test("authenticated dashboard bootstrap renders seller listings", async ({ page }) => {
+test("authenticated dashboard listings route renders seller inventory", async ({ page }) => {
   responder = (request) => {
     if (request.path === "/auth/me") {
       expect(request.method).toBe("GET");
@@ -255,13 +250,14 @@ test("authenticated dashboard bootstrap renders seller listings", async ({ page 
     };
   };
 
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/listings");
 
   await expect(page).toHaveTitle(/pal property seller/i);
-  await expect(page.getByRole("heading", { level: 1, name: /your listings/i })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 2, name: /garden residence/i })).toBeVisible();
-  await expect(page.getByText(/seller one/i)).toBeVisible();
-  await expect(page.getByRole("link", { name: /new listing/i })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /seller inventory/i })).toBeVisible();
+  await expect(page.getByTestId("dashboard-listings-table")).toBeVisible();
+  await expect(page.getByText(/seller@example.com/i)).toBeVisible();
+  await expect(page.getByText(/garden residence/i)).toBeVisible();
+  await expect(page.getByTestId("dashboard-refresh-button")).toBeVisible();
 });
 
 test("create listing flow submits canonical payload and redirects to edit mode", async ({ page }) => {
