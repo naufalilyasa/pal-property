@@ -1,65 +1,88 @@
-import Image from "next/image";
-
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <main className="min-h-screen px-6 py-10 sm:px-10 lg:px-12">
+      <div className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-6xl flex-col justify-between rounded-4xl border border-white/60 bg-(--panel) p-8 shadow-[0_30px_100px_rgba(15,23,42,0.18)] backdrop-blur sm:p-10">
+        <section className="grid gap-12 lg:grid-cols-[1.25fr_0.75fr] lg:items-end">
+          <div className="space-y-8">
+            <div
+              className="inline-flex items-center gap-3 rounded-full border border-(--line) bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-(--muted)"
+              style={{ fontFamily: "var(--font-mono), monospace" }}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              Seller app foundation
+            </div>
+            <div className="space-y-4">
+              <p className="text-sm font-medium uppercase tracking-[0.3em] text-(--accent)">
+                PAL Property
+              </p>
+              <h1 className="max-w-3xl text-4xl font-semibold tracking-[-0.04em] text-(--ink) sm:text-5xl lg:text-6xl">
+                A calm workspace for sellers to prepare listing operations.
+              </h1>
+            <p className="max-w-2xl text-base leading-8 text-(--muted) sm:text-lg">
+                The seller workspace already covers dashboard review, listing create and edit flows, and backend-authoritative media management.
+            </p>
+            </div>
+          </div>
+
+          <aside className="rounded-[1.75rem] border border-(--line) bg-(--panel-strong) p-6">
+            <p
+              className="text-xs uppercase tracking-[0.3em] text-(--muted)"
+              style={{ fontFamily: "var(--font-mono), monospace" }}
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+              Next steps
+            </p>
+            <ul className="mt-5 space-y-4 text-sm text-(--muted)">
+              <li>Dashboard access stays behind seller session checks.</li>
+              <li>Auth-aware API flows stay cookie-based.</li>
+              <li>Listing create, edit, and image tools are live.</li>
+            </ul>
+          </aside>
+        </section>
+
+        <section className="grid gap-4 pt-12 md:grid-cols-3">
+          <article className="rounded-3xl border border-(--line) bg-white/72 p-5">
+            <p
+              className="text-xs uppercase tracking-[0.3em] text-(--accent)"
+              style={{ fontFamily: "var(--font-mono), monospace" }}
+            >
+              Routing
+            </p>
+            <h2 className="mt-3 text-xl font-semibold text-(--ink)">
+              Dashboard-ready shell
+            </h2>
+            <p className="mt-2 text-sm leading-7 text-(--muted)">
+              A focused home surface that can expand into seller navigation without reworking the layout foundation.
+            </p>
+          </article>
+          <article className="rounded-3xl border border-(--line) bg-white/72 p-5">
+            <p
+              className="text-xs uppercase tracking-[0.3em] text-(--accent)"
+              style={{ fontFamily: "var(--font-mono), monospace" }}
+            >
+              Testing
+            </p>
+            <h2 className="mt-3 text-xl font-semibold text-(--ink)">
+              Minimal confidence layers
+            </h2>
+            <p className="mt-2 text-sm leading-7 text-(--muted)">
+              Unit coverage protects the shell markup while a deterministic smoke flow confirms the app boots in a browser.
+            </p>
+          </article>
+          <article className="rounded-3xl border border-(--line) bg-white/72 p-5">
+            <p
+              className="text-xs uppercase tracking-[0.3em] text-(--accent)"
+              style={{ fontFamily: "var(--font-mono), monospace" }}
+            >
+              Scope
+            </p>
+            <h2 className="mt-3 text-xl font-semibold text-(--ink)">
+              Seller-only baseline
+            </h2>
+            <p className="mt-2 text-sm leading-7 text-(--muted)">
+              Marketplace flows remain out of scope, but seller listing forms and dashboard operations are already wired to the API.
+            </p>
+          </article>
+        </section>
+      </div>
+    </main>
   );
 }
