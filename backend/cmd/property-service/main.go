@@ -16,6 +16,7 @@ import (
 	"github.com/naufalilyasa/pal-property-backend/internal/repository/redis"
 	"github.com/naufalilyasa/pal-property-backend/internal/router"
 	"github.com/naufalilyasa/pal-property-backend/internal/service"
+	"github.com/naufalilyasa/pal-property-backend/pkg/authz"
 	"github.com/naufalilyasa/pal-property-backend/pkg/cloudinary"
 	"github.com/naufalilyasa/pal-property-backend/pkg/config"
 	"github.com/naufalilyasa/pal-property-backend/pkg/logger"
@@ -73,8 +74,14 @@ func main() {
 	authService := service.NewAuthService(authRepo, cacheRepo)
 	authHandler := handler.NewAuthHandler(authService)
 
+	authzService, err := authz.NewService(db)
+	if err != nil {
+		logger.Log.Fatal("Failed to initialize authz service", zap.Error(err))
+	}
+
 	listingRepo := postgres.NewListingRepository(db)
-	listingService := service.NewListingService(listingRepo, listingImageStorage)
+	listingAuthzService := service.NewAuthzService(authzService)
+	listingService := service.NewListingServiceWithAuthz(listingRepo, listingAuthzService, listingImageStorage)
 	listingHandler := handler.NewListingHandler(listingService)
 
 	categoryRepo := postgres.NewCategoryRepository(db)
@@ -121,7 +128,7 @@ func main() {
 		},
 	})
 
-	router.Register(app, db, authHandler, listingHandler, categoryHandler)
+	router.Register(app, db, authzService, authHandler, listingHandler, categoryHandler)
 
 	logger.Log.Info("Server starting", zap.String("port", config.Env.Port))
 	if err := app.Listen(fmt.Sprintf(":%s", config.Env.Port)); err != nil {
