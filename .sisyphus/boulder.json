@@ -1,10 +1,10 @@
 {
-  "active_plan": "/mnt/data/Projects/pal-property-rbac-casbin-backend/.sisyphus/plans/rbac-casbin-backend.md",
+  "active_plan": "/mnt/data/Projects/pal-property/.sisyphus/plans/fix-security-arch-infra.md",
   "started_at": "2026-03-18T20:03:09.944Z",
   "session_ids": [
     "ses_2ffee0c43ffeH610jpiRBOIAT3"
   ],
-  "plan_name": "rbac-casbin-backend",
-  "worktree_path": "/mnt/data/Projects/pal-property-rbac-casbin-backend",
+  "plan_name": "fix-security-arch-infra",
+  "worktree_path": "/mnt/data/Projects/pal-property",
   "agent": "atlas"
 }
