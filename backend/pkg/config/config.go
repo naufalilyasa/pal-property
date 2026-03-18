@@ -6,6 +6,7 @@ import (
 
 	"github.com/caarlos0/env/v11"
 	"github.com/go-playground/validator/v10"
+	"github.com/joho/godotenv"
 )
 
 // AppConfig holds all application configuration loaded from environment variables.
@@ -66,6 +67,8 @@ var Env AppConfig
 // LoadConfig parses environment variables into AppConfig, validates required fields,
 // and decodes base64 PEM keys.
 func LoadConfig() error {
+	_ = godotenv.Load() // Load .env file if it exists, ignore error if not
+
 	cfg := AppConfig{}
 
 	if err := env.Parse(&cfg); err != nil {
