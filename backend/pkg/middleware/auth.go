@@ -2,12 +2,13 @@ package middleware
 
 import (
 	"github.com/gofiber/fiber/v3"
+	"github.com/naufalilyasa/pal-property-backend/pkg/authz"
 	"github.com/naufalilyasa/pal-property-backend/pkg/utils/jwt"
 	"gorm.io/gorm"
 )
 
-// Protected protects routes by checking for a valid access_token cookie
-func Protected(db *gorm.DB) fiber.Handler {
+// Protected protects routes by checking for a valid access_token cookie.
+func Protected(db *gorm.DB, authzService *authz.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		// 1. Get access_token from cookie
 		tokenString := c.Cookies("access_token")
@@ -27,9 +28,18 @@ func Protected(db *gorm.DB) fiber.Handler {
 			return fiber.NewError(fiber.StatusUnauthorized, "user not found")
 		}
 
-		// 4. Set User ID and Role in context locals
+		principal, err := authz.NewPrincipal(userID, user.Role)
+		if err != nil {
+			return fiber.NewError(fiber.StatusUnauthorized, err.Error())
+		}
+
+		// 4. Set compatibility locals and the structured principal in context locals.
 		c.Locals("user_id", userID)
 		c.Locals("user_role", user.Role)
+		c.Locals(authz.PrincipalContextKey, principal)
+		if authzService != nil {
+			c.Locals(authz.ServiceContextKey, authzService)
+		}
 
 		// 5. Continue to next handler
 		return c.Next()
