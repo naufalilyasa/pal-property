@@ -1,4 +1,4 @@
-import { ListingForm } from "@/app/dashboard/_components/listing-form";
+import { ListingForm } from "@/features/listings/forms/listing-form";
 
 export default function NewListingPage() {
   return <ListingForm mode="create" />;
