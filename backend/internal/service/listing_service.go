@@ -14,28 +14,30 @@ import (
 	"github.com/naufalilyasa/pal-property-backend/internal/domain/entity"
 	"github.com/naufalilyasa/pal-property-backend/internal/dto/request"
 	"github.com/naufalilyasa/pal-property-backend/internal/dto/response"
+	pkgauthz "github.com/naufalilyasa/pal-property-backend/pkg/authz"
 	"github.com/naufalilyasa/pal-property-backend/pkg/mediaasset"
 	"github.com/naufalilyasa/pal-property-backend/pkg/utils/slug"
 	"gorm.io/datatypes"
 )
 
 type ListingService interface {
-	Create(ctx context.Context, userID uuid.UUID, req *request.CreateListingRequest) (*response.ListingResponse, error)
+	Create(ctx context.Context, principal pkgauthz.Principal, req *request.CreateListingRequest) (*response.ListingResponse, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*response.ListingResponse, error)
 	GetBySlug(ctx context.Context, slugStr string) (*response.ListingResponse, error)
-	Update(ctx context.Context, id uuid.UUID, userID uuid.UUID, userRole string, req *request.UpdateListingRequest) (*response.ListingResponse, error)
-	UploadImage(ctx context.Context, id uuid.UUID, userID uuid.UUID, userRole string, file *multipart.FileHeader) (*response.ListingResponse, error)
-	DeleteImage(ctx context.Context, id uuid.UUID, imageID uuid.UUID, userID uuid.UUID, userRole string) (*response.ListingResponse, error)
-	SetPrimaryImage(ctx context.Context, id uuid.UUID, imageID uuid.UUID, userID uuid.UUID, userRole string) (*response.ListingResponse, error)
-	ReorderImages(ctx context.Context, id uuid.UUID, userID uuid.UUID, userRole string, orderedImageIDs []uuid.UUID) (*response.ListingResponse, error)
-	Delete(ctx context.Context, id uuid.UUID, userID uuid.UUID, userRole string) error
+	Update(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal, req *request.UpdateListingRequest) (*response.ListingResponse, error)
+	UploadImage(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal, file *multipart.FileHeader) (*response.ListingResponse, error)
+	DeleteImage(ctx context.Context, id uuid.UUID, imageID uuid.UUID, principal pkgauthz.Principal) (*response.ListingResponse, error)
+	SetPrimaryImage(ctx context.Context, id uuid.UUID, imageID uuid.UUID, principal pkgauthz.Principal) (*response.ListingResponse, error)
+	ReorderImages(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal, orderedImageIDs []uuid.UUID) (*response.ListingResponse, error)
+	Delete(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal) error
 	List(ctx context.Context, filter domain.ListingFilter) (*response.PaginatedListings, error)
-	ListByUserID(ctx context.Context, userID uuid.UUID, filter domain.ListingFilter) (*response.PaginatedListings, error)
+	ListByUserID(ctx context.Context, principal pkgauthz.Principal, filter domain.ListingFilter) (*response.PaginatedListings, error)
 }
 
 type listingService struct {
 	repo    domain.ListingRepository
 	storage domain.ListingImageStorage
+	authz   AuthzService
 }
 
 func NewListingService(repo domain.ListingRepository, storage ...domain.ListingImageStorage) ListingService {
@@ -46,7 +48,15 @@ func NewListingService(repo domain.ListingRepository, storage ...domain.ListingI
 	return service
 }
 
-func (s *listingService) Create(ctx context.Context, userID uuid.UUID, req *request.CreateListingRequest) (*response.ListingResponse, error) {
+func NewListingServiceWithAuthz(repo domain.ListingRepository, authzService AuthzService, storage ...domain.ListingImageStorage) ListingService {
+	service := &listingService{repo: repo, authz: authzService}
+	if len(storage) > 0 {
+		service.storage = storage[0]
+	}
+	return service
+}
+
+func (s *listingService) Create(ctx context.Context, principal pkgauthz.Principal, req *request.CreateListingRequest) (*response.ListingResponse, error) {
 	if req.Title == "" || req.Price <= 0 || req.Status == "" {
 		return nil, domain.ErrInvalidCredential
 	}
@@ -62,7 +72,7 @@ func (s *listingService) Create(ctx context.Context, userID uuid.UUID, req *requ
 	}
 
 	listing := &entity.Listing{
-		UserID:           userID,
+		UserID:           principal.UserID,
 		CategoryID:       req.CategoryID,
 		Title:            req.Title,
 		Slug:             listingSlug,
@@ -109,13 +119,13 @@ func (s *listingService) GetBySlug(ctx context.Context, slugStr string) (*respon
 	return s.mapToResponse(listing), nil
 }
 
-func (s *listingService) Update(ctx context.Context, id uuid.UUID, userID uuid.UUID, userRole string, req *request.UpdateListingRequest) (*response.ListingResponse, error) {
+func (s *listingService) Update(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal, req *request.UpdateListingRequest) (*response.ListingResponse, error) {
 	listing, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := s.checkOwnership(listing, userID, userRole); err != nil {
+	if err := s.authorizeListingAction(listing, principal, pkgauthz.ActionUpdate); err != nil {
 		return nil, err
 	}
 
@@ -186,20 +196,20 @@ func (s *listingService) Update(ctx context.Context, id uuid.UUID, userID uuid.U
 	return s.mapToResponse(updated), nil
 }
 
-func (s *listingService) Delete(ctx context.Context, id uuid.UUID, userID uuid.UUID, userRole string) error {
+func (s *listingService) Delete(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal) error {
 	listing, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	if err := s.checkOwnership(listing, userID, userRole); err != nil {
+	if err := s.authorizeListingAction(listing, principal, pkgauthz.ActionDelete); err != nil {
 		return err
 	}
 
 	return s.repo.Delete(ctx, id)
 }
 
-func (s *listingService) UploadImage(ctx context.Context, id uuid.UUID, userID uuid.UUID, userRole string, file *multipart.FileHeader) (*response.ListingResponse, error) {
+func (s *listingService) UploadImage(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal, file *multipart.FileHeader) (*response.ListingResponse, error) {
 	if err := validateListingImageFile(file); err != nil {
 		return nil, err
 	}
@@ -207,7 +217,7 @@ func (s *listingService) UploadImage(ctx context.Context, id uuid.UUID, userID u
 		return nil, err
 	}
 
-	listing, err := s.getAuthorizedListing(ctx, id, userID, userRole)
+	listing, err := s.getAuthorizedListing(ctx, id, principal, pkgauthz.ActionUploadImage)
 	if err != nil {
 		return nil, err
 	}
@@ -233,12 +243,12 @@ func (s *listingService) UploadImage(ctx context.Context, id uuid.UUID, userID u
 	return s.fetchListingResponse(ctx, id)
 }
 
-func (s *listingService) DeleteImage(ctx context.Context, id uuid.UUID, imageID uuid.UUID, userID uuid.UUID, userRole string) (*response.ListingResponse, error) {
+func (s *listingService) DeleteImage(ctx context.Context, id uuid.UUID, imageID uuid.UUID, principal pkgauthz.Principal) (*response.ListingResponse, error) {
 	if err := s.requireImageStorage(); err != nil {
 		return nil, err
 	}
 
-	if _, err := s.getAuthorizedListing(ctx, id, userID, userRole); err != nil {
+	if _, err := s.getAuthorizedListing(ctx, id, principal, pkgauthz.ActionDeleteImage); err != nil {
 		return nil, err
 	}
 
@@ -259,8 +269,8 @@ func (s *listingService) DeleteImage(ctx context.Context, id uuid.UUID, imageID 
 	return s.fetchListingResponse(ctx, id)
 }
 
-func (s *listingService) SetPrimaryImage(ctx context.Context, id uuid.UUID, imageID uuid.UUID, userID uuid.UUID, userRole string) (*response.ListingResponse, error) {
-	if _, err := s.getAuthorizedListing(ctx, id, userID, userRole); err != nil {
+func (s *listingService) SetPrimaryImage(ctx context.Context, id uuid.UUID, imageID uuid.UUID, principal pkgauthz.Principal) (*response.ListingResponse, error) {
+	if _, err := s.getAuthorizedListing(ctx, id, principal, pkgauthz.ActionSetPrimaryImage); err != nil {
 		return nil, err
 	}
 
@@ -279,8 +289,8 @@ func (s *listingService) SetPrimaryImage(ctx context.Context, id uuid.UUID, imag
 	return s.fetchListingResponse(ctx, id)
 }
 
-func (s *listingService) ReorderImages(ctx context.Context, id uuid.UUID, userID uuid.UUID, userRole string, orderedImageIDs []uuid.UUID) (*response.ListingResponse, error) {
-	if _, err := s.getAuthorizedListing(ctx, id, userID, userRole); err != nil {
+func (s *listingService) ReorderImages(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal, orderedImageIDs []uuid.UUID) (*response.ListingResponse, error) {
+	if _, err := s.getAuthorizedListing(ctx, id, principal, pkgauthz.ActionReorderImages); err != nil {
 		return nil, err
 	}
 
@@ -308,8 +318,8 @@ func (s *listingService) List(ctx context.Context, filter domain.ListingFilter) 
 	return s.mapToPaginatedResponse(listings, total, filter.Page, filter.Limit), nil
 }
 
-func (s *listingService) ListByUserID(ctx context.Context, userID uuid.UUID, filter domain.ListingFilter) (*response.PaginatedListings, error) {
-	listings, total, err := s.repo.FindByUserID(ctx, userID, filter)
+func (s *listingService) ListByUserID(ctx context.Context, principal pkgauthz.Principal, filter domain.ListingFilter) (*response.PaginatedListings, error) {
+	listings, total, err := s.repo.FindByUserID(ctx, principal.UserID, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -317,14 +327,12 @@ func (s *listingService) ListByUserID(ctx context.Context, userID uuid.UUID, fil
 	return s.mapToPaginatedResponse(listings, total, filter.Page, filter.Limit), nil
 }
 
-func (s *listingService) checkOwnership(listing *entity.Listing, userID uuid.UUID, userRole string) error {
-	if userRole == "admin" {
-		return nil // admin bypass
+func (s *listingService) authorizeListingAction(listing *entity.Listing, principal pkgauthz.Principal, action string) error {
+	if s.authz == nil {
+		return fmt.Errorf("authz service unavailable")
 	}
-	if listing.UserID != userID {
-		return domain.ErrForbidden
-	}
-	return nil
+
+	return s.authz.EnforceListingAction(principal, listing, action)
 }
 
 func (s *listingService) mapToResponse(l *entity.Listing) *response.ListingResponse {
@@ -364,13 +372,13 @@ func (s *listingService) mapToResponse(l *entity.Listing) *response.ListingRespo
 	}
 }
 
-func (s *listingService) getAuthorizedListing(ctx context.Context, id uuid.UUID, userID uuid.UUID, userRole string) (*entity.Listing, error) {
+func (s *listingService) getAuthorizedListing(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal, action string) (*entity.Listing, error) {
 	listing, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := s.checkOwnership(listing, userID, userRole); err != nil {
+	if err := s.authorizeListingAction(listing, principal, action); err != nil {
 		return nil, err
 	}
 
