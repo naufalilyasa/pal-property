@@ -9,12 +9,13 @@ Property listing platform for Indonesia. The Go backend remains the system-of-re
 
 **Stack:** Go 1.26 + Fiber v3 + GORM + PostgreSQL 17 + Redis + Goth OAuth | Next.js 16 App Router + React 19 + TypeScript + Tailwind v4 + TanStack Query + RHF + Zod | Cloudinary-backed listing images via backend APIs
 
-**Implemented:** Google OAuth with httpOnly cookie auth, refresh rotation, `/auth/me`, listing CRUD, category APIs, listing image upload/delete/set-primary/reorder, seller dashboard/listing create-edit-image flows, public listings browse/detail pages, Vitest + Playwright frontend coverage
-**Planned:** RBAC/Casbin, Redpanda producers/consumers, Elasticsearch indexing, broader buyer-facing/product flows beyond current public listings and seller workspace
+**Implemented:** Google OAuth with httpOnly cookie auth, refresh rotation, `/auth/me`, listing CRUD, category APIs, listing image upload/delete/set-primary/reorder, Casbin-backed backend authorization with DB-fresh principals, seller dashboard/listing create-edit-image flows, public listings browse/detail pages, Vitest + Playwright frontend coverage
+**Planned:** Redpanda producers/consumers, Elasticsearch indexing, broader buyer-facing/product flows beyond current public listings and seller workspace
 
 ## SOURCE OF TRUTH ARCHITECTURE
 
 - **Auth authority:** backend Go is the sole auth/session authority.
+- **Authorization model:** persisted roles remain `user` and `admin`; Casbin handles route/resource authorization and seller capability remains ownership-aware.
 - **Frontend auth model:** use backend-issued httpOnly cookies and `/auth/me`; Auth.js is forbidden in phase 1.
 - **Transport:** native `fetch` only; Axios is forbidden.
 - **API envelope:** backend returns `{ success, message, data, trace_id }`; frontend normalizes this centrally.
@@ -48,6 +49,7 @@ pal-property/
 |------|----------|-------|
 | Backend feature work | `backend/internal/` | flow = domain -> repository -> service -> handler -> router |
 | Auth routes + cookies | `backend/internal/handler/http/auth.go` | OAuth callback, `/auth/me`, refresh rotation |
+| Backend authz foundation | `backend/pkg/authz/` | Casbin model, enforcer wiring, authz vocabulary |
 | Listing transport | `backend/internal/handler/http/listing.go` | CRUD + multipart image endpoints |
 | Listing business logic | `backend/internal/service/listing_service.go` | ownership, upload, delete, reorder, primary selection |
 | Listing persistence | `backend/internal/repository/postgres/listing.go` | listing + listing_images queries/transactions |
@@ -86,6 +88,7 @@ cd frontend && npm run test:e2e
 - Keep layering strict: `handler -> service -> repository -> domain`.
 - In handlers, pass `c.Context()` to services; never use `context.Background()` in request flow.
 - Repositories translate `gorm.ErrRecordNotFound` into domain errors.
+- Authorization stays hybrid: middleware for coarse route checks, services for ownership-sensitive resource checks.
 - Money is always `int64` in IDR.
 - UUIDs use `uuid.UUID`; entities commonly generate UUID v7 in hooks.
 - Listing-image tests must use fake storage, never live Cloudinary.

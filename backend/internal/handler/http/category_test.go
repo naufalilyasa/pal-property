@@ -24,6 +24,7 @@ import (
 	handler "github.com/naufalilyasa/pal-property-backend/internal/handler/http"
 	repo "github.com/naufalilyasa/pal-property-backend/internal/repository/postgres"
 	"github.com/naufalilyasa/pal-property-backend/internal/service"
+	"github.com/naufalilyasa/pal-property-backend/pkg/authz"
 	"github.com/naufalilyasa/pal-property-backend/pkg/config"
 	"github.com/naufalilyasa/pal-property-backend/pkg/logger"
 	"github.com/naufalilyasa/pal-property-backend/pkg/middleware"
@@ -93,11 +94,15 @@ func (s *CategoryHandlerTestSuite) SetupSuite() {
 	// 3. AutoMigrate
 	err = s.db.AutoMigrate(&entity.User{}, &entity.Category{}, &entity.Listing{}, &entity.ListingImage{})
 	s.Require().NoError(err)
+	err = setupAuthzTestState(s.db)
+	s.Require().NoError(err)
 
 	// 4. Create real layers
 	categoryRepo := repo.NewCategoryRepository(s.db)
 	categoryService := service.NewCategoryService(categoryRepo)
 	categoryHandler := handler.NewCategoryHandler(categoryService)
+	authzService, err := newAuthzService(s.db)
+	s.Require().NoError(err)
 
 	// 5. Create fiber app
 	s.app = fiber.New(fiber.Config{
@@ -133,9 +138,9 @@ func (s *CategoryHandlerTestSuite) SetupSuite() {
 	// Register routes
 	s.app.Get("/api/categories", categoryHandler.List)
 	s.app.Get("/api/categories/:slug", categoryHandler.GetBySlug)
-	s.app.Post("/api/categories/", middleware.Protected(s.db), middleware.RequireRole("admin"), categoryHandler.Create)
-	s.app.Put("/api/categories/:id", middleware.Protected(s.db), middleware.RequireRole("admin"), categoryHandler.Update)
-	s.app.Delete("/api/categories/:id", middleware.Protected(s.db), middleware.RequireRole("admin"), categoryHandler.Delete)
+	s.app.Post("/api/categories/", middleware.Protected(s.db, authzService), middleware.RequirePermission(authzService, authz.ResourceCategory, authz.ActionCreate), categoryHandler.Create)
+	s.app.Put("/api/categories/:id", middleware.Protected(s.db, authzService), middleware.RequirePermission(authzService, authz.ResourceCategory, authz.ActionUpdate), categoryHandler.Update)
+	s.app.Delete("/api/categories/:id", middleware.Protected(s.db, authzService), middleware.RequirePermission(authzService, authz.ResourceCategory, authz.ActionDelete), categoryHandler.Delete)
 }
 
 func (s *CategoryHandlerTestSuite) SetupTest() {
@@ -301,7 +306,6 @@ func (s *CategoryHandlerTestSuite) TestCreate_DuplicateName_201() {
 	data := result["data"].(map[string]interface{})
 	s.Equal("rumah-2", data["slug"])
 }
-
 
 func (s *CategoryHandlerTestSuite) TestUpdate_AsAdmin_200() {
 	admin := s.createAdmin()
