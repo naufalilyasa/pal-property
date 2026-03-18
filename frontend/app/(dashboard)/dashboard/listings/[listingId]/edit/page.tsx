@@ -1,12 +1,9 @@
 import { ApiError } from "@/lib/api/envelope";
-import {
-  getSellerListingById,
-  isUnauthenticatedSellerListingsError,
-  type SellerListing,
-} from "@/lib/api/seller-listings";
-import { ListingForm } from "@/app/dashboard/_components/listing-form";
-import { getRequestCookieHeader } from "@/lib/server/cookies";
+import { requireUser } from "@/features/auth/server/require-user";
+import { ListingForm } from "@/features/listings/forms/listing-form";
+import { getSellerListingById } from "@/features/listings/server/get-seller-listings";
 import { notFound, redirect } from "next/navigation";
+import type { SellerListing } from "@/lib/api/seller-listings";
 
 export default async function EditListingPage({
   params,
@@ -14,15 +11,14 @@ export default async function EditListingPage({
   params: Promise<{ listingId: string }>;
 }) {
   const { listingId } = await params;
+  await requireUser();
   let listing: SellerListing;
 
   try {
-    listing = await getSellerListingById(listingId, {
-      cookieHeader: await getRequestCookieHeader(),
-    });
+    listing = await getSellerListingById(listingId);
   } catch (error) {
-    if (isUnauthenticatedSellerListingsError(error)) {
-      redirect("/");
+    if (error instanceof ApiError && error.status === 401) {
+      redirect("/login");
     }
 
     if (error instanceof ApiError && error.status === 404) {
