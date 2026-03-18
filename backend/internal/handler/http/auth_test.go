@@ -103,6 +103,8 @@ func (s *AuthHandlerTestSuite) SetupSuite() {
 	// Migrate essential models
 	err = s.db.AutoMigrate(&entity.User{}, &entity.OAuthAccount{})
 	s.Require().NoError(err)
+	err = setupAuthzTestState(s.db)
+	s.Require().NoError(err)
 
 	redisContainer, err := testcontainerRedis.Run(s.ctx, "redis:8.2-alpine")
 	s.Require().NoError(err)
@@ -132,6 +134,8 @@ func (s *AuthHandlerTestSuite) SetupSuite() {
 	cacheRepo := redisRepo.NewCacheRepository(s.rdb)
 	authService := service.NewAuthService(authRepo, cacheRepo)
 	authHandler := handler.NewAuthHandler(authService)
+	authzService, err := newAuthzService(s.db)
+	s.Require().NoError(err)
 
 	// 4. Initialize Fiber
 	s.app = fiber.New(fiber.Config{
@@ -154,7 +158,7 @@ func (s *AuthHandlerTestSuite) SetupSuite() {
 	authGroup.Get("/oauth/:provider/callback", authHandler.Callback)
 	authGroup.Post("/refresh", authHandler.RefreshToken)
 
-	apiProtected := authGroup.Group("/", middleware.Protected(s.db))
+	apiProtected := authGroup.Group("/", middleware.Protected(s.db, authzService))
 	apiProtected.Get("/me", authHandler.GetMe)
 	apiProtected.Post("/logout", authHandler.Logout)
 }
@@ -424,8 +428,6 @@ func (s *AuthHandlerTestSuite) TestLogout_NoRefreshToken() {
 	s.Require().NoError(err)
 	s.Equal(http.StatusOK, res.StatusCode, "Logout should succeed even without refresh token")
 }
-
-
 
 func (suite *AuthHandlerTestSuite) TestOAuthCallback_ExistingUser() {
 	// First login — creates user
