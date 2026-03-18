@@ -25,6 +25,7 @@ Property listing platform for Indonesia. The Go backend remains the system-of-re
 
 ```text
 pal-property/
+├── .sisyphus/                # plans, notepads, local session workflow
 ├── backend/                  # active Go service
 │   ├── cmd/                  # property-service + migrate entrypoints
 │   ├── internal/             # handlers, services, repositories, domain, DTOs, router
@@ -37,6 +38,7 @@ pal-property/
 │   ├── features/             # auth, listings, categories feature slices
 │   ├── lib/                  # api, env, query, server helpers
 │   └── e2e/                  # Playwright browser coverage
+├── plan/                     # local OAuth client secret + setup artifacts
 └── docker-compose.yml        # local infra + backend container
 ```
 
@@ -54,6 +56,8 @@ pal-property/
 | Frontend public listings | `frontend/app/(public)/listings/` | server-rendered browse/detail routes |
 | Frontend auth helpers | `frontend/features/auth/server/` | `/auth/me` server-side gating and redirects |
 | Frontend forms/images | `frontend/features/listings/forms/` + `frontend/features/listings/images/` | RHF + Zod + image mutation workflow |
+| Planning workflow | `.sisyphus/` | plans, notepads, drafts, local session state |
+| OAuth local secret | `plan/` | sensitive local Google OAuth client JSON |
 
 ## COMMANDS
 
@@ -111,4 +115,6 @@ cd frontend && npm run test:e2e
 - `backend/postman_collection.json` covers Authentication, Categories, Listings, and listing-image routes.
 - `frontend` currently implements seller dashboard flows and public listing browse/detail pages; broader buyer/product flows are still future work.
 - `workers/`, `infra/`, and `deploy/` are planned areas but are not present in the repo yet.
+- `.sisyphus/boulder.json` is local session state; do not treat it as product code unless the task is specifically about planning workflow.
+- `plan/` contains sensitive local OAuth material; avoid printing or copying secret values into commits, docs, or issues.
 - No .cursor/rules/, .cursorrules, or .github/copilot-instructions.md files currently exist in this repo.
