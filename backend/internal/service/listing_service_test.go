@@ -14,6 +14,7 @@ import (
 	"github.com/naufalilyasa/pal-property-backend/internal/domain/mocks"
 	"github.com/naufalilyasa/pal-property-backend/internal/dto/request"
 	"github.com/naufalilyasa/pal-property-backend/internal/service"
+	pkgauthz "github.com/naufalilyasa/pal-property-backend/pkg/authz"
 	"github.com/naufalilyasa/pal-property-backend/pkg/mediaasset"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -22,7 +23,7 @@ import (
 
 func TestListingService_Create_Success(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingService(repo)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	userID := uuid.New()
 	categoryID := uuid.New()
@@ -56,7 +57,7 @@ func TestListingService_Create_Success(t *testing.T) {
 		Specifications: datatypes.JSON(`{"bedrooms":3,"bathrooms":3,"land_area_sqm":200,"building_area_sqm":0}`),
 	}, nil)
 
-	res, err := svc.Create(context.Background(), userID, req)
+	res, err := svc.Create(context.Background(), pkgauthz.Principal{UserID: userID, Role: "user"}, req)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
@@ -66,7 +67,7 @@ func TestListingService_Create_Success(t *testing.T) {
 
 func TestListingService_Create_SlugCollision(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingService(repo)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	userID := uuid.New()
 	req := &request.CreateListingRequest{
@@ -86,7 +87,7 @@ func TestListingService_Create_SlugCollision(t *testing.T) {
 		Slug:  "test-listing-random",
 	}, nil)
 
-	res, err := svc.Create(context.Background(), userID, req)
+	res, err := svc.Create(context.Background(), pkgauthz.Principal{UserID: userID, Role: "user"}, req)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
@@ -95,7 +96,7 @@ func TestListingService_Create_SlugCollision(t *testing.T) {
 
 func TestListingService_Create_RepoError(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingService(repo)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	userID := uuid.New()
 	req := &request.CreateListingRequest{
@@ -107,7 +108,7 @@ func TestListingService_Create_RepoError(t *testing.T) {
 	repo.On("ExistsBySlug", mock.Anything, mock.Anything).Return(false, nil)
 	repo.On("Create", mock.Anything, mock.Anything).Return(nil, domain.ErrConflict)
 
-	res, err := svc.Create(context.Background(), userID, req)
+	res, err := svc.Create(context.Background(), pkgauthz.Principal{UserID: userID, Role: "user"}, req)
 
 	assert.Error(t, err)
 	assert.Nil(t, res)
@@ -116,7 +117,7 @@ func TestListingService_Create_RepoError(t *testing.T) {
 
 func TestListingService_GetByID_Success(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingService(repo)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	id := uuid.New()
 	listing := &entity.Listing{
@@ -136,7 +137,7 @@ func TestListingService_GetByID_Success(t *testing.T) {
 
 func TestListingService_GetByID_NotFound(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingService(repo)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	id := uuid.New()
 	repo.On("FindByID", mock.Anything, id).Return(nil, domain.ErrNotFound)
@@ -150,7 +151,7 @@ func TestListingService_GetByID_NotFound(t *testing.T) {
 
 func TestListingService_GetBySlug_Success(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingService(repo)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	slugStr := "test-slug"
 	id := uuid.New()
@@ -171,7 +172,7 @@ func TestListingService_GetBySlug_Success(t *testing.T) {
 
 func TestListingService_Update_SuccessOwner(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingService(repo)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	id := uuid.New()
 	userID := uuid.New()
@@ -197,7 +198,7 @@ func TestListingService_Update_SuccessOwner(t *testing.T) {
 		Slug:       "new-title",
 	}, nil)
 
-	res, err := svc.Update(context.Background(), id, userID, "user", req)
+	res, err := svc.Update(context.Background(), id, pkgauthz.Principal{UserID: userID, Role: "user"}, req)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
@@ -206,7 +207,7 @@ func TestListingService_Update_SuccessOwner(t *testing.T) {
 
 func TestListingService_Update_SuccessAdmin(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingService(repo)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	id := uuid.New()
 	ownerID := uuid.New()
@@ -228,7 +229,7 @@ func TestListingService_Update_SuccessAdmin(t *testing.T) {
 		Price:      newPrice,
 	}, nil)
 
-	res, err := svc.Update(context.Background(), id, adminID, "admin", req)
+	res, err := svc.Update(context.Background(), id, pkgauthz.Principal{UserID: adminID, Role: "admin"}, req)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
@@ -237,7 +238,7 @@ func TestListingService_Update_SuccessAdmin(t *testing.T) {
 
 func TestListingService_Update_Forbidden(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingService(repo)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	id := uuid.New()
 	ownerID := uuid.New()
@@ -251,7 +252,7 @@ func TestListingService_Update_Forbidden(t *testing.T) {
 
 	repo.On("FindByID", mock.Anything, id).Return(listing, nil)
 
-	res, err := svc.Update(context.Background(), id, otherUserID, "user", req)
+	res, err := svc.Update(context.Background(), id, pkgauthz.Principal{UserID: otherUserID, Role: "user"}, req)
 
 	assert.Error(t, err)
 	assert.Nil(t, res)
@@ -260,7 +261,7 @@ func TestListingService_Update_Forbidden(t *testing.T) {
 
 func TestListingService_Update_NoChanges(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingService(repo)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	id := uuid.New()
 	userID := uuid.New()
@@ -274,7 +275,7 @@ func TestListingService_Update_NoChanges(t *testing.T) {
 
 	repo.On("FindByID", mock.Anything, id).Return(listing, nil)
 
-	res, err := svc.Update(context.Background(), id, userID, "user", req)
+	res, err := svc.Update(context.Background(), id, pkgauthz.Principal{UserID: userID, Role: "user"}, req)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
@@ -284,7 +285,7 @@ func TestListingService_Update_NoChanges(t *testing.T) {
 
 func TestListingService_Delete_Success(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingService(repo)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	id := uuid.New()
 	userID := uuid.New()
@@ -296,14 +297,14 @@ func TestListingService_Delete_Success(t *testing.T) {
 	repo.On("FindByID", mock.Anything, id).Return(listing, nil)
 	repo.On("Delete", mock.Anything, id).Return(nil)
 
-	err := svc.Delete(context.Background(), id, userID, "user")
+	err := svc.Delete(context.Background(), id, pkgauthz.Principal{UserID: userID, Role: "user"})
 
 	assert.NoError(t, err)
 }
 
 func TestListingService_Delete_Forbidden(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingService(repo)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	id := uuid.New()
 	ownerID := uuid.New()
@@ -315,7 +316,7 @@ func TestListingService_Delete_Forbidden(t *testing.T) {
 
 	repo.On("FindByID", mock.Anything, id).Return(listing, nil)
 
-	err := svc.Delete(context.Background(), id, otherUserID, "user")
+	err := svc.Delete(context.Background(), id, pkgauthz.Principal{UserID: otherUserID, Role: "user"})
 
 	assert.Error(t, err)
 	assert.Equal(t, domain.ErrForbidden, err)
@@ -323,7 +324,7 @@ func TestListingService_Delete_Forbidden(t *testing.T) {
 
 func TestListingService_List_Success(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingService(repo)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	filter := domain.ListingFilter{Page: 1, Limit: 10}
 	listings := []*entity.Listing{
@@ -343,7 +344,7 @@ func TestListingService_List_Success(t *testing.T) {
 
 func TestListingService_List_Empty(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingService(repo)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	filter := domain.ListingFilter{Page: 1, Limit: 10}
 	repo.On("List", mock.Anything, filter).Return([]*entity.Listing{}, int64(0), nil)
@@ -359,7 +360,7 @@ func TestListingService_List_Empty(t *testing.T) {
 
 func TestListingService_ListByUserID_Success(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingService(repo)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	userID := uuid.New()
 	filter := domain.ListingFilter{Page: 1, Limit: 10}
@@ -369,7 +370,7 @@ func TestListingService_ListByUserID_Success(t *testing.T) {
 
 	repo.On("FindByUserID", mock.Anything, userID, filter).Return(listings, int64(1), nil)
 
-	res, err := svc.ListByUserID(context.Background(), userID, filter)
+	res, err := svc.ListByUserID(context.Background(), pkgauthz.Principal{UserID: userID, Role: "user"}, filter)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
@@ -380,7 +381,7 @@ func TestListingService_ListByUserID_Success(t *testing.T) {
 // Edge case: Create with nil CategoryID
 func TestListingService_Create_NilCategoryID(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingService(repo)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	userID := uuid.New()
 	req := &request.CreateListingRequest{
@@ -395,7 +396,7 @@ func TestListingService_Create_NilCategoryID(t *testing.T) {
 		return l.CategoryID == nil
 	})).Return(&entity.Listing{Title: req.Title}, nil)
 
-	res, err := svc.Create(context.Background(), userID, req)
+	res, err := svc.Create(context.Background(), pkgauthz.Principal{UserID: userID, Role: "user"}, req)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
@@ -404,7 +405,7 @@ func TestListingService_Create_NilCategoryID(t *testing.T) {
 // Edge case: Update only Specifications
 func TestListingService_Update_OnlySpecifications(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingService(repo)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	id := uuid.New()
 	userID := uuid.New()
@@ -424,7 +425,7 @@ func TestListingService_Update_OnlySpecifications(t *testing.T) {
 		Specifications: datatypes.JSON(`{"bedrooms":5}`),
 	}, nil)
 
-	res, err := svc.Update(context.Background(), id, userID, "user", req)
+	res, err := svc.Update(context.Background(), id, pkgauthz.Principal{UserID: userID, Role: "user"}, req)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
@@ -449,7 +450,7 @@ func TestListingService_UploadImage_Success(t *testing.T) {
 		Height:           800,
 		OriginalFilename: "villa.jpg",
 	}
-	svc := service.NewListingService(repo, storage)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t), storage)
 
 	listingID := uuid.New()
 	userID := uuid.New()
@@ -476,7 +477,7 @@ func TestListingService_UploadImage_Success(t *testing.T) {
 		}},
 	}, nil).Once()
 
-	res, err := svc.UploadImage(context.Background(), listingID, userID, "user", file)
+	res, err := svc.UploadImage(context.Background(), listingID, pkgauthz.Principal{UserID: userID, Role: "user"}, file)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
@@ -497,9 +498,9 @@ func TestListingService_UploadImage_Success(t *testing.T) {
 func TestListingService_UploadImage_InvalidFile(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
 	storage := newFakeListingImageStorage()
-	svc := service.NewListingService(repo, storage)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t), storage)
 
-	res, err := svc.UploadImage(context.Background(), uuid.New(), uuid.New(), "user", nil)
+	res, err := svc.UploadImage(context.Background(), uuid.New(), pkgauthz.Principal{UserID: uuid.New(), Role: "user"}, nil)
 
 	assert.ErrorIs(t, err, domain.ErrInvalidImageFile)
 	assert.Nil(t, res)
@@ -509,9 +510,9 @@ func TestListingService_UploadImage_InvalidFile(t *testing.T) {
 
 func TestListingService_UploadImage_StorageUnset(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingService(repo)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
-	res, err := svc.UploadImage(context.Background(), uuid.New(), uuid.New(), "user", testListingImageFileHeader("unit.jpg", "image/jpeg"))
+	res, err := svc.UploadImage(context.Background(), uuid.New(), pkgauthz.Principal{UserID: uuid.New(), Role: "user"}, testListingImageFileHeader("unit.jpg", "image/jpeg"))
 
 	assert.ErrorIs(t, err, domain.ErrImageStorageUnset)
 	assert.Nil(t, res)
@@ -521,7 +522,7 @@ func TestListingService_UploadImage_StorageUnset(t *testing.T) {
 func TestListingService_UploadImage_OverLimitFromRepository_DestroysUploadedAsset(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
 	storage := newFakeListingImageStorage()
-	svc := service.NewListingService(repo, storage)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t), storage)
 
 	listingID := uuid.New()
 	userID := uuid.New()
@@ -535,7 +536,7 @@ func TestListingService_UploadImage_OverLimitFromRepository_DestroysUploadedAsse
 			img.PublicID != nil && *img.PublicID == storage.uploadResult.PublicID
 	})).Return(nil, domain.ErrImageLimitReached).Once()
 
-	res, err := svc.UploadImage(context.Background(), listingID, userID, "user", testListingImageFileHeader("unit.jpg", "image/jpeg"))
+	res, err := svc.UploadImage(context.Background(), listingID, pkgauthz.Principal{UserID: userID, Role: "user"}, testListingImageFileHeader("unit.jpg", "image/jpeg"))
 
 	assert.ErrorIs(t, err, domain.ErrImageLimitReached)
 	assert.Nil(t, res)
@@ -548,7 +549,7 @@ func TestListingService_UploadImage_OverLimitFromRepository_DestroysUploadedAsse
 func TestListingService_UploadImage_Forbidden(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
 	storage := newFakeListingImageStorage()
-	svc := service.NewListingService(repo, storage)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t), storage)
 
 	listingID := uuid.New()
 	ownerID := uuid.New()
@@ -559,7 +560,7 @@ func TestListingService_UploadImage_Forbidden(t *testing.T) {
 		UserID:     ownerID,
 	}, nil).Once()
 
-	res, err := svc.UploadImage(context.Background(), listingID, otherUserID, "user", testListingImageFileHeader("unit.jpg", "image/jpeg"))
+	res, err := svc.UploadImage(context.Background(), listingID, pkgauthz.Principal{UserID: otherUserID, Role: "user"}, testListingImageFileHeader("unit.jpg", "image/jpeg"))
 
 	assert.ErrorIs(t, err, domain.ErrForbidden)
 	assert.Nil(t, res)
@@ -573,7 +574,7 @@ func TestListingService_UploadImage_CreateImageFails_DestroysUploadedAsset(t *te
 		PublicID:  "orphaned-upload",
 		SecureURL: "https://cdn.example.com/orphaned-upload.jpg",
 	}
-	svc := service.NewListingService(repo, storage)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t), storage)
 
 	listingID := uuid.New()
 	userID := uuid.New()
@@ -584,7 +585,7 @@ func TestListingService_UploadImage_CreateImageFails_DestroysUploadedAsset(t *te
 	}, nil).Once()
 	repo.On("CreateImage", mock.Anything, mock.Anything).Return(nil, domain.ErrConflict).Once()
 
-	res, err := svc.UploadImage(context.Background(), listingID, userID, "user", testListingImageFileHeader("unit.jpg", "image/jpeg"))
+	res, err := svc.UploadImage(context.Background(), listingID, pkgauthz.Principal{UserID: userID, Role: "user"}, testListingImageFileHeader("unit.jpg", "image/jpeg"))
 
 	assert.ErrorIs(t, err, domain.ErrConflict)
 	assert.Nil(t, res)
@@ -600,7 +601,7 @@ func TestListingService_UploadImage_CreateImageFails_DestroysUploadedAsset(t *te
 func TestListingService_DeleteImage_Success(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
 	storage := newFakeListingImageStorage()
-	svc := service.NewListingService(repo, storage)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t), storage)
 
 	listingID := uuid.New()
 	imageID := uuid.New()
@@ -627,7 +628,7 @@ func TestListingService_DeleteImage_Success(t *testing.T) {
 		Images:     []entity.ListingImage{},
 	}, nil).Once()
 
-	res, err := svc.DeleteImage(context.Background(), listingID, imageID, userID, "user")
+	res, err := svc.DeleteImage(context.Background(), listingID, imageID, pkgauthz.Principal{UserID: userID, Role: "user"})
 
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
@@ -640,7 +641,7 @@ func TestListingService_DeleteImage_Success(t *testing.T) {
 
 func TestListingService_SetPrimaryImage_Success(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingService(repo)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	listingID := uuid.New()
 	imageID := uuid.New()
@@ -665,7 +666,7 @@ func TestListingService_SetPrimaryImage_Success(t *testing.T) {
 		}},
 	}, nil).Once()
 
-	res, err := svc.SetPrimaryImage(context.Background(), listingID, imageID, userID, "user")
+	res, err := svc.SetPrimaryImage(context.Background(), listingID, imageID, pkgauthz.Principal{UserID: userID, Role: "user"})
 
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
@@ -676,7 +677,7 @@ func TestListingService_SetPrimaryImage_Success(t *testing.T) {
 
 func TestListingService_ReorderImages_Success(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingService(repo)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	listingID := uuid.New()
 	userID := uuid.New()
@@ -702,7 +703,7 @@ func TestListingService_ReorderImages_Success(t *testing.T) {
 		},
 	}, nil).Once()
 
-	res, err := svc.ReorderImages(context.Background(), listingID, userID, "user", ordered)
+	res, err := svc.ReorderImages(context.Background(), listingID, pkgauthz.Principal{UserID: userID, Role: "user"}, ordered)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
@@ -713,7 +714,7 @@ func TestListingService_ReorderImages_Success(t *testing.T) {
 
 func TestListingService_ReorderImages_InvalidPayload(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingService(repo)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	listingID := uuid.New()
 	userID := uuid.New()
@@ -729,7 +730,7 @@ func TestListingService_ReorderImages_InvalidPayload(t *testing.T) {
 		{ID: imageB, ListingID: listingID, SortOrder: 1},
 	}, nil).Once()
 
-	res, err := svc.ReorderImages(context.Background(), listingID, userID, "user", []uuid.UUID{imageA})
+	res, err := svc.ReorderImages(context.Background(), listingID, pkgauthz.Principal{UserID: userID, Role: "user"}, []uuid.UUID{imageA})
 
 	assert.ErrorIs(t, err, domain.ErrImageOrderInvalid)
 	assert.Nil(t, res)
