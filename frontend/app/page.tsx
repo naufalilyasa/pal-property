@@ -1,6 +1,8 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
-    <main className="min-h-screen px-6 py-10 sm:px-10 lg:px-12">
+    <main className="min-h-screen px-6 py-10 sm:px-10 lg:px-12" data-testid="home-shell">
       <div className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-6xl flex-col justify-between rounded-4xl border border-white/60 bg-(--panel) p-8 shadow-[0_30px_100px_rgba(15,23,42,0.18)] backdrop-blur sm:p-10">
         <section className="grid gap-12 lg:grid-cols-[1.25fr_0.75fr] lg:items-end">
           <div className="space-y-8">
@@ -35,6 +37,14 @@ export default function Home() {
               <li>Auth-aware API flows stay cookie-based.</li>
               <li>Listing create, edit, and image tools are live.</li>
             </ul>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link className="inline-flex items-center justify-center rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90" href="/login">
+                Go to login
+              </Link>
+              <Link className="inline-flex items-center justify-center rounded-full border border-[var(--line)] bg-[var(--panel)] px-5 py-3 text-sm font-semibold text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]" href="/listings">
+                Browse public listings
+              </Link>
+            </div>
           </aside>
         </section>
 
