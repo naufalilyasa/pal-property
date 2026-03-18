@@ -16,5 +16,7 @@ describe("Home", () => {
     expect(screen.getByText(/seller app foundation/i)).toBeInTheDocument();
     expect(screen.getByText(/dashboard-ready shell/i)).toBeInTheDocument();
     expect(screen.getByText(/listing create, edit, and image tools are live/i)).toBeInTheDocument();
+    expect(screen.getByTestId("home-shell")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /go to login/i })).toBeInTheDocument();
   });
 });
