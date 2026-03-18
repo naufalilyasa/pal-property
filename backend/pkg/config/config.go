@@ -21,7 +21,7 @@ type AppConfig struct {
 	DBPassword string `env:"DB_PASSWORD" validate:"required"`
 	DBName     string `env:"DB_NAME"     validate:"required"`
 	DBPort     string `env:"DB_PORT"     envDefault:"5432"`
-	DBSSLMode  string `env:"DB_SSL_MODE" envDefault:"disable"`
+	DBSSLMode  string `env:"DB_SSLMODE"    envDefault:"disable"`
 
 	// Redis
 	RedisAddr     string `env:"REDIS_ADDR"     validate:"required"`
@@ -67,7 +67,7 @@ var Env AppConfig
 // LoadConfig parses environment variables into AppConfig, validates required fields,
 // and decodes base64 PEM keys.
 func LoadConfig() error {
-	_ = godotenv.Load() // Load .env file if it exists, ignore error if not
+	_ = godotenv.Load() // Load .env file if it exists, ignore error; does NOT override container env vars
 
 	cfg := AppConfig{}
 
