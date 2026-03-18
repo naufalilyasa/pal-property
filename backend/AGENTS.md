@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-Go 1.26 REST API. Fiber v3 + GORM + PostgreSQL + Redis with strict layering. Listings now include Cloudinary-backed image management through a storage interface.
+Go 1.26 REST API. Fiber v3 + GORM + PostgreSQL + Redis with strict layering. Listings include Cloudinary-backed image management, and authorization now routes through a shared Casbin-backed authz layer.
 
 ## STRUCTURE
 
@@ -29,13 +29,20 @@ cmd/main.go -> router.go -> handler/ -> service/ -> repository/ -> domain/
 **DI wiring** (`cmd/property-service/main.go`):
 ```go
 listingRepo := postgres.NewListingRepository(db)
+authzSvc := authz.NewService(db)
+listingAuthzSvc := service.NewAuthzService(authzSvc)
 var imageStorage domain.ListingImageStorage
 if config.Env.CloudinaryEnabled {
     imageStorage = cloudinary.NewAdapter(...)
 }
-listingSvc := service.NewListingService(listingRepo, imageStorage)
+listingSvc := service.NewListingServiceWithAuthz(listingRepo, listingAuthzSvc, imageStorage)
 listingHandler := http.NewListingHandler(listingSvc)
 ```
+
+**Authorization wiring**:
+- `pkg/authz/` owns the embedded Casbin model and enforcer bootstrap.
+- `middleware.Protected` still validates JWTs and reloads the current DB role on every request.
+- `middleware.RequirePermission` handles coarse route checks; listing services keep owner/admin decisions close to loaded listing resources.
 
 **Error handler**:
 - Maps domain errors to HTTP status codes.
@@ -48,6 +55,7 @@ listingHandler := http.NewListingHandler(listingSvc)
 ## CURRENT FEATURE AREAS
 
 - Auth + refresh rotation
+- Casbin-backed RBAC + owner-aware listing authorization
 - Category CRUD
 - Listing CRUD + read filters
 - Listing image upload/delete/set-primary/reorder
