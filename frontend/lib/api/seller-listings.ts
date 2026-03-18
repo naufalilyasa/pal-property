@@ -1,5 +1,6 @@
-import { apiRequest } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/envelope";
+import { browserFetch } from "@/lib/api/browser-fetch";
+import { serverFetch } from "@/lib/api/server-fetch";
 
 export type SellerListingImage = {
   id: string;
@@ -101,7 +102,18 @@ async function getSellerListingsResponse(
 
   const path = searchParams.size > 0 ? `/auth/me/listings?${searchParams.toString()}` : "/auth/me/listings";
 
-  return apiRequest<SellerListingsPage>(path, {
+  if (options.cookieHeader) {
+    return serverFetch<SellerListingsPage>(path, {
+      method: "GET",
+      cache: "no-store",
+      baseUrl: options.baseUrl,
+      fetch: options.fetch,
+      headers,
+      cookieHeader: options.cookieHeader,
+    });
+  }
+
+  return browserFetch<SellerListingsPage>(path, {
     method: "GET",
     cache: "no-store",
     baseUrl: options.baseUrl,
