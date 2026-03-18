@@ -1,16 +1,25 @@
 # AGENTS.md — pal-property
 
-**Generated:** 2026-03-17
+**Generated:** 2026-03-18
 **Branch:** main
 
 ## OVERVIEW
 
-Property listing platform for Indonesia. Core implementation now spans the Go backend plus an active seller-facing Next.js frontend, while workers/infra/deploy remain mostly placeholders.
+Property listing platform for Indonesia. The Go backend remains the system-of-record API, and the Next.js frontend now includes an active seller workspace plus public listing browse/detail routes.
 
-**Stack:** Go 1.26 + Fiber v3 (Sonic JSON) + GORM + PostgreSQL 17 + Redis + Goth OAuth | Next.js 16 + React 19 + Tailwind v4 | Cloudinary for listing images | Redpanda and Elasticsearch provisioned for later work
+**Stack:** Go 1.26 + Fiber v3 + GORM + PostgreSQL 17 + Redis + Goth OAuth | Next.js 16 App Router + React 19 + TypeScript + Tailwind v4 + TanStack Query + RHF + Zod | Cloudinary-backed listing images via backend APIs
 
-**Implemented:** Auth (Google OAuth, JWT RS256, refresh rotation), Listing CRUD (create/read/update/delete/list/filter, soft delete, view count), Category management, Listing image management (upload/delete/set-primary/reorder with Cloudinary-backed storage), Seller frontend dashboard + listing create/edit/image workflows with cookie-session bootstrap
-**Planned:** RBAC/Casbin, Redpanda producers/consumers, Elasticsearch indexing, expanded frontend flows beyond current seller dashboard scope
+**Implemented:** Google OAuth with httpOnly cookie auth, refresh rotation, `/auth/me`, listing CRUD, category APIs, listing image upload/delete/set-primary/reorder, seller dashboard/listing create-edit-image flows, public listings browse/detail pages, Vitest + Playwright frontend coverage
+**Planned:** RBAC/Casbin, Redpanda producers/consumers, Elasticsearch indexing, broader buyer-facing/product flows beyond current public listings and seller workspace
+
+## SOURCE OF TRUTH ARCHITECTURE
+
+- **Auth authority:** backend Go is the sole auth/session authority.
+- **Frontend auth model:** use backend-issued httpOnly cookies and `/auth/me`; Auth.js is forbidden in phase 1.
+- **Transport:** native `fetch` only; Axios is forbidden.
+- **API envelope:** backend returns `{ success, message, data, trace_id }`; frontend normalizes this centrally.
+- **Images:** uploads go through backend multipart endpoints; frontend renders backend-returned URLs with `next/image`.
+- **Client state:** do not introduce browser token storage or Zustand for auth/backend state.
 
 ## STRUCTURE
 
@@ -19,13 +28,15 @@ pal-property/
 ├── backend/                  # active Go service
 │   ├── cmd/                  # property-service + migrate entrypoints
 │   ├── internal/             # handlers, services, repositories, domain, DTOs, router
-│   ├── pkg/                  # config, crypto, cloudinary, mediaasset, middleware, utils
+│   ├── pkg/                  # config, crypto, cloudinary, middleware, utils
 │   ├── db/migrations/        # golang-migrate SQL files
 │   └── postman_collection.json
-├── frontend/                 # Next.js seller dashboard + listing workflows
-├── workers/                  # planned, currently empty
-├── infra/                    # planned, currently empty
-├── deploy/                   # planned, currently empty
+├── frontend/                 # App Router frontend with seller + public listing flows
+│   ├── app/                  # routes, layouts, loading/error boundaries
+│   ├── components/           # ui primitives + shared shells
+│   ├── features/             # auth, listings, categories feature slices
+│   ├── lib/                  # api, env, query, server helpers
+│   └── e2e/                  # Playwright browser coverage
 └── docker-compose.yml        # local infra + backend container
 ```
 
@@ -33,27 +44,25 @@ pal-property/
 
 | Task | Location | Notes |
 |------|----------|-------|
-| Add backend feature | `backend/internal/` | flow = domain -> repository -> service -> handler -> router |
-| Startup wiring | `backend/cmd/property-service/main.go` | DI + Fiber config + global error mapping |
-| Listing image transport | `backend/internal/handler/http/listing.go` | multipart upload + JSON mutation endpoints |
-| Listings + images business logic | `backend/internal/service/listing_service.go` | ownership, upload, delete, reorder, primary selection |
-| Listing persistence | `backend/internal/repository/postgres/listing.go` | listing + listing_images queries and transactions |
-| Config/env vars | `backend/pkg/config/config.go` | `config.LoadConfig()` populates global `config.Env` |
-| Cloudinary adapter | `backend/pkg/cloudinary/adapter.go` | concrete storage implementation for listing images |
-| Seller frontend flows | `frontend/app/dashboard/` + `frontend/lib/` | dashboard, listing form/image actions, cookie-session API helpers |
+| Backend feature work | `backend/internal/` | flow = domain -> repository -> service -> handler -> router |
+| Auth routes + cookies | `backend/internal/handler/http/auth.go` | OAuth callback, `/auth/me`, refresh rotation |
+| Listing transport | `backend/internal/handler/http/listing.go` | CRUD + multipart image endpoints |
+| Listing business logic | `backend/internal/service/listing_service.go` | ownership, upload, delete, reorder, primary selection |
+| Listing persistence | `backend/internal/repository/postgres/listing.go` | listing + listing_images queries/transactions |
+| Backend config/env | `backend/pkg/config/config.go` | `LoadConfig()` + Cloudinary env validation |
+| Frontend protected routes | `frontend/app/(dashboard)/` | seller dashboard shell, overview, listings, edit/create routes |
+| Frontend public listings | `frontend/app/(public)/listings/` | server-rendered browse/detail routes |
+| Frontend auth helpers | `frontend/features/auth/server/` | `/auth/me` server-side gating and redirects |
+| Frontend forms/images | `frontend/features/listings/forms/` + `frontend/features/listings/images/` | RHF + Zod + image mutation workflow |
 
 ## COMMANDS
 
 ```bash
-# Backend dev
+# Backend
 cd backend && air
 cd backend && go run ./cmd/property-service
-
-# Migrations
 cd backend && go run ./cmd/migrate/main.go
 cd backend && go run ./cmd/migrate/main.go down
-
-# Backend verification
 cd backend && go test ./... -count=1
 cd backend && go test ./... -count=1 -run TestListingHandlerSuite -v
 cd backend && go build ./...
@@ -62,33 +71,44 @@ cd backend && go vet ./...
 # Frontend
 cd frontend && npm run dev
 cd frontend && npm run build
+cd frontend && npm run start
 cd frontend && npm run lint
-cd frontend && npm run test
+cd frontend && npm test
 cd frontend && npm run test:e2e
 ```
 
-## KEY CONVENTIONS
+## BACKEND RULES
 
-- **Money**: always `int64`, unit = IDR.
-- **UUIDs**: use `uuid.UUID`; entities generate IDs with `uuid.NewV7()` in hooks.
-- **JSON**: Fiber app uses `sonic.Marshal` / `sonic.Unmarshal`.
-- **Context propagation**: handlers pass `c.Context()` into services; do not use `context.Background()` in request flow.
-- **Errors**: repositories translate `gorm.ErrRecordNotFound` to domain errors; the Fiber global handler maps domain errors to the standard JSON envelope.
-- **Auth**: access + refresh tokens are httpOnly cookies with `SameSite=Lax`; refresh JTIs live in Redis.
-- **Listing images**: tests use fake storage implementations; production uses the Cloudinary adapter behind the `domain.ListingImageStorage` interface.
-- **Cloudinary config**: `CLOUDINARY_ENABLED=false` keeps image upload wiring optional; once enabled, all three credentials must be present together.
+- Keep layering strict: `handler -> service -> repository -> domain`.
+- In handlers, pass `c.Context()` to services; never use `context.Background()` in request flow.
+- Repositories translate `gorm.ErrRecordNotFound` into domain errors.
+- Money is always `int64` in IDR.
+- UUIDs use `uuid.UUID`; entities commonly generate UUID v7 in hooks.
+- Listing-image tests must use fake storage, never live Cloudinary.
+
+## FRONTEND RULES
+
+- Server Components are the default for routes, layouts, auth checks, and initial page data.
+- Keep the root layout server-rendered; mount the Query provider in `frontend/app/providers.tsx`.
+- TanStack Query is for client-owned async state, refreshes, and mutations only.
+- Use RHF + Zod + shadcn-style form primitives for non-trivial forms.
+- Keep `components/ui/` free of business logic; compose feature widgets in `features/*` or `components/shared/`.
+- Use browser-safe env via `NEXT_PUBLIC_*`; keep server-only env helpers under `frontend/lib/env/server.ts`.
+- Do not import server-only modules into client components.
+- Do not store auth tokens in `localStorage`, `sessionStorage`, or readable cookies.
 
 ## TESTING RULES
 
-- `backend/internal/service/*_test.go`: `package service_test`, `testify/mock`, flat `TestXxx` functions.
+- `backend/internal/service/*_test.go`: `package service_test`, `testify/mock`, flat `TestXxx`.
 - `backend/internal/handler/http/*_test.go`: `testify/suite` + testcontainers Postgres, with `logger.Log = zap.NewNop()` in setup.
-- Listing image handler coverage should inject fake storage into `service.NewListingService(listingRepo, fakeStorage)`; never hit live Cloudinary in tests.
-- `config.Env.AppEnv = "testing"` keeps the rate limiter out of integration-test request paths.
-- Frontend uses Vitest + Testing Library for unit/component coverage and Playwright for browser smoke checks (`frontend/e2e`).
-- Frontend auth/session assumptions stay cookie-based: `fetch` calls use `credentials: "include"`, and server-side routes forward `cookies()` headers for `/auth/me` and `/auth/me/listings`.
+- `config.Env.AppEnv = "testing"` disables rate limiting in integration-test paths.
+- `frontend` uses Vitest + Testing Library for unit/component coverage.
+- `frontend/e2e` uses Playwright for browser-level seller/public flow checks.
 
 ## NOTES
 
 - Host Postgres port is `5433`, not `5432`.
 - `backend/postman_collection.json` covers Authentication, Categories, Listings, and listing-image routes.
-- Frontend seller routes are live; avoid describing `frontend/` as scaffold-only.
+- `frontend` currently implements seller dashboard flows and public listing browse/detail pages; broader buyer/product flows are still future work.
+- `workers/`, `infra/`, and `deploy/` are planned areas but are not present in the repo yet.
+- No .cursor/rules/, .cursorrules, or .github/copilot-instructions.md files currently exist in this repo.
