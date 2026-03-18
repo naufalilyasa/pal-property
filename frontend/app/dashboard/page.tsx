@@ -61,15 +61,15 @@ function SellerState({
   action?: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[1.75rem] border border-[var(--line)] bg-white/72 p-8">
+    <section className="rounded-[1.75rem] border border-(--line) bg-white/72 p-8">
       <p
-        className="text-xs uppercase tracking-[0.3em] text-[var(--muted)]"
+        className="text-xs uppercase tracking-[0.3em] text-(--muted)"
         style={{ fontFamily: "var(--font-mono), monospace" }}
       >
         {eyebrow}
       </p>
-      <h2 className="mt-4 text-2xl font-semibold tracking-[-0.03em] text-[var(--ink)]">{title}</h2>
-      <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)] sm:text-base">{body}</p>
+      <h2 className="mt-4 text-2xl font-semibold tracking-[-0.03em] text-(--ink)">{title}</h2>
+      <p className="mt-3 max-w-2xl text-sm leading-7 text-(--muted) sm:text-base">{body}</p>
       {action ? <div className="mt-6">{action}</div> : null}
     </section>
   );
@@ -79,8 +79,8 @@ function SellerListingCard({ listing }: { listing: SellerListing }) {
   const image = getPrimaryImage(listing);
 
   return (
-    <article className="grid gap-5 rounded-[1.75rem] border border-[var(--line)] bg-white/80 p-5 sm:grid-cols-[176px_1fr] sm:p-6">
-      <div className="overflow-hidden rounded-[1.25rem] border border-[var(--line)] bg-[var(--panel-strong)]">
+    <article className="grid gap-5 rounded-[1.75rem] border border-(--line) bg-white/80 p-5 sm:grid-cols-[176px_1fr] sm:p-6">
+      <div className="overflow-hidden rounded-[1.25rem] border border-(--line) bg-(--panel-strong)">
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -89,7 +89,7 @@ function SellerListingCard({ listing }: { listing: SellerListing }) {
             src={image.url}
           />
         ) : (
-          <div className="flex h-44 items-center justify-center px-6 text-center text-sm text-[var(--muted)] sm:h-full">
+          <div className="flex h-44 items-center justify-center px-6 text-center text-sm text-(--muted) sm:h-full">
             No image uploaded yet
           </div>
         )}
@@ -99,17 +99,17 @@ function SellerListingCard({ listing }: { listing: SellerListing }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-[var(--panel-strong)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">
+              <span className="rounded-full bg-(--panel-strong) px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-(--accent)">
                 {formatStatus(listing.status)}
               </span>
-              <span className="text-sm text-[var(--muted)]">{listing.category?.name ?? "Uncategorized"}</span>
+              <span className="text-sm text-(--muted)">{listing.category?.name ?? "Uncategorized"}</span>
             </div>
-            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-[var(--ink)]">
+            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-(--ink)">
               {listing.title}
             </h2>
             <div>
               <Link
-                className="inline-flex items-center rounded-full border border-[var(--line)] bg-[var(--panel)] px-4 py-2 text-sm font-semibold text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                className="inline-flex items-center rounded-full border border-(--line) bg-(--panel) px-4 py-2 text-sm font-semibold text-(--ink) transition hover:border-(--accent) hover:text-(--accent)"
                 href={`/dashboard/listings/${listing.id}/edit`}
               >
                 Edit listing
@@ -117,25 +117,25 @@ function SellerListingCard({ listing }: { listing: SellerListing }) {
             </div>
           </div>
 
-          <p className="text-lg font-semibold text-[var(--ink)]">{formatPrice(listing.price, listing.currency)}</p>
+          <p className="text-lg font-semibold text-(--ink)">{formatPrice(listing.price, listing.currency)}</p>
         </div>
 
-        <dl className="grid gap-3 text-sm text-[var(--muted)] sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-[1rem] border border-[var(--line)] bg-[var(--panel)] px-4 py-3">
+        <dl className="grid gap-3 text-sm text-(--muted) sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-(--line) bg-(--panel) px-4 py-3">
             <dt className="text-xs uppercase tracking-[0.2em]">Primary image</dt>
-            <dd className="mt-2 font-medium text-[var(--ink)]">{image ? "Ready" : "Missing"}</dd>
+            <dd className="mt-2 font-medium text-(--ink)">{image ? "Ready" : "Missing"}</dd>
           </div>
-          <div className="rounded-[1rem] border border-[var(--line)] bg-[var(--panel)] px-4 py-3">
+          <div className="rounded-2xl border border-(--line) bg-(--panel) px-4 py-3">
             <dt className="text-xs uppercase tracking-[0.2em]">Views</dt>
-            <dd className="mt-2 font-medium text-[var(--ink)]">{listing.view_count}</dd>
+            <dd className="mt-2 font-medium text-(--ink)">{listing.view_count}</dd>
           </div>
-          <div className="rounded-[1rem] border border-[var(--line)] bg-[var(--panel)] px-4 py-3">
+          <div className="rounded-2xl border border-(--line) bg-(--panel) px-4 py-3">
             <dt className="text-xs uppercase tracking-[0.2em]">City</dt>
-            <dd className="mt-2 font-medium text-[var(--ink)]">{listing.location_city ?? "Not set"}</dd>
+            <dd className="mt-2 font-medium text-(--ink)">{listing.location_city ?? "Not set"}</dd>
           </div>
-          <div className="rounded-[1rem] border border-[var(--line)] bg-[var(--panel)] px-4 py-3">
+          <div className="rounded-2xl border border-(--line) bg-(--panel) px-4 py-3">
             <dt className="text-xs uppercase tracking-[0.2em]">Updated</dt>
-            <dd className="mt-2 font-medium text-[var(--ink)]">
+            <dd className="mt-2 font-medium text-(--ink)">
               {new Intl.DateTimeFormat("en", {
                 dateStyle: "medium",
               }).format(new Date(listing.updated_at))}
@@ -172,7 +172,7 @@ export default async function DashboardPage() {
         body="Your seller account is connected, but there are no property records to review yet. Create and publish inventory in the next task flow."
         action={
           <Link
-            className="inline-flex items-center rounded-full border border-[var(--line)] bg-[var(--panel-strong)] px-5 py-3 text-sm font-semibold text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+            className="inline-flex items-center rounded-full border border-(--line) bg-(--panel-strong) px-5 py-3 text-sm font-semibold text-(--ink) transition hover:border-(--accent) hover:text-(--accent)"
             href="/dashboard/listings/new"
           >
             Create your first listing
@@ -186,7 +186,7 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <section className="flex justify-end">
         <Link
-          className="inline-flex items-center rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+          className="inline-flex items-center rounded-full bg-(--accent) px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90"
           href="/dashboard/listings/new"
         >
           New listing
@@ -194,15 +194,15 @@ export default async function DashboardPage() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-[1.5rem] border border-[var(--line)] bg-white/72 p-5">
-          <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">Total listings</p>
-          <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
+        <div className="rounded-3xl border border-(--line) bg-white/72 p-5">
+          <p className="text-xs uppercase tracking-[0.24em] text-(--muted)">Total listings</p>
+          <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-(--ink)">
             {listingsResult.listingsPage.total}
           </p>
         </div>
-        <div className="rounded-[1.5rem] border border-[var(--line)] bg-white/72 p-5">
-          <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">Current page</p>
-          <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
+        <div className="rounded-3xl border border-(--line) bg-white/72 p-5">
+          <p className="text-xs uppercase tracking-[0.24em] text-(--muted)">Current page</p>
+          <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-(--ink)">
             {listingsResult.listingsPage.page}
           </p>
         </div>
