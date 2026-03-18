@@ -8,18 +8,24 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:guardrails": "node ./scripts/verify-guardrails.mjs",
     "test:e2e": "rm -rf test-results && playwright test && rm -rf test-results"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.90.5",
     "next": "16.1.6",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "react-hook-form": "^7.66.0",
+    "server-only": "^0.0.1",
+    "zod": "^4.1.11"
   },
   "devDependencies": {
+    "@hookform/resolvers": "^5.2.2",
     "@playwright/test": "^1.56.1",
+    "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
-    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
