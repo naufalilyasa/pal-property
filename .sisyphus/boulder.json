@@ -1,11 +1,10 @@
 {
-  "active_plan": "/mnt/data/Projects/pal-property/.sisyphus/plans/frontend-seller-listing-dashboard.md",
-  "started_at": "2026-03-16T22:05:56.639Z",
+  "active_plan": "/mnt/data/Projects/pal-property-rbac-casbin-backend/.sisyphus/plans/rbac-casbin-backend.md",
+  "started_at": "2026-03-18T20:03:09.944Z",
   "session_ids": [
-    "ses_3324f826fffeYsUl8ARRsgmJDN",
     "ses_2ffee0c43ffeH610jpiRBOIAT3"
   ],
-  "plan_name": "frontend-seller-listing-dashboard",
-  "worktree_path": "/mnt/data/Projects/pal-property-frontend-seller-listing-dashboard",
+  "plan_name": "rbac-casbin-backend",
+  "worktree_path": "/mnt/data/Projects/pal-property-rbac-casbin-backend",
   "agent": "atlas"
 }
