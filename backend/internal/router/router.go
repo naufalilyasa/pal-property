@@ -10,6 +10,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/google/uuid"
 	"github.com/naufalilyasa/pal-property-backend/internal/handler/http"
+	"github.com/naufalilyasa/pal-property-backend/pkg/authz"
 	"github.com/naufalilyasa/pal-property-backend/pkg/config"
 	"github.com/naufalilyasa/pal-property-backend/pkg/logger"
 	"github.com/naufalilyasa/pal-property-backend/pkg/middleware"
@@ -40,6 +41,7 @@ func ZapLogger() fiber.Handler {
 func Register(
 	app *fiber.App,
 	db *gorm.DB,
+	authzService *authz.Service,
 	authHandler *http.AuthHandler,
 	listingHandler *http.ListingHandler,
 	categoryHandler *http.CategoryHandler,
@@ -93,7 +95,7 @@ func Register(
 	// ==========================================
 	// Buat sub-group dari authGroup, dan pasang middleware Protected() di sini.
 	// Semua route di bawah apiProtected otomatis membutuhkan autentikasi.
-	apiProtected := authGroup.Group("/", middleware.Protected(db))
+	apiProtected := authGroup.Group("/", middleware.Protected(db, authzService))
 	apiProtected.Get("/me", authHandler.GetMe)
 	apiProtected.Post("/logout", authHandler.Logout)
 	// ==========================================
@@ -107,7 +109,7 @@ func Register(
 	// ==========================================
 	// 4. Listing Routes (Protected)
 	// ==========================================
-	listingProtected := api.Group("/listings", middleware.Protected(db))
+	listingProtected := api.Group("/listings", middleware.Protected(db, authzService))
 	listingProtected.Post("/", listingHandler.Create)
 	listingProtected.Put("/:id", listingHandler.Update)
 	listingProtected.Delete("/:id", listingHandler.Delete)
@@ -126,11 +128,8 @@ func Register(
 	// ==========================================
 	// 6. Category Routes (Admin Protected)
 	// ==========================================
-	categoryAdmin := api.Group("/categories",
-		middleware.Protected(db),
-		middleware.RequireRole("admin"),
-	)
-	categoryAdmin.Post("/", categoryHandler.Create)
-	categoryAdmin.Put("/:id", categoryHandler.Update)
-	categoryAdmin.Delete("/:id", categoryHandler.Delete)
+	categoryAdmin := api.Group("/categories", middleware.Protected(db, authzService))
+	categoryAdmin.Post("/", middleware.RequirePermission(authzService, authz.ResourceCategory, authz.ActionCreate), categoryHandler.Create)
+	categoryAdmin.Put("/:id", middleware.RequirePermission(authzService, authz.ResourceCategory, authz.ActionUpdate), categoryHandler.Update)
+	categoryAdmin.Delete("/:id", middleware.RequirePermission(authzService, authz.ResourceCategory, authz.ActionDelete), categoryHandler.Delete)
 }
