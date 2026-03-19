@@ -49,6 +49,7 @@ frontend/
 - Server Components by default; add `"use client"` only for interactive islands.
 - Use native `fetch` only.
 - Use `browserFetch` for client mutations/queries and `serverFetch` for server-side reads.
+- Keep frontend env access centralized in `frontend/lib/env/`; when adding, renaming, or removing any frontend env var, update `frontend/.env-example` in the same change.
 - Keep query keys in `frontend/lib/query/keys.ts`.
 - Use `components/ui/` for primitives only, not business logic.
 - Keep feature-owned schemas, mappers, and composed widgets under `features/*`.
@@ -70,4 +71,5 @@ cd frontend && npm run test:e2e
 - **NEVER** store access or refresh tokens in localStorage or sessionStorage.
 - **NEVER** move page/layout data fetching wholesale into TanStack Query.
 - **NEVER** import server-only env/auth helpers into client components.
+- **NEVER** add a frontend env var without updating `frontend/.env-example` to match the validated schema.
 - **NEVER** bypass the shared envelope/fetch helpers when adding new API modules.
