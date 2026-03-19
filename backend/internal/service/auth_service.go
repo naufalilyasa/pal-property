@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -35,12 +36,11 @@ func (s *authService) CompleteAuth(ctx context.Context, provider string, gothUse
 
 	// 1. Check if OAuthAccount exists
 	// Convert ProviderUserID string to UUID if needed, but in entity it is varchar(255)
-	_, err := s.repo.FindOAuthAccount(ctx, provider, gothUser.UserID)
+	oauthAccount, err := s.repo.FindOAuthAccount(ctx, provider, gothUser.UserID)
 	if err == nil {
-		// Account exists, return user
-		user, err := s.repo.FindUserByEmail(ctx, gothUser.Email)
+		user, err := s.repo.FindUserByID(ctx, oauthAccount.UserID)
 		if err != nil {
-			return nil, errors.New("oauth account exists but user not found")
+			return nil, err
 		}
 		return user, nil
 	}
@@ -52,8 +52,20 @@ func (s *authService) CompleteAuth(ctx context.Context, provider string, gothUse
 	// 2. Check if User exists by email
 	user, err := s.repo.FindUserByEmail(ctx, gothUser.Email)
 	if err == nil {
-		// User exists
+		account := &entity.OAuthAccount{
+			UserID:         user.ID,
+			Provider:       provider,
+			ProviderUserID: gothUser.UserID,
+			AccessToken:    &gothUser.AccessToken,
+			RefreshToken:   &gothUser.RefreshToken,
+		}
+		if err := s.repo.CreateOAuthAccount(ctx, account); err != nil {
+			return nil, err
+		}
 		return user, nil
+	}
+	if !errors.Is(err, domain.ErrNotFound) {
+		return nil, err
 	}
 
 	// 3. User does not exist, create new
@@ -90,13 +102,13 @@ func (s *authService) CompleteAuth(ctx context.Context, provider string, gothUse
 func (s *authService) LoginUser(ctx context.Context, user *entity.User) (*response.AuthTokens, error) {
 	accToken, refToken, jti, err := jwt.GenerateTokens(user.ID)
 	if err != nil {
-		return nil, errors.New("failed to generate tokens: " + err.Error())
+		return nil, fmt.Errorf("failed to generate tokens: %w", err)
 	}
 
 	// Save jti to Redis
 	err = s.cache.SaveRefreshTokenJTI(ctx, jti, user.ID, time.Duration(config.Env.JwtRefreshExpiration)*time.Second)
 	if err != nil {
-		return nil, errors.New("failed to cache refresh token: " + err.Error())
+		return nil, fmt.Errorf("failed to cache refresh token: %w", err)
 	}
 
 	return &response.AuthTokens{
@@ -108,7 +120,7 @@ func (s *authService) LoginUser(ctx context.Context, user *entity.User) (*respon
 func (s *authService) GetMe(ctx context.Context, userID uuid.UUID) (*response.UserResponse, error) {
 	user, err := s.repo.FindUserByID(ctx, userID)
 	if err != nil {
-		return nil, errors.New("user not found")
+		return nil, err
 	}
 
 	return &response.UserResponse{
@@ -125,13 +137,13 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*r
 	// 1. Validate refresh token structure and signature
 	userID, jti, err := jwt.ValidateRefreshToken(refreshToken)
 	if err != nil {
-		return nil, errors.New("invalid refresh token: " + err.Error())
+		return nil, fmt.Errorf("invalid refresh token: %w", domain.ErrUnauthorized)
 	}
 
 	// 2. Validate JTI against Redis cache (check if revoked/expired)
 	err = s.cache.ValidateRefreshTokenJTI(ctx, jti, userID)
 	if err != nil {
-		return nil, errors.New("refresh token session expired or revoked")
+		return nil, fmt.Errorf("refresh token session expired or revoked: %w", domain.ErrUnauthorized)
 	}
 
 	// 3. Delete old JTI from Redis (Refresh token rotation)
@@ -140,13 +152,13 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*r
 	// 4. Generate new tokens
 	accToken, newRefToken, newJTI, err := jwt.GenerateTokens(userID)
 	if err != nil {
-		return nil, errors.New("failed to generate new tokens: " + err.Error())
+		return nil, fmt.Errorf("failed to generate new tokens: %w", err)
 	}
 
 	// 5. Save new JTI to Redis
 	err = s.cache.SaveRefreshTokenJTI(ctx, newJTI, userID, time.Duration(config.Env.JwtRefreshExpiration)*time.Second)
 	if err != nil {
-		return nil, errors.New("failed to cache new refresh token: " + err.Error())
+		return nil, fmt.Errorf("failed to cache new refresh token: %w", err)
 	}
 
 	return &response.AuthTokens{
