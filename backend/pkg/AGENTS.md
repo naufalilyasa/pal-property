@@ -21,7 +21,7 @@ Reusable support packages shared across the backend. This layer now includes the
 
 ## CONFIG
 
-- `config.LoadConfig()` parses env vars, validates required values, decodes JWT/AES secrets, and validates Cloudinary env combinations.
+- `config.LoadConfig()` parses env vars via `caarlos0/env/v11`, validates required values, decodes JWT/AES secrets, and validates Cloudinary env combinations so OAuth provider tokens stay encrypted at rest.
 - Casbin rollout does not add new env toggles in phase 1; policy schema is migration-managed and model source stays in `pkg/authz/model.conf`.
 - Listing-image env guidance:
   - `CLOUDINARY_ENABLED=false` allows the app to start without image credentials.
