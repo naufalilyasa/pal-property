@@ -77,13 +77,13 @@ func TestGetMe_NotFound(t *testing.T) {
 	mockRepo, _, svc := setupTest()
 
 	userID, _ := uuid.NewV7()
-	mockRepo.On("FindUserByID", mock.Anything, userID).Return(&entity.User{}, errors.New("db error"))
+	mockRepo.On("FindUserByID", mock.Anything, userID).Return((*entity.User)(nil), domain.ErrNotFound)
 
 	res, err := svc.GetMe(context.Background(), userID)
 
 	assert.Error(t, err)
 	assert.Nil(t, res)
-	assert.Equal(t, "user not found", err.Error())
+	assert.ErrorIs(t, err, domain.ErrNotFound)
 	mockRepo.AssertExpectations(t)
 }
 
@@ -115,7 +115,7 @@ func TestRefreshToken_InvalidToken(t *testing.T) {
 	res, err := svc.RefreshToken(context.Background(), "invalid-token")
 	assert.Error(t, err)
 	assert.Nil(t, res)
-	assert.Contains(t, err.Error(), "invalid refresh token")
+	assert.ErrorIs(t, err, domain.ErrUnauthorized)
 }
 
 func TestRefreshToken_Revoked(t *testing.T) {
@@ -132,7 +132,7 @@ func TestRefreshToken_Revoked(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, res)
-	assert.Contains(t, err.Error(), "refresh token session expired or revoked")
+	assert.ErrorIs(t, err, domain.ErrUnauthorized)
 	mockCache.AssertExpectations(t)
 }
 
@@ -165,14 +165,30 @@ func TestCompleteAuth_ExistingOAuthAccount(t *testing.T) {
 	userID, _ := uuid.NewV7()
 	gothUser := goth.User{UserID: "provider-uid-123", Email: "existing@example.com", Provider: "google"}
 
-	mockRepo.On("FindOAuthAccount", mock.Anything, "google", "provider-uid-123").Return(&entity.OAuthAccount{}, nil)
-	mockRepo.On("FindUserByEmail", mock.Anything, "existing@example.com").Return(&entity.User{BaseEntity: entity.BaseEntity{ID: userID}, Email: "existing@example.com"}, nil)
+	account := &entity.OAuthAccount{UserID: userID}
+	mockRepo.On("FindOAuthAccount", mock.Anything, "google", "provider-uid-123").Return(account, nil)
+	mockRepo.On("FindUserByID", mock.Anything, userID).Return(&entity.User{BaseEntity: entity.BaseEntity{ID: userID}, Email: "existing@example.com"}, nil)
 
 	res, err := svc.CompleteAuth(context.Background(), "google", gothUser)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.Equal(t, "existing@example.com", res.Email)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestCompleteAuth_OAuthAccountWithoutUser(t *testing.T) {
+	mockRepo, _, svc := setupTest()
+	gothUser := goth.User{UserID: "existing-oauth", Email: "missing@example.com", Provider: "google"}
+
+	account := &entity.OAuthAccount{UserID: uuid.New()}
+	mockRepo.On("FindOAuthAccount", mock.Anything, "google", "existing-oauth").Return(account, nil)
+	mockRepo.On("FindUserByID", mock.Anything, account.UserID).Return((*entity.User)(nil), domain.ErrNotFound)
+
+	res, err := svc.CompleteAuth(context.Background(), "google", gothUser)
+
+	assert.Nil(t, res)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
 	mockRepo.AssertExpectations(t)
 }
 
@@ -193,15 +209,38 @@ func TestCompleteAuth_NewUserBrandNew(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 }
 
+func TestCompleteAuth_FindUserByEmailError(t *testing.T) {
+	mockRepo, _, svc := setupTest()
+	gothUser := goth.User{UserID: "new-oauth-uid", Email: "existing@example.com", Provider: "google"}
+	errDB := errors.New("failed to reach db")
+
+	mockRepo.On("FindOAuthAccount", mock.Anything, "google", "new-oauth-uid").Return((*entity.OAuthAccount)(nil), domain.ErrNotFound)
+	mockRepo.On("FindUserByEmail", mock.Anything, "existing@example.com").Return((*entity.User)(nil), errDB)
+
+	res, err := svc.CompleteAuth(context.Background(), "google", gothUser)
+
+	assert.Nil(t, res)
+	assert.ErrorIs(t, err, errDB)
+	mockRepo.AssertExpectations(t)
+}
+
 func TestCompleteAuth_EmailExistsNoOAuth(t *testing.T) {
 	mockRepo, _, svc := setupTest()
 	userID, _ := uuid.NewV7()
-	gothUser := goth.User{UserID: "new-oauth-uid", Email: "existing@example.com", Provider: "google"}
+	gothUser := goth.User{UserID: "new-oauth-uid", Email: "existing@example.com", Provider: "google", AccessToken: "access-token", RefreshToken: "refresh-token"}
 
 	mockRepo.On("FindOAuthAccount", mock.Anything, "google", "new-oauth-uid").Return((*entity.OAuthAccount)(nil), domain.ErrNotFound)
 	mockRepo.On("FindUserByEmail", mock.Anything, "existing@example.com").Return(&entity.User{BaseEntity: entity.BaseEntity{ID: userID}, Email: "existing@example.com"}, nil)
-	// The service should update the user or at least link the account, 1but we follow instructions: Assert: no error, user returned.
-	// The prompt implies it returns the user.
+	mockRepo.On("CreateOAuthAccount", mock.Anything, mock.MatchedBy(func(account *entity.OAuthAccount) bool {
+		if account == nil {
+			return false
+		}
+		return account.UserID == userID &&
+			account.Provider == "google" &&
+			account.ProviderUserID == "new-oauth-uid" &&
+			account.AccessToken != nil && *account.AccessToken == "access-token" &&
+			account.RefreshToken != nil && *account.RefreshToken == "refresh-token"
+	})).Return(nil)
 
 	res, err := svc.CompleteAuth(context.Background(), "google", gothUser)
 
@@ -293,6 +332,7 @@ func TestRefreshToken_NewJTISaveFails(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to cache new refresh token")
+	assert.NotErrorIs(t, err, domain.ErrUnauthorized)
 	mockCache.AssertExpectations(t)
 }
 
@@ -311,8 +351,9 @@ func TestCompleteAuth_ExistingAccount(t *testing.T) {
 		Email:      "existing@example.com",
 		Name:       "Existing User",
 	}
-	mockRepo.On("FindOAuthAccount", mock.Anything, "google", "google-uid-123").Return(&entity.OAuthAccount{}, nil)
-	mockRepo.On("FindUserByEmail", mock.Anything, "existing@example.com").Return(existingUser, nil)
+	account := &entity.OAuthAccount{UserID: userID}
+	mockRepo.On("FindOAuthAccount", mock.Anything, "google", "google-uid-123").Return(account, nil)
+	mockRepo.On("FindUserByID", mock.Anything, userID).Return(existingUser, nil)
 
 	user, err := svc.CompleteAuth(ctx, "google", gothUser)
 

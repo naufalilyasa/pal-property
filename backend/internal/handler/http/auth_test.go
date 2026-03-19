@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -20,6 +21,8 @@ import (
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
 	"github.com/markbates/goth/providers/faux"
+	"github.com/naufalilyasa/pal-property-backend/internal/domain"
+	"github.com/naufalilyasa/pal-property-backend/internal/dto/response"
 	handler "github.com/naufalilyasa/pal-property-backend/internal/handler/http"
 	repo "github.com/naufalilyasa/pal-property-backend/internal/repository/postgres"
 	redisRepo "github.com/naufalilyasa/pal-property-backend/internal/repository/redis"
@@ -50,6 +53,78 @@ type AuthHandlerTestSuite struct {
 	rdb            *redis.Client
 	ctx            context.Context
 	fauxProvider   *faux.Provider
+}
+
+type stubAuthService struct {
+	completeAuth func(ctx context.Context, provider string, gothUser goth.User) (*entity.User, error)
+	loginUser    func(ctx context.Context, user *entity.User) (*response.AuthTokens, error)
+	getMe        func(ctx context.Context, userID uuid.UUID) (*response.UserResponse, error)
+	refreshToken func(ctx context.Context, refreshToken string) (*response.AuthTokens, error)
+	logout       func(ctx context.Context, refreshToken string) error
+}
+
+func (s *stubAuthService) CompleteAuth(ctx context.Context, provider string, gothUser goth.User) (*entity.User, error) {
+	if s.completeAuth == nil {
+		return nil, nil
+	}
+
+	return s.completeAuth(ctx, provider, gothUser)
+}
+
+func (s *stubAuthService) LoginUser(ctx context.Context, user *entity.User) (*response.AuthTokens, error) {
+	if s.loginUser == nil {
+		return nil, nil
+	}
+
+	return s.loginUser(ctx, user)
+}
+
+func (s *stubAuthService) GetMe(ctx context.Context, userID uuid.UUID) (*response.UserResponse, error) {
+	if s.getMe == nil {
+		return nil, nil
+	}
+
+	return s.getMe(ctx, userID)
+}
+
+func (s *stubAuthService) RefreshToken(ctx context.Context, refreshToken string) (*response.AuthTokens, error) {
+	if s.refreshToken == nil {
+		return nil, nil
+	}
+
+	return s.refreshToken(ctx, refreshToken)
+}
+
+func (s *stubAuthService) Logout(ctx context.Context, refreshToken string) error {
+	if s.logout == nil {
+		return nil
+	}
+
+	return s.logout(ctx, refreshToken)
+}
+
+func newRefreshHandlerTestApp(authSvc service.AuthService) *fiber.App {
+	authHandler := handler.NewAuthHandler(authSvc)
+
+	app := fiber.New(fiber.Config{
+		ErrorHandler: func(c fiber.Ctx, err error) error {
+			code := fiber.StatusInternalServerError
+			if e, ok := err.(*fiber.Error); ok {
+				code = e.Code
+			}
+
+			return c.Status(code).JSON(fiber.Map{
+				"success":  false,
+				"message":  err.Error(),
+				"data":     nil,
+				"trace_id": "test-trace",
+			})
+		},
+	})
+
+	app.Post("/auth/refresh", authHandler.RefreshToken)
+
+	return app
 }
 
 // SetupSuite runs once before the tests in the suite
@@ -528,4 +603,56 @@ func (suite *AuthHandlerTestSuite) TestLogout_GarbageRefreshToken() {
 }
 func TestAuthHandlerSuite(t *testing.T) {
 	suite.Run(t, new(AuthHandlerTestSuite))
+}
+
+func TestRefreshToken_InfraFailureReturnsInternalServerError(t *testing.T) {
+	app := newRefreshHandlerTestApp(&stubAuthService{
+		refreshToken: func(ctx context.Context, refreshToken string) (*response.AuthTokens, error) {
+			return nil, errors.New("cache unavailable")
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/refresh", nil)
+	req.AddCookie(&http.Cookie{Name: "refresh_token", Value: "refresh-token"})
+	req.AddCookie(&http.Cookie{Name: "access_token", Value: "old-access"})
+
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 30 * time.Second})
+	if err != nil {
+		t.Fatalf("app.Test error: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("expected %d, got %d", http.StatusInternalServerError, resp.StatusCode)
+	}
+
+	cleared := map[string]bool{}
+	for _, cookie := range resp.Cookies() {
+		if (cookie.Name == "access_token" || cookie.Name == "refresh_token") && (cookie.Value == "" || cookie.MaxAge < 0) {
+			cleared[cookie.Name] = true
+		}
+	}
+
+	if !cleared["access_token"] || !cleared["refresh_token"] {
+		t.Fatalf("expected access and refresh cookies to be cleared, got %#v", cleared)
+	}
+}
+
+func TestRefreshToken_UnauthorizedStaysUnauthorized(t *testing.T) {
+	app := newRefreshHandlerTestApp(&stubAuthService{
+		refreshToken: func(ctx context.Context, refreshToken string) (*response.AuthTokens, error) {
+			return nil, domain.ErrUnauthorized
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/refresh", nil)
+	req.AddCookie(&http.Cookie{Name: "refresh_token", Value: "refresh-token"})
+
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 30 * time.Second})
+	if err != nil {
+		t.Fatalf("app.Test error: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected %d, got %d", http.StatusUnauthorized, resp.StatusCode)
+	}
 }
