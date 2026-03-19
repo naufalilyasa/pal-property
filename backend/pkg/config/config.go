@@ -21,7 +21,7 @@ type AppConfig struct {
 	DBPassword string `env:"DB_PASSWORD" validate:"required"`
 	DBName     string `env:"DB_NAME"     validate:"required"`
 	DBPort     string `env:"DB_PORT"     envDefault:"5432"`
-	DBSSLMode  string `env:"DB_SSLMODE"    envDefault:"disable"`
+	DBSSLMode  string `env:"DB_SSL_MODE" envDefault:"disable"`
 
 	// Redis
 	RedisAddr     string `env:"REDIS_ADDR"     validate:"required"`
