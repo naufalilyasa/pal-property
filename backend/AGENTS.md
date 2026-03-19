@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-Go 1.26 REST API. Fiber v3 + GORM + PostgreSQL + Redis with strict layering. Listings include Cloudinary-backed image management, and authorization now routes through a shared Casbin-backed authz layer.
+Go 1.26 REST API. Fiber v3 + GORM + PostgreSQL + Redis with strict layering. Listings include Cloudinary-backed image management, and authorization now routes through a shared Casbin-backed authz layer. Redpanda already owns the message broker role, and the recent security/config cleanup aligned DB SSL config, legacy OAuth token reads, auth refresh semantics, and env guidance ahead of the planned producers/consumers, Elasticsearch indexing, and broader buyer-facing/product flows.
 
 ## STRUCTURE
 
@@ -49,8 +49,9 @@ listingHandler := http.NewListingHandler(listingSvc)
 - Includes listing-image validation/config errors (`ErrInvalidImageFile`, `ErrImageOrderInvalid`, `ErrImageLimitReached`, `ErrImageStorageUnset`).
 
 **Config sync**:
-- Runtime authority is `pkg/config/config.go`.
+- Runtime authority is `pkg/config/config.go`, which uses `caarlos0/env/v11` to parse env and decode AES secrets so OAuth provider tokens stay encrypted at rest.
 - Any new env var still requires updates to `.env-example` and `.env.docker` when local startup depends on it.
+- **Prices:** Listing and commerce values stay `int64` in IDR to protect precision across services.
 
 ## CURRENT FEATURE AREAS
 
