@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gofiber/fiber/v3"
@@ -8,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
+	"github.com/naufalilyasa/pal-property-backend/internal/domain"
 	"github.com/naufalilyasa/pal-property-backend/internal/service"
 	"github.com/naufalilyasa/pal-property-backend/pkg/config"
 	"github.com/naufalilyasa/pal-property-backend/pkg/utils"
@@ -129,7 +131,11 @@ func (h *AuthHandler) RefreshToken(c fiber.Ctx) error {
 	if err != nil {
 		// Clear cookies if refresh fails
 		c.ClearCookie("access_token", "refresh_token")
-		return fiber.NewError(fiber.StatusUnauthorized, err.Error())
+		if errors.Is(err, domain.ErrUnauthorized) {
+			return fiber.NewError(fiber.StatusUnauthorized, err.Error())
+		}
+
+		return err
 	}
 
 	isSecure := config.Env.AppEnv == "production"
