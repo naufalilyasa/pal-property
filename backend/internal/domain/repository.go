@@ -10,6 +10,7 @@ import (
 type AuthRepository interface {
 	FindOAuthAccount(ctx context.Context, provider, providerUserID string) (*entity.OAuthAccount, error)
 	CreateUserWithOAuth(ctx context.Context, user *entity.User, account *entity.OAuthAccount) (*entity.User, error)
+	CreateOAuthAccount(ctx context.Context, account *entity.OAuthAccount) error
 	FindUserByEmail(ctx context.Context, email string) (*entity.User, error)
 	FindUserByID(ctx context.Context, id uuid.UUID) (*entity.User, error)
 	Updates(ctx context.Context, user *entity.User) error

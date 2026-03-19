@@ -47,6 +47,24 @@ func (_m *AuthRepository) CreateUserWithOAuth(ctx context.Context, user *entity.
 	return r0, r1
 }
 
+// CreateOAuthAccount provides a mock function with given fields: ctx, account
+func (_m *AuthRepository) CreateOAuthAccount(ctx context.Context, account *entity.OAuthAccount) error {
+	ret := _m.Called(ctx, account)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateOAuthAccount")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *entity.OAuthAccount) error); ok {
+		r0 = rf(ctx, account)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // FindOAuthAccount provides a mock function with given fields: ctx, provider, providerUserID
 func (_m *AuthRepository) FindOAuthAccount(ctx context.Context, provider string, providerUserID string) (*entity.OAuthAccount, error) {
 	ret := _m.Called(ctx, provider, providerUserID)
