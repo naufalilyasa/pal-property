@@ -11,6 +11,12 @@ services:
       POSTGRES_DB: pal_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d pal_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # 2. CACHING & RATE LIMIT (Redis)
   redis:
@@ -78,12 +84,17 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - postgres
-      - redis
-      - redpanda
-      - elasticsearch
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      redpanda:
+        condition: service_started
+      elasticsearch:
+        condition: service_started
     env_file:
-      - ./backend/.env.docker 
+      - ./backend/.env.docker
+    command: ["sh", "-c", "go run ./cmd/migrate/main.go && exec air"]
 
 volumes:
   postgres_data:
