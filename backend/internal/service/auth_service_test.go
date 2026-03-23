@@ -19,6 +19,7 @@ import (
 	"github.com/naufalilyasa/pal-property-backend/internal/service"
 	"github.com/naufalilyasa/pal-property-backend/pkg/config"
 	"github.com/naufalilyasa/pal-property-backend/pkg/utils/jwt"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -126,13 +127,32 @@ func TestRefreshToken_Revoked(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Mock token revoked (not in cache)
-	mockCache.On("ValidateRefreshTokenJTI", mock.Anything, jti, userID).Return(errors.New("redis nil"))
+	mockCache.On("ValidateRefreshTokenJTI", mock.Anything, jti, userID).Return(redis.Nil)
 
 	res, err := svc.RefreshToken(context.Background(), refToken)
 
 	assert.Error(t, err)
 	assert.Nil(t, res)
 	assert.ErrorIs(t, err, domain.ErrUnauthorized)
+	mockCache.AssertExpectations(t)
+}
+
+func TestRefreshToken_CacheInfraError(t *testing.T) {
+	_, mockCache, svc := setupTest()
+
+	userID, _ := uuid.NewV7()
+	_, refToken, jti, err := jwt.GenerateTokens(userID)
+	assert.NoError(t, err)
+
+	infraErr := errors.New("redis timeout")
+	mockCache.On("ValidateRefreshTokenJTI", mock.Anything, jti, userID).Return(infraErr)
+
+	res, err := svc.RefreshToken(context.Background(), refToken)
+
+	assert.Error(t, err)
+	assert.Nil(t, res)
+	assert.NotErrorIs(t, err, domain.ErrUnauthorized)
+	assert.ErrorIs(t, err, infraErr)
 	mockCache.AssertExpectations(t)
 }
 
