@@ -136,10 +136,10 @@ Wave 2: auth-service semantics, then docs/env sync, then focused verification.
   - [x] `grep -n 'Price    int64' backend/internal/domain/entity/listing.go` returns the integer-money invariant.
 
 ## Final Verification Wave (4 parallel agents, ALL must APPROVE)
-- [ ] F1. Plan Compliance Audit — oracle
-- [ ] F2. Code Quality Review — reviewer
-- [ ] F3. Real Runtime QA — tester
-- [ ] F4. Scope Fidelity Check — deep
+- [x] F1. Plan Compliance Audit — oracle
+- [x] F2. Code Quality Review — reviewer
+- [x] F3. Real Runtime QA — tester
+- [x] F4. Scope Fidelity Check — deep
 
 ## Success Criteria
 - The plan reflects current repo reality instead of stale migrations that are already done.
