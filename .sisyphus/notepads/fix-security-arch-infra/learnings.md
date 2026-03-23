@@ -11,3 +11,8 @@
 - 2026-03-19: Sanitized the local `backend/.env.docker` template by replacing OAuth/JWT values with placeholders to keep developer config handling safer.
 - 2026-03-19: Registered the broker comment as Redpanda to keep infra notes aligned with the live messaging stack.
 - 2026-03-19: Added a config regression test that pins `LoadConfig` to the documented `DB_SSL_MODE` so future tweaks can’t drift back to the old key.
+
+- 2026-03-24: Refresh-token cache validation now treats redis.Nil as unauthorized while bubbling other cache errors so handler surfaces infra failures instead of masking them.
+- 2026-03-24: Hardened the OAuth plaintext fallback so truncated/corrupted ciphertext can’t misreport as legacy plaintext and added a regression test that enforces the new boundary.
+- 2026-03-24: Finalized the legacy plaintext guard by validating raw plaintext-like shape (no whitespace/control characters) before accepting corrupted base64 input, keeping true legacy tokens safe while rejecting obvious garbage.
+* 2026-03-23T19:48:21Z: Runtime QA re-run after cache/plaintext fixes. Verified refreshed error handling distinguishes redis.Nil vs general infra failure and plaintext fallback still preserves decrypt-on-read while rejecting malformed ciphertext; `go build`, targeted service, and repo tests pass.
