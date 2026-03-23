@@ -13,6 +13,7 @@ import (
 	"github.com/naufalilyasa/pal-property-backend/internal/dto/response"
 	"github.com/naufalilyasa/pal-property-backend/pkg/config"
 	"github.com/naufalilyasa/pal-property-backend/pkg/utils/jwt"
+	"github.com/redis/go-redis/v9"
 )
 
 type AuthService interface {
@@ -143,7 +144,10 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*r
 	// 2. Validate JTI against Redis cache (check if revoked/expired)
 	err = s.cache.ValidateRefreshTokenJTI(ctx, jti, userID)
 	if err != nil {
-		return nil, fmt.Errorf("refresh token session expired or revoked: %w", domain.ErrUnauthorized)
+		if errors.Is(err, redis.Nil) {
+			return nil, fmt.Errorf("refresh token session expired or revoked: %w", domain.ErrUnauthorized)
+		}
+		return nil, fmt.Errorf("failed to validate refresh token session: %w", err)
 	}
 
 	// 3. Delete old JTI from Redis (Refresh token rotation)
