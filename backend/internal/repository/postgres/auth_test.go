@@ -83,3 +83,39 @@ func TestAuthRepository_DecryptInvalidCiphertext(t *testing.T) {
 		t.Fatalf("unexpected error for tampered ciphertext: %v", err)
 	}
 }
+
+func TestAuthRepository_RejectsMalformedCiphertextPlaintextFallback(t *testing.T) {
+	setTestEncryptionKey(t)
+	encrypted, err := crypto.Encrypt("value", config.Env.OAuthTokenEncryptionKey)
+	if err != nil {
+		t.Fatalf("failed to encrypt token: %v", err)
+	}
+
+	decoded, err := base64.URLEncoding.DecodeString(encrypted)
+	if err != nil {
+		t.Fatalf("failed to decode encrypted token: %v", err)
+	}
+	short := decoded[:20]
+	short[0] = 0
+	invalid := base64.URLEncoding.EncodeToString(short)
+
+	result, err := decryptOAuthToken(invalid, "refresh token")
+	if err == nil {
+		t.Fatalf("expected error for malformed ciphertext, got %v", result)
+	}
+	if !strings.Contains(err.Error(), "failed to decrypt refresh token") {
+		t.Fatalf("unexpected error for malformed ciphertext: %v", err)
+	}
+}
+
+func TestAuthRepository_RejectsNonPlaintextGarbage(t *testing.T) {
+	setTestEncryptionKey(t)
+	garbage := "not plaintext"
+	result, err := decryptOAuthToken(garbage, "access token")
+	if err == nil {
+		t.Fatalf("expected error for non-plaintext fallback, got %v", result)
+	}
+	if !strings.Contains(err.Error(), "failed to decrypt access token") {
+		t.Fatalf("unexpected error for non-plaintext garbage: %v", err)
+	}
+}

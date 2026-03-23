@@ -121,7 +121,7 @@ func decryptOAuthToken(raw string, fieldName string) (*string, error) {
 func isLegacyPlaintextToken(raw string, decryptErr error) bool {
 	var corruptInputError base64.CorruptInputError
 	if errors.As(decryptErr, &corruptInputError) {
-		return true
+		return isLikelyPlaintextToken([]byte(raw))
 	}
 
 	decoded, err := base64.URLEncoding.DecodeString(raw)
@@ -129,10 +129,7 @@ func isLegacyPlaintextToken(raw string, decryptErr error) bool {
 		return false
 	}
 
-	if len(decoded) < 28 {
-		return true
-	}
-
+	// Require the decoded bytes to look like plaintext before accepting them.
 	return isLikelyPlaintextToken(decoded)
 }
 
