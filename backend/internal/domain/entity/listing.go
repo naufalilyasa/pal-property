@@ -34,31 +34,50 @@ func (c *Category) BeforeCreate(tx *gorm.DB) error {
 
 type Listing struct {
 	BaseEntity
-	UserID      uuid.UUID  `gorm:"type:uuid;not null" json:"user_id"`
-	CategoryID  *uuid.UUID `gorm:"type:uuid" json:"category_id"`
-	Title       string     `gorm:"type:varchar(255);not null" json:"title"`
-	Slug        string     `gorm:"type:varchar(255);unique;not null" json:"slug"`
-	Description *string    `gorm:"type:text" json:"description"`
+	UserID     uuid.UUID  `gorm:"type:uuid;not null" json:"user_id"`
+	CategoryID *uuid.UUID `gorm:"type:uuid" json:"category_id"`
+
+	Title       string  `gorm:"type:varchar(255);not null" json:"title"`
+	Slug        string  `gorm:"type:varchar(255);unique;not null" json:"slug"`
+	Description *string `gorm:"type:text" json:"description"`
+
 	// Price is stored in the smallest currency unit (Indonesian Rupiah, no decimal).
 	// Example: Rp 500.000.000 is stored as 500000000.
-	Price    int64  `gorm:"not null" json:"price"`
-	Currency string `gorm:"type:varchar(3);default:'IDR'" json:"currency"`
+	TransactionType string `gorm:"type:varchar(20);not null;default:'sale';index" json:"transaction_type"`
+	Price           int64  `gorm:"not null" json:"price"`
+	Currency        string `gorm:"type:varchar(3);default:'IDR'" json:"currency"`
+	IsNegotiable    bool   `gorm:"default:false" json:"is_negotiable"`
 
-	LocationCity     *string `gorm:"type:varchar(100)" json:"location_city"`
-	LocationDistrict *string `gorm:"type:varchar(100)" json:"location_district"`
-	// LocationCoordinates is handled as point type, usually needs custom GORM data type or raw SQL.
-	// For simplicity in struct, we might use a custom struct or interface.
-	// Putting placeholder here, might need PostGIS or similar if advanced.
-	// But schema says POINT.
+	SpecialOffers datatypes.JSON `gorm:"type:jsonb;default:'[]'" json:"special_offers"`
 
-	AddressDetail *string `gorm:"type:text" json:"address_detail"`
+	LocationProvince *string  `gorm:"type:varchar(100);index" json:"location_province"`
+	LocationCity     *string  `gorm:"type:varchar(100)" json:"location_city"`
+	LocationDistrict *string  `gorm:"type:varchar(100)" json:"location_district"`
+	AddressDetail    *string  `gorm:"type:text" json:"address_detail"`
+	Latitude         *float64 `gorm:"type:decimal(10,8)" json:"latitude"`
+	Longitude        *float64 `gorm:"type:decimal(11,8)" json:"longitude"`
 
-	Status     string `gorm:"type:varchar(20);default:'active'" json:"status"`
-	IsFeatured bool   `gorm:"default:false" json:"is_featured"`
+	BedroomCount    *int `gorm:"type:int;index" json:"bedroom_count"`
+	BathroomCount   *int `gorm:"type:int;index" json:"bathroom_count"`
+	FloorCount      *int `gorm:"type:int" json:"floor_count"`
+	CarportCapacity *int `gorm:"type:int" json:"carport_capacity"`
 
+	LandAreaSqm     *int `gorm:"type:int;index" json:"land_area_sqm"`
+	BuildingAreaSqm *int `gorm:"type:int;index" json:"building_area_sqm"`
+
+	CertificateType   *string `gorm:"type:varchar(50);index" json:"certificate_type"`
+	Condition         *string `gorm:"type:varchar(50);index" json:"condition"`
+	Furnishing        *string `gorm:"type:varchar(50);index" json:"furnishing"`
+	ElectricalPowerVA *int    `gorm:"type:int" json:"electrical_power_va"`
+	FacingDirection   *string `gorm:"type:varchar(50)" json:"facing_direction"`
+	YearBuilt         *int    `gorm:"type:int" json:"year_built"`
+
+	Facilities     datatypes.JSON `gorm:"type:jsonb;default:'[]'" json:"facilities"`
 	Specifications datatypes.JSON `gorm:"type:jsonb;default:'{}'" json:"specifications"`
 
-	ViewCount int `gorm:"default:0" json:"view_count"`
+	Status     string `gorm:"type:varchar(20);default:'active';index" json:"status"`
+	IsFeatured bool   `gorm:"default:false" json:"is_featured"`
+	ViewCount  int    `gorm:"default:0" json:"view_count"`
 
 	User     *User          `gorm:"foreignKey:UserID" json:"user,omitempty"`
 	Category *Category      `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
