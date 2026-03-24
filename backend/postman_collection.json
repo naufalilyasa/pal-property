@@ -207,13 +207,25 @@
                                 {
                                     "key": "status",
                                     "value": "active",
-                                    "description": "Filter by status: active | inactive | sold",
+                                    "description": "Filter by public-safe status: active | sold",
                                     "disabled": true
                                 },
                                 {
-                                    "key": "city",
+                                    "key": "transaction_type",
+                                    "value": "sale",
+                                    "description": "Filter by transaction type: sale | rent",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "location_province",
+                                    "value": "Jawa Barat",
+                                    "description": "Filter by province name (case-insensitive partial match)",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "location_city",
                                     "value": "Jakarta",
-                                    "description": "Filter by city name (case-insensitive partial match)",
+                                    "description": "Canonical city filter name (legacy alias `city` is still accepted for compatibility)",
                                     "disabled": true
                                 },
                                 {
@@ -233,10 +245,52 @@
                                     "value": "2000000000",
                                     "description": "Maximum price in IDR (int64)",
                                     "disabled": true
+                                },
+                                {
+                                    "key": "bedroom_count",
+                                    "value": "3",
+                                    "description": "Minimum bedroom count",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "bathroom_count",
+                                    "value": "2",
+                                    "description": "Minimum bathroom count",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "land_area_min",
+                                    "value": "90",
+                                    "description": "Minimum land area in square meters",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "building_area_min",
+                                    "value": "75",
+                                    "description": "Minimum building area in square meters",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "certificate_type",
+                                    "value": "SHM",
+                                    "description": "Filter by certificate type",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "condition",
+                                    "value": "new",
+                                    "description": "Filter by property condition",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "furnishing",
+                                    "value": "semi",
+                                    "description": "Filter by furnishing level",
+                                    "disabled": true
                                 }
                             ]
                         },
-                        "description": "Returns a paginated list of listings. Supports filtering by status, city, category_id, price_min, price_max. Public endpoint — no auth required."
+                        "description": "Returns a paginated list of listings. Public endpoints only expose public-safe statuses (`active`, `sold`). Supports filtering by transaction type, province/city, category_id, price range, selected typed property fields, and legacy-compatible listing metadata. Public endpoint — no auth required."
                     },
                     "response": []
                 },
@@ -250,7 +304,7 @@
                             "host": ["{{baseUrl}}"],
                             "path": ["api", "listings", "{{listingId}}"]
                         },
-                        "description": "Fetch a single listing by its UUID. Also increments the view_count asynchronously. Returns 404 if not found."
+                        "description": "Fetch a single public-safe listing by its UUID. Also increments the view_count asynchronously. Returns 404 if not found or if the listing is not public-safe."
                     },
                     "response": []
                 },
@@ -264,7 +318,7 @@
                             "host": ["{{baseUrl}}"],
                             "path": ["api", "listings", "slug", "{{listingSlug}}"]
                         },
-                        "description": "Fetch a single listing by its URL-friendly slug. Also increments the view_count asynchronously. Returns 404 if not found."
+                        "description": "Fetch a single public-safe listing by its URL-friendly slug. Also increments the view_count asynchronously. Returns 404 if not found or if the listing is not public-safe."
                     },
                     "response": []
                 },
@@ -280,7 +334,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"title\": \"Rumah Minimalis 3 Kamar di Depok\",\n  \"description\": \"Rumah dengan desain modern minimalis, 3 kamar tidur, 2 kamar mandi, dekat tol.\",\n  \"price\": 850000000,\n  \"status\": \"active\",\n  \"location_city\": \"Depok\",\n  \"location_district\": \"Beji\",\n  \"address_detail\": \"Jl. Margonda Raya No. 123\",\n  \"category_id\": null,\n  \"specifications\": {\n    \"bedrooms\": 3,\n    \"bathrooms\": 2,\n    \"land_area_sqm\": 120,\n    \"building_area_sqm\": 90\n  }\n}",
+                            "raw": "{\n  \"title\": \"Rumah Minimalis 3 Kamar di Depok\",\n  \"description\": \"Rumah dengan desain modern minimalis, 3 kamar tidur, 2 kamar mandi, dekat tol.\",\n  \"transaction_type\": \"sale\",\n  \"price\": 850000000,\n  \"currency\": \"IDR\",\n  \"is_negotiable\": true,\n  \"special_offers\": [\"Promo\"],\n  \"status\": \"draft\",\n  \"location_province\": \"Jawa Barat\",\n  \"location_city\": \"Depok\",\n  \"location_district\": \"Beji\",\n  \"address_detail\": \"Jl. Margonda Raya No. 123\",\n  \"latitude\": -6.394,\n  \"longitude\": 106.822,\n  \"bedroom_count\": 3,\n  \"bathroom_count\": 2,\n  \"floor_count\": 2,\n  \"carport_capacity\": 1,\n  \"land_area_sqm\": 120,\n  \"building_area_sqm\": 90,\n  \"certificate_type\": \"SHM\",\n  \"condition\": \"new\",\n  \"furnishing\": \"semi\",\n  \"electrical_power_va\": 2200,\n  \"facing_direction\": \"east\",\n  \"year_built\": 2021,\n  \"facilities\": [\"AC\", \"CCTV\"],\n  \"category_id\": null,\n  \"specifications\": {\n    \"bedrooms\": 3,\n    \"bathrooms\": 2,\n    \"land_area_sqm\": 120,\n    \"building_area_sqm\": 90\n  }\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -292,7 +346,7 @@
                             "host": ["{{baseUrl}}"],
                             "path": ["api", "listings", ""]
                         },
-                        "description": "Create a new property listing. Requires access_token cookie. Slug is auto-generated from the title. Price is in IDR (int64, must be > 0). Status: active | inactive | sold."
+                        "description": "Create a new property listing. Requires access_token cookie. Slug is auto-generated from the title. Price is in IDR (int64, must be > 0). Status now supports `active`, `inactive`, `sold`, `draft`, and `archived`. New typed property fields are accepted, while `specifications` remains temporarily for compatibility during the rollout."
                     },
                     "response": []
                 },
@@ -308,7 +362,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"title\": \"Rumah Minimalis 3 Kamar di Depok - Updated\",\n  \"price\": 900000000,\n  \"status\": \"active\"\n}",
+                            "raw": "{\n  \"title\": \"Rumah Minimalis 3 Kamar di Depok - Updated\",\n  \"transaction_type\": \"rent\",\n  \"price\": 900000000,\n  \"status\": \"inactive\",\n  \"location_province\": \"Jawa Barat\",\n  \"bedroom_count\": 4,\n  \"bathroom_count\": 3,\n  \"land_area_sqm\": 135,\n  \"building_area_sqm\": 105,\n  \"special_offers\": [\"Turun_Harga\"],\n  \"facilities\": [\"AC\", \"Water_Heater\"],\n  \"specifications\": {\n    \"bedrooms\": 4,\n    \"bathrooms\": 3,\n    \"land_area_sqm\": 135,\n    \"building_area_sqm\": 105\n  }\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -320,7 +374,7 @@
                             "host": ["{{baseUrl}}"],
                             "path": ["api", "listings", "{{listingId}}"]
                         },
-                        "description": "Partially update a listing. Only provided fields are updated (PATCH semantics despite PUT method). Only the listing owner or an admin can update. Returns 403 Forbidden for non-owners."
+                        "description": "Partially update a listing. Only provided fields are updated (PATCH semantics despite PUT method). Only the listing owner or an admin can update. Typed property fields are now supported; `specifications` is still accepted and regenerated for compatibility during the rollout. Returns 403 Forbidden for non-owners."
                     },
                     "response": []
                 },
@@ -363,7 +417,7 @@
                                 }
                             ]
                         },
-                        "description": "Returns a paginated list of listings belonging to the currently authenticated user. Requires access_token cookie."
+                        "description": "Returns a paginated list of listings belonging to the currently authenticated user. Seller-owned views can include non-public statuses such as `draft` and `archived`. Requires access_token cookie."
                     },
                     "response": []
                 },

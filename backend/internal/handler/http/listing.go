@@ -10,6 +10,7 @@ import (
 	"github.com/naufalilyasa/pal-property-backend/internal/service"
 	"github.com/naufalilyasa/pal-property-backend/pkg/middleware"
 	"github.com/naufalilyasa/pal-property-backend/pkg/utils"
+	pkgvalidator "github.com/naufalilyasa/pal-property-backend/pkg/validator"
 )
 
 type ListingHandler struct {
@@ -29,6 +30,9 @@ func (h *ListingHandler) Create(c fiber.Ctx) error {
 	var req request.CreateListingRequest
 	if err := c.Bind().JSON(&req); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid request body: "+err.Error())
+	}
+	if err := pkgvalidator.Validate.Struct(req); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "validation failed: "+err.Error())
 	}
 
 	res, err := h.svc.Create(c.Context(), principal, &req)
@@ -81,6 +85,9 @@ func (h *ListingHandler) Update(c fiber.Ctx) error {
 	var req request.UpdateListingRequest
 	if err = c.Bind().JSON(&req); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid request body: "+err.Error())
+	}
+	if err := pkgvalidator.Validate.Struct(req); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "validation failed: "+err.Error())
 	}
 
 	res, err := h.svc.Update(c.Context(), id, principal, &req)
@@ -241,10 +248,15 @@ func (h *ListingHandler) parseFilter(c fiber.Ctx) domain.ListingFilter {
 	}
 
 	filter := domain.ListingFilter{
-		Status:       c.Query("status"),
-		LocationCity: c.Query("city"),
-		Page:         page,
-		Limit:        limit,
+		Status:           c.Query("status"),
+		TransactionType:  c.Query("transaction_type"),
+		LocationProvince: c.Query("location_province"),
+		LocationCity:     firstQueryValue(c, "location_city", "city"),
+		CertificateType:  c.Query("certificate_type"),
+		Condition:        c.Query("condition"),
+		Furnishing:       c.Query("furnishing"),
+		Page:             page,
+		Limit:            limit,
 	}
 
 	if catID := c.Query("category_id"); catID != "" {
@@ -265,5 +277,50 @@ func (h *ListingHandler) parseFilter(c fiber.Ctx) domain.ListingFilter {
 		}
 	}
 
+	if bedrooms := c.Query("bedroom_count"); bedrooms != "" {
+		if val, err := strconv.Atoi(bedrooms); err == nil {
+			filter.BedroomCount = &val
+		}
+	}
+
+	if bathrooms := c.Query("bathroom_count"); bathrooms != "" {
+		if val, err := strconv.Atoi(bathrooms); err == nil {
+			filter.BathroomCount = &val
+		}
+	}
+
+	if landMin := c.Query("land_area_min"); landMin != "" {
+		if val, err := strconv.Atoi(landMin); err == nil {
+			filter.LandAreaMin = &val
+		}
+	}
+
+	if landMax := c.Query("land_area_max"); landMax != "" {
+		if val, err := strconv.Atoi(landMax); err == nil {
+			filter.LandAreaMax = &val
+		}
+	}
+
+	if buildingMin := c.Query("building_area_min"); buildingMin != "" {
+		if val, err := strconv.Atoi(buildingMin); err == nil {
+			filter.BuildingAreaMin = &val
+		}
+	}
+
+	if buildingMax := c.Query("building_area_max"); buildingMax != "" {
+		if val, err := strconv.Atoi(buildingMax); err == nil {
+			filter.BuildingAreaMax = &val
+		}
+	}
+
 	return filter
+}
+
+func firstQueryValue(c fiber.Ctx, keys ...string) string {
+	for _, key := range keys {
+		if value := c.Query(key); value != "" {
+			return value
+		}
+	}
+	return ""
 }

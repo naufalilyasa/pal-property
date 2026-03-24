@@ -115,6 +115,196 @@ func TestListingService_Create_RepoError(t *testing.T) {
 	assert.Equal(t, domain.ErrConflict, err)
 }
 
+func TestListingService_Create_ExpandedFields_PreservesCompatibilitySpecifications(t *testing.T) {
+	repo := mocks.NewListingRepository(t)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
+
+	userID := uuid.New()
+	categoryID := uuid.New()
+	negotiable := true
+	province := "Jawa Barat"
+	city := "Bogor"
+	bedrooms := 4
+	bathrooms := 3
+	landArea := 180
+	buildingArea := 140
+	electricalPower := 5500
+	transactionType := "sale"
+	latitude := -6.5971
+	longitude := 106.8060
+	req := &request.CreateListingRequest{
+		CategoryID:        &categoryID,
+		Title:             "Rumah Keluarga Besar Bogor",
+		Description:       ptr("Rumah luas dengan fasilitas lengkap"),
+		TransactionType:   transactionType,
+		Price:             1750000000,
+		IsNegotiable:      &negotiable,
+		SpecialOffers:     []string{"Promo", "Turun_Harga"},
+		LocationProvince:  &province,
+		LocationCity:      &city,
+		Latitude:          &latitude,
+		Longitude:         &longitude,
+		BedroomCount:      &bedrooms,
+		BathroomCount:     &bathrooms,
+		LandAreaSqm:       &landArea,
+		BuildingAreaSqm:   &buildingArea,
+		ElectricalPowerVA: &electricalPower,
+		Facilities:        []string{"AC", "CCTV"},
+		Status:            "draft",
+		Specifications: request.Specifications{
+			Bedrooms:        1,
+			Bathrooms:       1,
+			LandAreaSqm:     20,
+			BuildingAreaSqm: 15,
+		},
+	}
+
+	repo.On("ExistsBySlug", mock.Anything, "rumah-keluarga-besar-bogor").Return(false, nil)
+	repo.On("Create", mock.Anything, mock.MatchedBy(func(l *entity.Listing) bool {
+		if l.TransactionType != transactionType || !l.IsNegotiable || l.Status != "draft" {
+			return false
+		}
+		if l.LocationProvince == nil || *l.LocationProvince != province {
+			return false
+		}
+		if l.BedroomCount == nil || *l.BedroomCount != bedrooms {
+			return false
+		}
+		if l.BuildingAreaSqm == nil || *l.BuildingAreaSqm != buildingArea {
+			return false
+		}
+		var specs request.Specifications
+		if err := json.Unmarshal(l.Specifications, &specs); err != nil {
+			return false
+		}
+		return specs.Bedrooms == bedrooms && specs.Bathrooms == bathrooms && specs.LandAreaSqm == landArea && specs.BuildingAreaSqm == buildingArea
+	})).Return(&entity.Listing{
+		BaseEntity:        entity.BaseEntity{ID: uuid.New(), CreatedAt: time.Now()},
+		UserID:            userID,
+		CategoryID:        &categoryID,
+		Title:             req.Title,
+		Slug:              "rumah-keluarga-besar-bogor",
+		Description:       req.Description,
+		TransactionType:   transactionType,
+		Price:             req.Price,
+		Currency:          "IDR",
+		IsNegotiable:      true,
+		SpecialOffers:     datatypes.JSON(`["Promo","Turun_Harga"]`),
+		LocationProvince:  &province,
+		LocationCity:      &city,
+		Latitude:          &latitude,
+		Longitude:         &longitude,
+		BedroomCount:      &bedrooms,
+		BathroomCount:     &bathrooms,
+		LandAreaSqm:       &landArea,
+		BuildingAreaSqm:   &buildingArea,
+		ElectricalPowerVA: &electricalPower,
+		Facilities:        datatypes.JSON(`["AC","CCTV"]`),
+		Status:            "draft",
+		Specifications:    datatypes.JSON(`{"bedrooms":4,"bathrooms":3,"land_area_sqm":180,"building_area_sqm":140}`),
+	}, nil)
+
+	res, err := svc.Create(context.Background(), pkgauthz.Principal{UserID: userID, Role: "user"}, req)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.Equal(t, transactionType, res.TransactionType)
+	assert.Equal(t, province, *res.LocationProvince)
+	assert.Equal(t, bedrooms, *res.BedroomCount)
+	assert.Equal(t, buildingArea, *res.BuildingAreaSqm)
+	assert.Equal(t, datatypes.JSON(`["Promo","Turun_Harga"]`), res.SpecialOffers)
+}
+
+func TestListingService_Update_ExpandedFields_RegeneratesCompatibilitySpecifications(t *testing.T) {
+	repo := mocks.NewListingRepository(t)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
+
+	id := uuid.New()
+	userID := uuid.New()
+	transactionType := "rent"
+	province := "Banten"
+	bedrooms := 5
+	bathrooms := 4
+	landArea := 250
+	buildingArea := 210
+	facilities := []string{"Wifi", "Water_Heater"}
+	listing := &entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: id},
+		UserID:     userID,
+		Status:     "active",
+	}
+	req := &request.UpdateListingRequest{
+		TransactionType:  &transactionType,
+		LocationProvince: &province,
+		BedroomCount:     &bedrooms,
+		BathroomCount:    &bathrooms,
+		LandAreaSqm:      &landArea,
+		BuildingAreaSqm:  &buildingArea,
+		Facilities:       &facilities,
+	}
+
+	repo.On("FindByID", mock.Anything, id).Return(listing, nil)
+	repo.On("Update", mock.Anything, mock.MatchedBy(func(l *entity.Listing) bool {
+		if l.TransactionType != transactionType {
+			return false
+		}
+		if l.LocationProvince == nil || *l.LocationProvince != province {
+			return false
+		}
+		if l.BedroomCount == nil || *l.BedroomCount != bedrooms {
+			return false
+		}
+		var specs request.Specifications
+		if err := json.Unmarshal(l.Specifications, &specs); err != nil {
+			return false
+		}
+		return specs.Bedrooms == bedrooms && specs.Bathrooms == bathrooms && specs.LandAreaSqm == landArea && specs.BuildingAreaSqm == buildingArea
+	}), mock.MatchedBy(func(fields []string) bool {
+		required := map[string]bool{
+			"transaction_type":  false,
+			"location_province": false,
+			"bedroom_count":     false,
+			"bathroom_count":    false,
+			"land_area_sqm":     false,
+			"building_area_sqm": false,
+			"facilities":        false,
+			"specifications":    false,
+		}
+		for _, field := range fields {
+			if _, ok := required[field]; ok {
+				required[field] = true
+			}
+		}
+		for _, seen := range required {
+			if !seen {
+				return false
+			}
+		}
+		return true
+	})).Return(&entity.Listing{
+		BaseEntity:       entity.BaseEntity{ID: id},
+		UserID:           userID,
+		TransactionType:  transactionType,
+		LocationProvince: &province,
+		BedroomCount:     &bedrooms,
+		BathroomCount:    &bathrooms,
+		LandAreaSqm:      &landArea,
+		BuildingAreaSqm:  &buildingArea,
+		Facilities:       datatypes.JSON(`["Wifi","Water_Heater"]`),
+		Status:           "active",
+		Specifications:   datatypes.JSON(`{"bedrooms":5,"bathrooms":4,"land_area_sqm":250,"building_area_sqm":210}`),
+	}, nil)
+
+	res, err := svc.Update(context.Background(), id, pkgauthz.Principal{UserID: userID, Role: "user"}, req)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.Equal(t, transactionType, res.TransactionType)
+	assert.Equal(t, bedrooms, *res.BedroomCount)
+	assert.Equal(t, buildingArea, *res.BuildingAreaSqm)
+	assert.Equal(t, datatypes.JSON(`["Wifi","Water_Heater"]`), res.Facilities)
+}
+
 func TestListingService_GetByID_Success(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
 	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
@@ -123,6 +313,7 @@ func TestListingService_GetByID_Success(t *testing.T) {
 	listing := &entity.Listing{
 		BaseEntity: entity.BaseEntity{ID: id},
 		Title:      "Test",
+		Status:     "active",
 	}
 
 	repo.On("FindByID", mock.Anything, id).Return(listing, nil)
@@ -158,6 +349,7 @@ func TestListingService_GetBySlug_Success(t *testing.T) {
 	listing := &entity.Listing{
 		BaseEntity: entity.BaseEntity{ID: id},
 		Slug:       slugStr,
+		Status:     "active",
 	}
 
 	repo.On("FindBySlug", mock.Anything, slugStr).Return(listing, nil)
@@ -327,12 +519,14 @@ func TestListingService_List_Success(t *testing.T) {
 	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	filter := domain.ListingFilter{Page: 1, Limit: 10}
+	expectedFilter := filter
+	expectedFilter.Statuses = []string{"active", "sold"}
 	listings := []*entity.Listing{
 		{BaseEntity: entity.BaseEntity{ID: uuid.New()}, Title: "Listing 1"},
 		{BaseEntity: entity.BaseEntity{ID: uuid.New()}, Title: "Listing 2"},
 	}
 
-	repo.On("List", mock.Anything, filter).Return(listings, int64(2), nil)
+	repo.On("List", mock.Anything, expectedFilter).Return(listings, int64(2), nil)
 
 	res, err := svc.List(context.Background(), filter)
 
@@ -347,7 +541,9 @@ func TestListingService_List_Empty(t *testing.T) {
 	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	filter := domain.ListingFilter{Page: 1, Limit: 10}
-	repo.On("List", mock.Anything, filter).Return([]*entity.Listing{}, int64(0), nil)
+	expectedFilter := filter
+	expectedFilter.Statuses = []string{"active", "sold"}
+	repo.On("List", mock.Anything, expectedFilter).Return([]*entity.Listing{}, int64(0), nil)
 
 	res, err := svc.List(context.Background(), filter)
 
@@ -409,9 +605,13 @@ func TestListingService_Update_OnlySpecifications(t *testing.T) {
 
 	id := uuid.New()
 	userID := uuid.New()
+	bathrooms := 2
+	landArea := 120
+	buildingArea := 95
 	listing := &entity.Listing{
-		BaseEntity: entity.BaseEntity{ID: id},
-		UserID:     userID,
+		BaseEntity:     entity.BaseEntity{ID: id},
+		UserID:         userID,
+		Specifications: datatypes.JSON(`{"bedrooms":3,"bathrooms":2,"land_area_sqm":120,"building_area_sqm":95}`),
 	}
 
 	newSpecs := &request.Specifications{Bedrooms: 5}
@@ -420,9 +620,13 @@ func TestListingService_Update_OnlySpecifications(t *testing.T) {
 	}
 
 	repo.On("FindByID", mock.Anything, id).Return(listing, nil)
-	repo.On("Update", mock.Anything, mock.Anything, []string{"specifications"}).Return(&entity.Listing{
-		BaseEntity:     entity.BaseEntity{ID: id},
-		Specifications: datatypes.JSON(`{"bedrooms":5}`),
+	repo.On("Update", mock.Anything, mock.Anything, []string{"bedroom_count", "bathroom_count", "land_area_sqm", "building_area_sqm", "specifications"}).Return(&entity.Listing{
+		BaseEntity:      entity.BaseEntity{ID: id},
+		BedroomCount:    ptr(5),
+		BathroomCount:   &bathrooms,
+		LandAreaSqm:     &landArea,
+		BuildingAreaSqm: &buildingArea,
+		Specifications:  datatypes.JSON(`{"bedrooms":5,"bathrooms":2,"land_area_sqm":120,"building_area_sqm":95}`),
 	}, nil)
 
 	res, err := svc.Update(context.Background(), id, pkgauthz.Principal{UserID: userID, Role: "user"}, req)
@@ -432,6 +636,54 @@ func TestListingService_Update_OnlySpecifications(t *testing.T) {
 	var s request.Specifications
 	_ = json.Unmarshal(res.Specifications, &s)
 	assert.Equal(t, 5, s.Bedrooms)
+	assert.Equal(t, 2, s.Bathrooms)
+	assert.Equal(t, 120, s.LandAreaSqm)
+	assert.Equal(t, 95, s.BuildingAreaSqm)
+	assert.Equal(t, 5, *res.BedroomCount)
+	assert.Equal(t, 2, *res.BathroomCount)
+}
+
+func TestListingService_Update_OnlySpecifications_CanSetZeroWithoutDroppingSiblings(t *testing.T) {
+	repo := mocks.NewListingRepository(t)
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
+
+	id := uuid.New()
+	userID := uuid.New()
+	bathrooms := 2
+	landArea := 120
+	buildingArea := 95
+	listing := &entity.Listing{
+		BaseEntity:     entity.BaseEntity{ID: id},
+		UserID:         userID,
+		Specifications: datatypes.JSON(`{"bedrooms":3,"bathrooms":2,"land_area_sqm":120,"building_area_sqm":95}`),
+	}
+
+	var req request.UpdateListingRequest
+	err := json.Unmarshal([]byte(`{"specifications":{"bedrooms":0}}`), &req)
+	assert.NoError(t, err)
+
+	repo.On("FindByID", mock.Anything, id).Return(listing, nil)
+	repo.On("Update", mock.Anything, mock.Anything, []string{"bedroom_count", "bathroom_count", "land_area_sqm", "building_area_sqm", "specifications"}).Return(&entity.Listing{
+		BaseEntity:      entity.BaseEntity{ID: id},
+		BedroomCount:    ptr(0),
+		BathroomCount:   &bathrooms,
+		LandAreaSqm:     &landArea,
+		BuildingAreaSqm: &buildingArea,
+		Specifications:  datatypes.JSON(`{"bedrooms":0,"bathrooms":2,"land_area_sqm":120,"building_area_sqm":95}`),
+	}, nil)
+
+	res, err := svc.Update(context.Background(), id, pkgauthz.Principal{UserID: userID, Role: "user"}, &req)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	var s request.Specifications
+	_ = json.Unmarshal(res.Specifications, &s)
+	assert.Equal(t, 0, s.Bedrooms)
+	assert.Equal(t, 2, s.Bathrooms)
+	assert.Equal(t, 120, s.LandAreaSqm)
+	assert.Equal(t, 95, s.BuildingAreaSqm)
+	assert.Equal(t, 0, *res.BedroomCount)
+	assert.Equal(t, 2, *res.BathroomCount)
 }
 
 func TestListingService_UploadImage_Success(t *testing.T) {
