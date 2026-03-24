@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"mime/multipart"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -17,6 +18,7 @@ import (
 	pkgauthz "github.com/naufalilyasa/pal-property-backend/pkg/authz"
 	"github.com/naufalilyasa/pal-property-backend/pkg/mediaasset"
 	"github.com/naufalilyasa/pal-property-backend/pkg/utils/slug"
+	pkgvalidator "github.com/naufalilyasa/pal-property-backend/pkg/validator"
 	"gorm.io/datatypes"
 )
 
@@ -60,29 +62,60 @@ func (s *listingService) Create(ctx context.Context, principal pkgauthz.Principa
 	if req.Title == "" || req.Price <= 0 || req.Status == "" {
 		return nil, domain.ErrInvalidCredential
 	}
+	if err := pkgvalidator.Validate.Struct(req); err != nil {
+		return nil, domain.ErrInvalidCredential
+	}
 	// Generate unique slug
 	listingSlug := slug.GenerateUnique(req.Title, func(candidate string) bool {
 		exists, _ := s.repo.ExistsBySlug(ctx, candidate)
 		return exists
 	})
 
-	specsJSON, err := json.Marshal(req.Specifications)
+	specsJSON, err := json.Marshal(buildCompatibilitySpecifications(req.BedroomCount, req.BathroomCount, req.LandAreaSqm, req.BuildingAreaSqm, &req.Specifications))
+	if err != nil {
+		return nil, err
+	}
+	specialOffersJSON, err := marshalStringArray(req.SpecialOffers)
+	if err != nil {
+		return nil, err
+	}
+	facilitiesJSON, err := marshalStringArray(req.Facilities)
 	if err != nil {
 		return nil, err
 	}
 
 	listing := &entity.Listing{
-		UserID:           principal.UserID,
-		CategoryID:       req.CategoryID,
-		Title:            req.Title,
-		Slug:             listingSlug,
-		Description:      req.Description,
-		Price:            req.Price,
-		LocationCity:     req.LocationCity,
-		LocationDistrict: req.LocationDistrict,
-		AddressDetail:    req.AddressDetail,
-		Status:           req.Status,
-		Specifications:   datatypes.JSON(specsJSON),
+		UserID:            principal.UserID,
+		CategoryID:        req.CategoryID,
+		Title:             req.Title,
+		Slug:              listingSlug,
+		Description:       req.Description,
+		TransactionType:   defaultString(req.TransactionType, "sale"),
+		Price:             req.Price,
+		Currency:          defaultStringPointer(req.Currency, "IDR"),
+		IsNegotiable:      defaultBool(req.IsNegotiable),
+		SpecialOffers:     datatypes.JSON(specialOffersJSON),
+		LocationProvince:  req.LocationProvince,
+		LocationCity:      req.LocationCity,
+		LocationDistrict:  req.LocationDistrict,
+		AddressDetail:     req.AddressDetail,
+		Latitude:          req.Latitude,
+		Longitude:         req.Longitude,
+		BedroomCount:      resolveIntFieldWithLegacy(req.BedroomCount, req.Specifications.Bedrooms, req.Specifications.HasBedrooms()),
+		BathroomCount:     resolveIntFieldWithLegacy(req.BathroomCount, req.Specifications.Bathrooms, req.Specifications.HasBathrooms()),
+		FloorCount:        req.FloorCount,
+		CarportCapacity:   req.CarportCapacity,
+		LandAreaSqm:       resolveIntFieldWithLegacy(req.LandAreaSqm, req.Specifications.LandAreaSqm, req.Specifications.HasLandAreaSqm()),
+		BuildingAreaSqm:   resolveIntFieldWithLegacy(req.BuildingAreaSqm, req.Specifications.BuildingAreaSqm, req.Specifications.HasBuildingAreaSqm()),
+		CertificateType:   req.CertificateType,
+		Condition:         req.Condition,
+		Furnishing:        req.Furnishing,
+		ElectricalPowerVA: req.ElectricalPowerVA,
+		FacingDirection:   req.FacingDirection,
+		YearBuilt:         req.YearBuilt,
+		Facilities:        datatypes.JSON(facilitiesJSON),
+		Status:            req.Status,
+		Specifications:    datatypes.JSON(specsJSON),
 	}
 
 	created, err := s.repo.Create(ctx, listing)
@@ -98,6 +131,9 @@ func (s *listingService) GetByID(ctx context.Context, id uuid.UUID) (*response.L
 	if err != nil {
 		return nil, err
 	}
+	if !isPublicListingStatus(listing.Status) {
+		return nil, domain.ErrNotFound
+	}
 
 	// Increment view count atomically
 	_ = s.repo.IncrementViewCount(ctx, id)
@@ -111,6 +147,9 @@ func (s *listingService) GetBySlug(ctx context.Context, slugStr string) (*respon
 	if err != nil {
 		return nil, err
 	}
+	if !isPublicListingStatus(listing.Status) {
+		return nil, domain.ErrNotFound
+	}
 
 	// Increment view count atomically
 	_ = s.repo.IncrementViewCount(ctx, listing.ID)
@@ -120,6 +159,10 @@ func (s *listingService) GetBySlug(ctx context.Context, slugStr string) (*respon
 }
 
 func (s *listingService) Update(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal, req *request.UpdateListingRequest) (*response.ListingResponse, error) {
+	if err := pkgvalidator.Validate.Struct(req); err != nil {
+		return nil, domain.ErrInvalidCredential
+	}
+
 	listing, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -134,6 +177,11 @@ func (s *listingService) Update(ctx context.Context, id uuid.UUID, principal pkg
 	if req.CategoryID != nil {
 		listing.CategoryID = req.CategoryID
 		fields = append(fields, "category_id")
+	}
+
+	if req.TransactionType != nil {
+		listing.TransactionType = *req.TransactionType
+		fields = append(fields, "transaction_type")
 	}
 
 	if req.Title != nil && *req.Title != listing.Title {
@@ -155,6 +203,30 @@ func (s *listingService) Update(ctx context.Context, id uuid.UUID, principal pkg
 		fields = append(fields, "price")
 	}
 
+	if req.Currency != nil {
+		listing.Currency = *req.Currency
+		fields = append(fields, "currency")
+	}
+
+	if req.IsNegotiable != nil {
+		listing.IsNegotiable = *req.IsNegotiable
+		fields = append(fields, "is_negotiable")
+	}
+
+	if req.SpecialOffers != nil {
+		specialOffersJSON, err := marshalStringArray(*req.SpecialOffers)
+		if err != nil {
+			return nil, err
+		}
+		listing.SpecialOffers = datatypes.JSON(specialOffersJSON)
+		fields = append(fields, "special_offers")
+	}
+
+	if req.LocationProvince != nil {
+		listing.LocationProvince = req.LocationProvince
+		fields = append(fields, "location_province")
+	}
+
 	if req.LocationCity != nil {
 		listing.LocationCity = req.LocationCity
 		fields = append(fields, "location_city")
@@ -170,13 +242,94 @@ func (s *listingService) Update(ctx context.Context, id uuid.UUID, principal pkg
 		fields = append(fields, "address_detail")
 	}
 
+	if req.Latitude != nil {
+		listing.Latitude = req.Latitude
+		fields = append(fields, "latitude")
+	}
+
+	if req.Longitude != nil {
+		listing.Longitude = req.Longitude
+		fields = append(fields, "longitude")
+	}
+
+	compatSpecs := mergeCompatibilitySpecifications(readCompatibilitySpecifications(listing.Specifications), req.Specifications, req.BedroomCount, req.BathroomCount, req.LandAreaSqm, req.BuildingAreaSqm)
+
+	if req.BedroomCount != nil || req.Specifications != nil {
+		listing.BedroomCount = resolveIntFieldWithLegacy(req.BedroomCount, compatSpecs.Bedrooms, compatSpecs.HasBedrooms())
+		fields = append(fields, "bedroom_count")
+	}
+
+	if req.BathroomCount != nil || req.Specifications != nil {
+		listing.BathroomCount = resolveIntFieldWithLegacy(req.BathroomCount, compatSpecs.Bathrooms, compatSpecs.HasBathrooms())
+		fields = append(fields, "bathroom_count")
+	}
+
+	if req.FloorCount != nil {
+		listing.FloorCount = req.FloorCount
+		fields = append(fields, "floor_count")
+	}
+
+	if req.CarportCapacity != nil {
+		listing.CarportCapacity = req.CarportCapacity
+		fields = append(fields, "carport_capacity")
+	}
+
+	if req.LandAreaSqm != nil || req.Specifications != nil {
+		listing.LandAreaSqm = resolveIntFieldWithLegacy(req.LandAreaSqm, compatSpecs.LandAreaSqm, compatSpecs.HasLandAreaSqm())
+		fields = append(fields, "land_area_sqm")
+	}
+
+	if req.BuildingAreaSqm != nil || req.Specifications != nil {
+		listing.BuildingAreaSqm = resolveIntFieldWithLegacy(req.BuildingAreaSqm, compatSpecs.BuildingAreaSqm, compatSpecs.HasBuildingAreaSqm())
+		fields = append(fields, "building_area_sqm")
+	}
+
+	if req.CertificateType != nil {
+		listing.CertificateType = req.CertificateType
+		fields = append(fields, "certificate_type")
+	}
+
+	if req.Condition != nil {
+		listing.Condition = req.Condition
+		fields = append(fields, "condition")
+	}
+
+	if req.Furnishing != nil {
+		listing.Furnishing = req.Furnishing
+		fields = append(fields, "furnishing")
+	}
+
+	if req.ElectricalPowerVA != nil {
+		listing.ElectricalPowerVA = req.ElectricalPowerVA
+		fields = append(fields, "electrical_power_va")
+	}
+
+	if req.FacingDirection != nil {
+		listing.FacingDirection = req.FacingDirection
+		fields = append(fields, "facing_direction")
+	}
+
+	if req.YearBuilt != nil {
+		listing.YearBuilt = req.YearBuilt
+		fields = append(fields, "year_built")
+	}
+
+	if req.Facilities != nil {
+		facilitiesJSON, err := marshalStringArray(*req.Facilities)
+		if err != nil {
+			return nil, err
+		}
+		listing.Facilities = datatypes.JSON(facilitiesJSON)
+		fields = append(fields, "facilities")
+	}
+
 	if req.Status != nil {
 		listing.Status = *req.Status
 		fields = append(fields, "status")
 	}
 
-	if req.Specifications != nil {
-		specsJSON, err := json.Marshal(req.Specifications)
+	if req.Specifications != nil || req.BedroomCount != nil || req.BathroomCount != nil || req.LandAreaSqm != nil || req.BuildingAreaSqm != nil {
+		specsJSON, err := json.Marshal(compatSpecs)
 		if err != nil {
 			return nil, err
 		}
@@ -310,6 +463,18 @@ func (s *listingService) ReorderImages(ctx context.Context, id uuid.UUID, princi
 }
 
 func (s *listingService) List(ctx context.Context, filter domain.ListingFilter) (*response.PaginatedListings, error) {
+	if filter.Status != "" && !isPublicListingStatus(filter.Status) {
+		return &response.PaginatedListings{
+			Data:       []*response.ListingResponse{},
+			Total:      0,
+			Page:       filter.Page,
+			Limit:      filter.Limit,
+			TotalPages: 0,
+		}, nil
+	}
+	if filter.Status == "" {
+		filter.Statuses = publicListingStatuses()
+	}
 	listings, total, err := s.repo.List(ctx, filter)
 	if err != nil {
 		return nil, err
@@ -339,23 +504,43 @@ func (s *listingService) mapToResponse(l *entity.Listing) *response.ListingRespo
 	if l == nil {
 		return nil
 	}
+	compatSpecs := readCompatibilitySpecifications(l.Specifications)
 	return &response.ListingResponse{
-		ID:               l.ID,
-		UserID:           l.UserID,
-		CategoryID:       l.CategoryID,
-		Title:            l.Title,
-		Slug:             l.Slug,
-		Description:      l.Description,
-		Price:            l.Price,
-		Currency:         l.Currency,
-		LocationCity:     l.LocationCity,
-		LocationDistrict: l.LocationDistrict,
-		AddressDetail:    l.AddressDetail,
-		Status:           l.Status,
-		IsFeatured:       l.IsFeatured,
-		Specifications:   l.Specifications,
-		ViewCount:        l.ViewCount,
-		Images:           mapListingImagesToResponse(l.Images),
+		ID:                l.ID,
+		UserID:            l.UserID,
+		CategoryID:        l.CategoryID,
+		Title:             l.Title,
+		Slug:              l.Slug,
+		Description:       l.Description,
+		TransactionType:   l.TransactionType,
+		Price:             l.Price,
+		Currency:          l.Currency,
+		IsNegotiable:      l.IsNegotiable,
+		SpecialOffers:     l.SpecialOffers,
+		LocationProvince:  l.LocationProvince,
+		LocationCity:      l.LocationCity,
+		LocationDistrict:  l.LocationDistrict,
+		AddressDetail:     l.AddressDetail,
+		Latitude:          l.Latitude,
+		Longitude:         l.Longitude,
+		BedroomCount:      resolveIntField(l.BedroomCount, compatSpecs.Bedrooms),
+		BathroomCount:     resolveIntField(l.BathroomCount, compatSpecs.Bathrooms),
+		FloorCount:        l.FloorCount,
+		CarportCapacity:   l.CarportCapacity,
+		LandAreaSqm:       resolveIntField(l.LandAreaSqm, compatSpecs.LandAreaSqm),
+		BuildingAreaSqm:   resolveIntField(l.BuildingAreaSqm, compatSpecs.BuildingAreaSqm),
+		CertificateType:   l.CertificateType,
+		Condition:         l.Condition,
+		Furnishing:        l.Furnishing,
+		ElectricalPowerVA: l.ElectricalPowerVA,
+		FacingDirection:   l.FacingDirection,
+		YearBuilt:         l.YearBuilt,
+		Facilities:        l.Facilities,
+		Status:            l.Status,
+		IsFeatured:        l.IsFeatured,
+		Specifications:    l.Specifications,
+		ViewCount:         l.ViewCount,
+		Images:            mapListingImagesToResponse(l.Images),
 		Category: func() *response.CategoryShortResponse {
 			if l.Category == nil {
 				return nil
@@ -370,6 +555,126 @@ func (s *listingService) mapToResponse(l *entity.Listing) *response.ListingRespo
 		CreatedAt: l.CreatedAt,
 		UpdatedAt: l.UpdatedAt,
 	}
+}
+
+func buildCompatibilitySpecifications(bedroomCount, bathroomCount, landAreaSqm, buildingAreaSqm *int, legacy *request.Specifications) request.Specifications {
+	specs := request.Specifications{}
+	if legacy != nil {
+		specs = *legacy
+	}
+	if bedroomCount != nil {
+		specs.SetBedrooms(*bedroomCount)
+	}
+	if bathroomCount != nil {
+		specs.SetBathrooms(*bathroomCount)
+	}
+	if landAreaSqm != nil {
+		specs.SetLandAreaSqm(*landAreaSqm)
+	}
+	if buildingAreaSqm != nil {
+		specs.SetBuildingAreaSqm(*buildingAreaSqm)
+	}
+	return specs
+}
+
+func mergeCompatibilitySpecifications(existing request.Specifications, legacy *request.Specifications, bedroomCount, bathroomCount, landAreaSqm, buildingAreaSqm *int) request.Specifications {
+	specs := existing
+	if legacy != nil {
+		if legacy.HasBedrooms() || legacy.Bedrooms != 0 {
+			specs.SetBedrooms(legacy.Bedrooms)
+		}
+		if legacy.HasBathrooms() || legacy.Bathrooms != 0 {
+			specs.SetBathrooms(legacy.Bathrooms)
+		}
+		if legacy.HasLandAreaSqm() || legacy.LandAreaSqm != 0 {
+			specs.SetLandAreaSqm(legacy.LandAreaSqm)
+		}
+		if legacy.HasBuildingAreaSqm() || legacy.BuildingAreaSqm != 0 {
+			specs.SetBuildingAreaSqm(legacy.BuildingAreaSqm)
+		}
+	}
+	if bedroomCount != nil {
+		specs.SetBedrooms(*bedroomCount)
+	}
+	if bathroomCount != nil {
+		specs.SetBathrooms(*bathroomCount)
+	}
+	if landAreaSqm != nil {
+		specs.SetLandAreaSqm(*landAreaSqm)
+	}
+	if buildingAreaSqm != nil {
+		specs.SetBuildingAreaSqm(*buildingAreaSqm)
+	}
+	return specs
+}
+
+func readCompatibilitySpecifications(raw datatypes.JSON) request.Specifications {
+	if len(raw) == 0 {
+		return request.Specifications{}
+	}
+	var specs request.Specifications
+	if err := json.Unmarshal(raw, &specs); err != nil {
+		return request.Specifications{}
+	}
+	return specs
+}
+
+func marshalStringArray(values []string) ([]byte, error) {
+	if len(values) == 0 {
+		return []byte("[]"), nil
+	}
+	return json.Marshal(values)
+}
+
+func resolveIntField(explicit *int, legacy int) *int {
+	if explicit != nil {
+		return explicit
+	}
+	if legacy == 0 {
+		return nil
+	}
+	value := legacy
+	return &value
+}
+
+func resolveIntFieldWithLegacy(explicit *int, legacy int, legacyPresent bool) *int {
+	if explicit != nil {
+		return explicit
+	}
+	if !legacyPresent && legacy == 0 {
+		return nil
+	}
+	value := legacy
+	return &value
+}
+
+func defaultBool(value *bool) bool {
+	if value == nil {
+		return false
+	}
+	return *value
+}
+
+func defaultString(value, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
+}
+
+func defaultStringPointer(value *string, fallback string) string {
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return fallback
+	}
+	return *value
+}
+
+func publicListingStatuses() []string {
+	return []string{"active", "sold"}
+}
+
+func isPublicListingStatus(status string) bool {
+	return slices.Contains(publicListingStatuses(), status)
 }
 
 func (s *listingService) getAuthorizedListing(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal, action string) (*entity.Listing, error) {
