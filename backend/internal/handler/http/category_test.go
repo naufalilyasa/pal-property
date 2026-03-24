@@ -85,8 +85,11 @@ func (s *CategoryHandlerTestSuite) SetupSuite() {
 	s.Require().NoError(err)
 	s.pgContainer = pgContainer
 
-	dsn, err := pgContainer.ConnectionString(s.ctx, "sslmode=disable")
+	host, err := pgContainer.Host(s.ctx)
 	s.Require().NoError(err)
+	port, err := pgContainer.MappedPort(s.ctx, "5432")
+	s.Require().NoError(err)
+	dsn := "host=" + host + " port=" + port.Port() + " user=user password=password dbname=pal_db_test sslmode=disable"
 
 	s.db, err = gorm.Open(pgDriver.Open(dsn), &gorm.Config{})
 	s.Require().NoError(err)
