@@ -1,113 +1,124 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { browserFetch } from "@/lib/api/browser-fetch";
 import type { ListingCategory } from "@/lib/api/listing-form";
 import { queryKeys } from "@/lib/query/keys";
 
-type ListingFilterValues = {
-  city?: string;
-  category_id?: string;
-  price_min?: string;
-  price_max?: string;
-  status?: string;
-  limit?: string;
-};
+export function ListingFilters({ view }: { view: "map" | "list" }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-async function getCategoryOptions() {
-  const response = await browserFetch<ListingCategory[]>("/api/categories", {
-    method: "GET",
-    cache: "no-store",
-  });
-
-  return response.data;
-}
-
-export function ListingFilters({ values, total, visibleCount }: { values: ListingFilterValues; total: number; visibleCount: number }) {
   const categoriesQuery = useQuery({
     queryKey: queryKeys.categories,
-    queryFn: () => getCategoryOptions(),
+    queryFn: async () => {
+      const response = await browserFetch<ListingCategory[]>("/api/categories", {
+        method: "GET",
+        cache: "no-store",
+      });
+      return response.data;
+    },
   });
 
-  const quickStats = useMemo(
-    () => [
-      { label: "Listings", value: total.toLocaleString("en-US") },
-      { label: "Visible now", value: visibleCount.toLocaleString("en-US") },
-      { label: "Categories", value: (categoriesQuery.data?.length ?? 0).toLocaleString("en-US") },
-    ],
-    [categoriesQuery.data?.length, total, visibleCount],
-  );
+  const updateView = (newView: "map" | "list") => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("view", newView);
+    router.push(`/listings?${params.toString()}`);
+  };
 
   return (
-    <section className="space-y-2" data-testid="listing-filters">
-      <form action="/listings" className="grid gap-2 xl:grid-cols-[minmax(0,1.8fr)_repeat(5,minmax(0,1fr))]">
-        <label className="flex min-h-11 flex-col justify-center gap-1 rounded-md border border-[#ddd9d1] bg-[#fffdf9] px-3 py-2">
-          <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-[#8a8a86]">Enter property address</span>
+    <div
+      className="flex w-full items-center justify-between overflow-x-auto border-b border-gray-200 bg-white px-4 py-3 sm:px-6"
+      data-testid="listing-filters"
+    >
+      {/* Left side: filters */}
+      <div className="flex items-center gap-3">
+        {/* Search Input */}
+        <div className="relative flex items-center">
+          <svg
+            className="absolute left-3 text-gray-400"
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
           <input
-            className="bg-transparent text-[12px] text-[var(--ink)] outline-none placeholder:text-[#9a978f]"
-            defaultValue={values.city ?? ""}
-            name="city"
-            placeholder="Jakarta, Bandung, Surabaya"
+            className="w-64 rounded-full border border-gray-300 bg-white py-1.5 pr-4 pl-9 text-sm text-[#111] outline-none transition focus:border-black placeholder:text-gray-500"
+            placeholder="Address, neighborhood, city, ZIP"
             type="text"
+            defaultValue={searchParams.get("city") ?? ""}
           />
-        </label>
-
-        <label className="flex min-h-11 flex-col justify-center gap-1 rounded-md border border-[#ddd9d1] bg-[#fffdf9] px-3 py-2">
-          <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-[#8a8a86]">Neighborhoods</span>
-          <select className="bg-transparent text-[12px] text-[var(--ink)] outline-none" defaultValue={values.category_id ?? ""} name="category_id">
-            <option value="">All categories</option>
-            {(categoriesQuery.data ?? []).map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex min-h-11 flex-col justify-center gap-1 rounded-md border border-[#ddd9d1] bg-[#fffdf9] px-3 py-2">
-          <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-[#8a8a86]">For sale</span>
-          <select className="bg-transparent text-[12px] text-[var(--ink)] outline-none" defaultValue={values.status ?? ""} name="status">
-            <option value="">Any status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="sold">Sold</option>
-          </select>
-        </label>
-
-        <label className="flex min-h-11 flex-col justify-center gap-1 rounded-md border border-[#ddd9d1] bg-[#fffdf9] px-3 py-2">
-          <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-[#8a8a86]">Price</span>
-          <input className="bg-transparent text-[12px] text-[var(--ink)] outline-none placeholder:text-[#9a978f]" defaultValue={values.price_min ?? ""} inputMode="numeric" name="price_min" placeholder="Min budget" type="text" />
-        </label>
-
-        <label className="flex min-h-11 flex-col justify-center gap-1 rounded-md border border-[#ddd9d1] bg-[#fffdf9] px-3 py-2">
-          <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-[#8a8a86]">Residential</span>
-          <input className="bg-transparent text-[12px] text-[var(--ink)] outline-none placeholder:text-[#9a978f]" defaultValue={values.price_max ?? ""} inputMode="numeric" name="price_max" placeholder="Max budget" type="text" />
-        </label>
-
-        <div className="flex min-h-11 items-stretch gap-2 xl:justify-end">
-          <input name="limit" type="hidden" value={values.limit ?? "12"} />
-          <Link className="inline-flex flex-1 items-center justify-center rounded-md border border-[#ddd9d1] bg-[#fffdf9] px-3 py-2 text-[12px] font-medium text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] xl:flex-none" href="/listings">
-            Clear
-          </Link>
-          <button className="inline-flex flex-[1.1] items-center justify-center rounded-md bg-[var(--ink)] px-4 py-2 text-[12px] font-medium text-white transition hover:bg-[var(--accent)] xl:flex-none" type="submit">
-            Search
-          </button>
         </div>
-      </form>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#ede8df] pb-2 text-[10px] font-medium uppercase tracking-[0.14em] text-[#77746d]">
-        <div className="flex flex-wrap gap-2">
-          {quickStats.map((item) => (
-            <span key={item.label} className="rounded-full bg-[#f2f0eb] px-2 py-1">
-              {item.label}: {item.value}
-            </span>
+        {/* Dropdowns */}
+        <select className="w-auto cursor-pointer appearance-none rounded-full border border-gray-300 bg-white px-4 py-1.5 pr-8 text-sm font-medium text-[#111] outline-none hover:border-black bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-position-[calc(100%-12px)_center] bg-no-repeat">
+          <option value="">Neighborhood</option>
+          {categoriesQuery.data?.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
           ))}
-        </div>
-        <span>{categoriesQuery.isLoading ? "Loading filters" : `${categoriesQuery.data?.length ?? 0} category filters ready`}</span>
+        </select>
+
+        <select className="w-auto cursor-pointer appearance-none rounded-full border border-gray-300 bg-white px-4 py-1.5 pr-8 text-sm font-medium text-[#111] outline-none hover:border-black bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-position-[calc(100%-12px)_center] bg-no-repeat">
+          <option value="">Property</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+
+        <select className="w-auto cursor-pointer appearance-none rounded-full border border-gray-300 bg-white px-4 py-1.5 pr-8 text-sm font-medium text-[#111] outline-none hover:border-black bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-position-[calc(100%-12px)_center] bg-no-repeat">
+          <option value="">Price</option>
+        </select>
+
+        <select className="w-auto cursor-pointer appearance-none rounded-full border border-gray-300 bg-white px-4 py-1.5 pr-8 text-sm font-medium text-[#111] outline-none hover:border-black bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-position-[calc(100%-12px)_center] bg-no-repeat">
+          <option value="">Bedrooms</option>
+        </select>
+
+        <button className="flex h-[34px] items-center gap-1 rounded-full border border-gray-300 bg-white px-4 text-sm font-medium text-[#111] outline-none hover:border-black">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M21 4H3" />
+            <path d="M21 12H3" />
+            <path d="M21 20H3" />
+          </svg>
+          <span className="mt-px leading-none">More details</span>
+        </button>
       </div>
-    </section>
+
+      {/* Right side: Map/List toggle */}
+      <div className="flex shrink-0 items-center justify-center rounded-full border border-gray-300 bg-white p-[3px]">
+        <button
+          onClick={() => updateView("map")}
+          className={`rounded-full px-4 py-1 text-sm font-semibold transition ${view === "map" ? "bg-black text-white" : "text-gray-600 hover:text-black"}`}
+        >
+          Map
+        </button>
+        <button
+          onClick={() => updateView("list")}
+          className={`rounded-full px-4 py-1 text-sm font-semibold transition ${view === "list" ? "bg-black text-white" : "text-gray-600 hover:text-black"}`}
+        >
+          List
+        </button>
+      </div>
+    </div>
   );
 }

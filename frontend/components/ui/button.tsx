@@ -1,20 +1,25 @@
 import type { ButtonHTMLAttributes } from "react";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "ghost" | "destructive";
+  variant?: "primary" | "secondary" | "outline" | "ghost" | "destructive";
 };
 
 const variantClassNames: Record<NonNullable<ButtonProps["variant"]>, string> = {
-  primary: "bg-[var(--accent)] text-white hover:opacity-90",
-  secondary: "border border-[var(--line)] bg-[var(--panel)] text-[var(--ink)] hover:border-[var(--accent)] hover:text-[var(--accent)]",
-  ghost: "text-[var(--ink)] hover:bg-[var(--panel)]",
-  destructive: "border border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100",
+  primary: "bg-slate-900 text-slate-50 shadow hover:bg-slate-900/90",
+  secondary: "bg-slate-100 text-slate-900 shadow-sm hover:bg-slate-100/80",
+  outline: "border border-slate-200 bg-white shadow-sm hover:bg-slate-100 hover:text-slate-900",
+  ghost: "hover:bg-slate-100 hover:text-slate-900",
+  destructive: "bg-red-500 text-slate-50 shadow-sm hover:bg-red-500/90",
 };
 
 export function Button({ className = "", type = "button", variant = "primary", ...props }: ButtonProps) {
+  // We keep backward compatibility by interpreting 'secondary' as 'outline' if needed,
+  // but let's standardise on the shadcn setup.
+  const actualVariant = variant === "secondary" && !className.includes("bg-") ? "outline" : variant;
+
   return (
     <button
-      className={`inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${variantClassNames[variant]} ${className}`.trim()}
+      className={`inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 disabled:pointer-events-none disabled:opacity-50 ${variantClassNames[actualVariant]} ${className}`.trim()}
       type={type}
       {...props}
     />

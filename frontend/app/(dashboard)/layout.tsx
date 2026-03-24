@@ -10,14 +10,18 @@ export default async function ProtectedDashboardLayout({
   const user = await requireUser();
 
   return (
-    <main className="min-h-screen px-6 py-8 sm:px-10 lg:px-12">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-7xl flex-col rounded-[2rem] border border-white/60 bg-[var(--panel)] p-6 shadow-[0_30px_100px_rgba(15,23,42,0.18)] backdrop-blur sm:p-8">
-        <AppHeader sellerName={user.email} />
-        <div className="mt-8 grid gap-6 lg:grid-cols-[280px_1fr]">
+    <div className="flex min-h-screen w-full flex-col bg-gray-50/50 font-sans text-slate-950">
+      <AppHeader sellerName={user.email} />
+      <div className="flex flex-1">
+        <aside className="hidden w-64 shrink-0 flex-col border-r border-gray-200 bg-white md:flex">
           <DashboardSidebar />
-          <section>{children}</section>
-        </div>
+        </aside>
+        <main className="flex-1 p-6 md:p-8 lg:p-10">
+          <div className="mx-auto max-w-6xl">
+            {children}
+          </div>
+        </main>
       </div>
-    </main>
+    </div>
   );
 }
