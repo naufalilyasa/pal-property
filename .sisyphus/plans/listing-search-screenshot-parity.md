@@ -104,7 +104,7 @@ Wave 3: QA and polish
 ## TODOs
 > Implementation + Test = ONE task. Never separate.
 
-- [ ] 1. Fix query-state fidelity for the `/listings` shell
+- [x] 1. Fix query-state fidelity for the `/listings` shell
 
   **What to do**: Update the `/listings` route and filter form so every displayed default comes from resolved `searchParams`. Replace the current DOM-only reset behavior with a route-safe clear flow that returns the user to `/listings` without stale query params. Preserve `limit` handling and keep the backend query set unchanged.
   **Must NOT do**: Do not add new backend params, and do not leave any visual default that differs from the actual server fetch inputs.
@@ -144,7 +144,7 @@ Wave 3: QA and polish
 
   **Commit**: YES | Message: `fix(frontend): align listings query state with search shell` | Files: `frontend/app/(public)/listings/page.tsx`, `frontend/features/listings/components/listing-filters.tsx`, `frontend/app/(public)/listings/page.test.tsx`
 
-- [ ] 2. Rebuild the `/listings` page shell around screenshot parity
+- [x] 2. Rebuild the `/listings` page shell around screenshot parity
 
   **What to do**: Recompose `frontend/app/(public)/listings/page.tsx` into a flatter search workspace matching the screenshot’s structure: compact top page chrome, toolbar immediately under it, persistent left map panel, right-side result column, narrow spacing, and reduced “hero” emphasis. Keep the map visible on desktop and stacked below the toolbar on mobile.
   **Must NOT do**: Do not extract a new site-wide header/layout, and do not hide the map entirely on mobile.
@@ -184,7 +184,7 @@ Wave 3: QA and polish
 
   **Commit**: YES | Message: `feat(frontend): reshape listings page into search workspace shell` | Files: `frontend/app/(public)/listings/page.tsx`
 
-- [ ] 3. Add route-level test coverage for the public listings page
+- [x] 3. Add route-level test coverage for the public listings page
 
   **What to do**: Introduce a dedicated test file for the public `/listings` route that mocks `getListings()` and verifies SSR route composition, query parsing, and data-testid coverage for filter/map/pagination regions.
   **Must NOT do**: Do not rely only on broad `npm test` smoke coverage.
@@ -223,7 +223,7 @@ Wave 3: QA and polish
 
   **Commit**: YES | Message: `test(frontend): cover public listings route shell` | Files: `frontend/app/(public)/listings/page.test.tsx`
 
-- [ ] 4. Densify the top toolbar and filter band to MLS-style rhythm
+- [x] 4. Densify the top toolbar and filter band to MLS-style rhythm
 
   **What to do**: Compress `frontend/features/listings/components/listing-filters.tsx` into a flatter toolbar that feels closer to the screenshot: narrow controls, restrained labels, consistent heights, tighter gaps, and no oversized panel treatment. Keep it functional only for the existing filters.
   **Must NOT do**: Do not invent unsupported filters, and do not make the toolbar taller or more decorative than the screenshot.
@@ -262,7 +262,7 @@ Wave 3: QA and polish
 
   **Commit**: YES | Message: `feat(frontend): tighten listings search toolbar density` | Files: `frontend/features/listings/components/listing-filters.tsx`
 
-- [ ] 5. Flatten the result toolbar, pagination, and footer block
+- [x] 5. Flatten the result toolbar, pagination, and footer block
 
   **What to do**: Tune the right-column result chrome in `frontend/app/(public)/listings/page.tsx` so it more closely matches the screenshot’s lightweight header (`results`, `sort`, view hint), minimal pagination, and dark footer/newsletter block. Keep the footer local to the page for this iteration.
   **Must NOT do**: Do not introduce global footer refactors or unsupported sorting behavior.
@@ -300,7 +300,7 @@ Wave 3: QA and polish
 
   **Commit**: YES | Message: `feat(frontend): refine listings result chrome and footer` | Files: `frontend/app/(public)/listings/page.tsx`
 
-- [ ] 6. Tighten listing-card rhythm to the screenshot style
+- [x] 6. Tighten listing-card rhythm to the screenshot style
 
   **What to do**: Rework `frontend/features/listings/components/listing-card.tsx` so cards are flatter, denser, and more brokerage-listing-like: compact image block, restrained metadata, tight stats line, lightweight utility controls, and a less “editorial” presentation.
   **Must NOT do**: Do not add nonexistent data like agent names, coordinates, or days-on-market; do not make the cards taller than needed.
@@ -339,7 +339,7 @@ Wave 3: QA and polish
 
   **Commit**: YES | Message: `feat(frontend): tighten public listing card rhythm` | Files: `frontend/features/listings/components/listing-card.tsx`
 
-- [ ] 7. Add Playwright coverage for desktop/mobile search-shell parity
+- [x] 7. Add Playwright coverage for desktop/mobile search-shell parity
 
   **What to do**: Create `frontend/e2e/public-listings.spec.ts` to validate the new `/listings` shell on desktop and mobile. The spec must verify shell regions, lack of horizontal overflow, deterministic map behavior, and visible listing-card rendering.
   **Must NOT do**: Do not make the test depend on exact pixels or live third-party map rendering internals.
@@ -378,7 +378,7 @@ Wave 3: QA and polish
 
   **Commit**: YES | Message: `test(frontend): cover listings search shell in playwright` | Files: `frontend/e2e/public-listings.spec.ts`
 
-- [ ] 8. Run final frontend verification and fix regressions
+- [x] 8. Run final frontend verification and fix regressions
 
   **What to do**: Run LSP diagnostics, the dedicated public-route Vitest file, the dedicated Playwright file, the full frontend test suite, and the production build. Fix any regressions introduced by the redesign while preserving the scope boundaries above.
   **Must NOT do**: Do not expand the scope into backend or unrelated dashboard changes.
@@ -420,10 +420,10 @@ Wave 3: QA and polish
   **Commit**: NO | Message: `n/a` | Files: `n/a`
 
 ## Final Verification Wave (4 parallel agents, ALL must APPROVE)
-- [ ] F1. Plan Compliance Audit - oracle
-- [ ] F2. Code Quality Review - unspecified-high
-- [ ] F3. Real Manual QA - unspecified-high (+ playwright)
-- [ ] F4. Scope Fidelity Check - deep
+- [x] F1. Plan Compliance Audit - oracle
+- [x] F2. Code Quality Review - unspecified-high
+- [x] F3. Real Manual QA - unspecified-high (+ playwright)
+- [x] F4. Scope Fidelity Check - deep
 
 ## Commit Strategy
 - Commit 1: query-state fidelity + route test
