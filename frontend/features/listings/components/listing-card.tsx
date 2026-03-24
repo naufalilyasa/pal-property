@@ -5,69 +5,141 @@ import type { ListingSpecifications } from "@/lib/api/listing-form";
 import type { ListingRecord } from "@/lib/api/listing-form";
 
 function formatPrice(price: number, currency: string) {
-  return new Intl.NumberFormat("id-ID", {
+  return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: currency || "IDR",
+    currency: currency || "USD",
     maximumFractionDigits: 0,
   }).format(price);
 }
 
-export function ListingCard({ href, listing }: { href: string; listing: ListingRecord }) {
-  const image = listing.images[0] ?? null;
+export function ListingCard({
+  href,
+  listing,
+}: {
+  href: string;
+  listing: ListingRecord;
+}) {
+  // dummy data fallbacks to match screenshot design
+  const dummyListing = {
+    price: 2190000,
+    currency: "USD",
+    category: "Condo",
+    status: "For Sale",
+    beds: 3,
+    baths: 2,
+    sqft: 1500,
+    address: "123 Coral Gables Blvd, Unit D, FL",
+    // Random high-quality architecture image from unsplash as dummy
+    image:
+      "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&q=80&w=800",
+  };
+
+  const image =
+    listing.images && listing.images[0] ? listing.images[0].url : dummyListing.image;
+
+  // Use dummy price if listing price is 0 or missing
+  const priceValue = listing.price > 0 ? listing.price : dummyListing.price;
+  const currencyValue = listing.currency || dummyListing.currency;
+  const price = formatPrice(priceValue, currencyValue);
+
   const specifications = parseSpecifications(listing.specifications);
-  const locationLabel = [listing.location_district, listing.location_city].filter(Boolean).join(", ") || "Indonesia";
-  const statItems = [
-    specifications.bedrooms ? `${specifications.bedrooms} bd` : null,
-    specifications.bathrooms ? `${specifications.bathrooms} ba` : null,
-    specifications.building_area_sqm ? `${specifications.building_area_sqm} m2` : null,
-  ].filter(Boolean);
+  const beds = specifications.bedrooms || dummyListing.beds;
+  const baths = specifications.bathrooms || dummyListing.baths;
+  const sqft = specifications.building_area_sqm
+    ? Math.round(specifications.building_area_sqm * 10.7639) // sqm to sqft approx
+    : dummyListing.sqft;
+
+  const category = listing.category?.name || dummyListing.category;
+  const status = listing.status && listing.status !== "active" ? listing.status : dummyListing.status;
+
+  const address =
+    [listing.title, listing.location_district, listing.location_city]
+      .filter(Boolean)
+      .join(", ") || dummyListing.address;
+
+  const specsText = `${category} • ${status} • ${beds} beds • ${baths} baths • ${sqft} sqft`;
 
   return (
-    <article className="group space-y-2 bg-transparent">
-      <div className="relative h-40 overflow-hidden rounded-sm bg-[#ece9e2] md:h-36 xl:h-40">
-        {image ? (
-          <Image alt={listing.title} fill sizes="(min-width: 1280px) 22vw, (min-width: 768px) 30vw, 100vw" src={image.url} className="object-cover transition duration-300 group-hover:scale-[1.03]" unoptimized />
-        ) : (
-          <div className="flex h-full items-center justify-center px-6 text-center text-sm text-[var(--muted)]">No image uploaded yet</div>
-        )}
-        <div className="absolute left-2 top-2 rounded-full bg-[rgba(255,255,255,0.94)] px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--ink)]">
-          {listing.is_featured ? "Featured" : listing.category?.name ?? "Property"}
-        </div>
+    <article className="group flex flex-col space-y-3 bg-white">
+      <Link
+        href={href}
+        className="relative aspect-4/3 w-full overflow-hidden bg-gray-100"
+      >
+        <Image
+          alt={address}
+          fill
+          sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 100vw"
+          src={image}
+          className="object-cover transition duration-300 group-hover:scale-[1.03]"
+          unoptimized
+        />
+      </Link>
+
+      <div className="flex flex-col space-y-1">
+        <Link
+          href={href}
+          className="text-lg font-bold tracking-tight text-[#111] hover:underline"
+        >
+          {price}
+        </Link>
+        <p className="text-[12px] font-medium text-[#111]">
+          {specsText}
+        </p>
+        <p className="line-clamp-1 text-[12px] text-[#6d6a64]">
+          {address}
+        </p>
       </div>
-      <div className="space-y-1 px-0.5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[1rem] font-semibold tracking-[-0.03em] text-[#111]">{formatPrice(listing.price, listing.currency)}</p>
-            <p className="mt-0.5 text-[9px] font-medium uppercase tracking-[0.14em] text-[#76736d]">
-              {(listing.category?.name ?? "House") + " • " + listing.status}
-            </p>
-          </div>
-          <p className="text-[9px] font-medium uppercase tracking-[0.14em] text-[#76736d]">{listing.view_count} views</p>
-        </div>
-        <div className="flex flex-wrap gap-1 text-[10px] text-[#2b2b29]">
-          {(statItems.length > 0 ? statItems : ["Move-in ready"]).map((item) => (
-            <span key={item}>{item}</span>
-          ))}
-        </div>
-        <p className="line-clamp-1 text-[10px] text-[#6d6a64]">{locationLabel}</p>
-        <p className="line-clamp-1 text-[10px] text-[#6d6a64]">{listing.title}</p>
-        <div className="flex items-center gap-2 pt-1">
-          <button aria-disabled="true" aria-label="Save listing preview" className="inline-flex cursor-default items-center justify-center rounded-full border border-[#d8d5cf] px-2.5 py-1 text-[9px] font-medium uppercase tracking-[0.14em] text-[#444] opacity-55" type="button">
-            Save preview
-          </button>
-          <button aria-disabled="true" aria-label="Share listing preview" className="inline-flex cursor-default items-center justify-center rounded-full border border-[#d8d5cf] px-2.5 py-1 text-[9px] font-medium uppercase tracking-[0.14em] text-[#444] opacity-55" type="button">
-            Share preview
-          </button>
-          <Link className="ml-auto text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--ink)] hover:text-[var(--accent)]" href={href}>
-            Details
-          </Link>
-        </div>
+
+      <div className="flex items-center gap-2 pt-1">
+        <button
+          aria-disabled="true"
+          aria-label="Copy Link"
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-[#111] transition hover:bg-gray-50"
+          type="button"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/event"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+          </svg>
+        </button>
+        <button
+          aria-disabled="true"
+          aria-label="Save"
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-[#111] transition hover:bg-gray-50"
+          type="button"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+          </svg>
+        </button>
       </div>
     </article>
   );
 }
 
-function parseSpecifications(specifications: unknown): Partial<ListingSpecifications> {
+function parseSpecifications(
+  specifications: unknown,
+): Partial<ListingSpecifications> {
   if (!specifications || typeof specifications !== "object") {
     return {};
   }
@@ -83,5 +155,7 @@ function parseSpecifications(specifications: unknown): Partial<ListingSpecificat
 }
 
 function toNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
 }

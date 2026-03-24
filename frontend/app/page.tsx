@@ -38,10 +38,10 @@ export default function Home() {
               <li>Listing create, edit, and image tools are live.</li>
             </ul>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link className="inline-flex items-center justify-center rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90" href="/login">
+              <Link className="inline-flex items-center justify-center rounded-full bg-(--accent) px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90" href="/login">
                 Go to login
               </Link>
-              <Link className="inline-flex items-center justify-center rounded-full border border-[var(--line)] bg-[var(--panel)] px-5 py-3 text-sm font-semibold text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]" href="/listings">
+              <Link className="inline-flex items-center justify-center rounded-full border border-(--line) bg-(--panel) px-5 py-3 text-sm font-semibold text-(--ink) transition hover:border-(--accent) hover:text-(--accent)" href="/listings">
                 Browse public listings
               </Link>
             </div>
