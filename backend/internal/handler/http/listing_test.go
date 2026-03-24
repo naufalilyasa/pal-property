@@ -378,6 +378,14 @@ func (s *ListingHandlerTestSuite) TestCreateListing_InvalidPayload() {
 	req2 := request.CreateListingRequest{Title: "Test Title", Price: 0, Status: "active"}
 	resp2 := s.makeRequest(http.MethodPost, "/api/listings/", req2, token)
 	s.Equal(http.StatusBadRequest, resp2.StatusCode)
+
+	req3 := request.CreateListingRequest{Title: "Valid Enough Title", Price: 1000, Status: "active", TransactionType: "lease"}
+	resp3 := s.makeRequest(http.MethodPost, "/api/listings/", req3, token)
+	s.Equal(http.StatusBadRequest, resp3.StatusCode)
+
+	req4 := request.CreateListingRequest{Title: "Valid Enough Title", Price: 1000, Status: "active", Specifications: request.Specifications{Bedrooms: 999}}
+	resp4 := s.makeRequest(http.MethodPost, "/api/listings/", req4, token)
+	s.Equal(http.StatusBadRequest, resp4.StatusCode)
 }
 
 func (s *ListingHandlerTestSuite) TestCreateListing_Unauthorized() {
@@ -424,28 +432,85 @@ func (s *ListingHandlerTestSuite) TestListListings() {
 
 	for i := 1; i <= 3; i++ {
 		s.createListing(token, request.CreateListingRequest{
-			Title:        fmt.Sprintf("Listing %d", i),
-			Price:        int64(i * 1000000),
-			Status:       "active",
-			LocationCity: ptr("Jakarta"),
+			Title:            fmt.Sprintf("Listing %d", i),
+			Price:            int64(i * 1000000),
+			Status:           "active",
+			TransactionType:  "sale",
+			LocationProvince: ptr("DKI Jakarta"),
+			LocationCity:     ptr("Jakarta"),
+			BedroomCount:     ptr(i),
 		})
 	}
+
+	s.createListing(token, request.CreateListingRequest{
+		Title:            "Rental Listing",
+		Price:            4000000,
+		Status:           "active",
+		TransactionType:  "rent",
+		LocationProvince: ptr("Banten"),
+		LocationCity:     ptr("Tangerang"),
+		BedroomCount:     ptr(4),
+		CertificateType:  ptr("SHM"),
+		Condition:        ptr("new"),
+		Furnishing:       ptr("semi"),
+	})
 
 	resp := s.makeRequest(http.MethodGet, "/api/listings?limit=2", nil, "")
 	s.Equal(http.StatusOK, resp.StatusCode)
 	listResult := decodePaginatedEnvelope(s.T(), resp)
 	s.Len(listResult.Data.Data, 2)
-	s.Equal(int64(3), listResult.Data.Total)
+	s.Equal(int64(4), listResult.Data.Total)
 
-	resp2 := s.makeRequest(http.MethodGet, "/api/listings?city=Jakarta", nil, "")
+	resp2 := s.makeRequest(http.MethodGet, "/api/listings?location_city=Jakarta", nil, "")
 	s.Equal(http.StatusOK, resp2.StatusCode)
 	listResult2 := decodePaginatedEnvelope(s.T(), resp2)
 	s.Len(listResult2.Data.Data, 3)
+
+	resp4 := s.makeRequest(http.MethodGet, "/api/listings?transaction_type=rent&location_province=Banten&bedroom_count=4&certificate_type=SHM&condition=new&furnishing=semi", nil, "")
+	s.Equal(http.StatusOK, resp4.StatusCode)
+	listResult4 := decodePaginatedEnvelope(s.T(), resp4)
+	s.Len(listResult4.Data.Data, 1)
+	s.Equal("Rental Listing", listResult4.Data.Data[0].Title)
 
 	resp3 := s.makeRequest(http.MethodGet, "/api/listings?price_min=100&price_max=50", nil, "")
 	s.Equal(http.StatusOK, resp3.StatusCode)
 	listResult3 := decodePaginatedEnvelope(s.T(), resp3)
 	s.Empty(listResult3.Data.Data)
+}
+
+func (s *ListingHandlerTestSuite) TestPublicListingStatusVisibility() {
+	user := s.createTestUser("user")
+	token := s.mintJWT(user.ID)
+
+	activeListing := s.createListing(token, request.CreateListingRequest{Title: "Active Public Listing", Price: 1500000, Status: "active"})
+	draftListing := s.createListing(token, request.CreateListingRequest{Title: "Draft Private Listing", Price: 1500000, Status: "draft"})
+	soldListing := s.createListing(token, request.CreateListingRequest{Title: "Sold Public Listing", Price: 1600000, Status: "sold"})
+
+	publicListResp := s.makeRequest(http.MethodGet, "/api/listings?limit=10", nil, "")
+	s.Equal(http.StatusOK, publicListResp.StatusCode)
+	publicListResult := decodePaginatedEnvelope(s.T(), publicListResp)
+	s.Len(publicListResult.Data.Data, 2)
+	titles := []string{publicListResult.Data.Data[0].Title, publicListResult.Data.Data[1].Title}
+	s.Contains(titles, activeListing.Title)
+	s.Contains(titles, soldListing.Title)
+	s.NotContains(titles, draftListing.Title)
+
+	publicDraftByID := s.makeRequest(http.MethodGet, "/api/listings/"+draftListing.ID.String(), nil, "")
+	s.Equal(http.StatusNotFound, publicDraftByID.StatusCode)
+
+	publicDraftBySlug := s.makeRequest(http.MethodGet, "/api/listings/slug/"+draftListing.Slug, nil, "")
+	s.Equal(http.StatusNotFound, publicDraftBySlug.StatusCode)
+
+	publicDraftStatusFilter := s.makeRequest(http.MethodGet, "/api/listings?status=draft", nil, "")
+	s.Equal(http.StatusOK, publicDraftStatusFilter.StatusCode)
+	publicDraftStatusResult := decodePaginatedEnvelope(s.T(), publicDraftStatusFilter)
+	s.Empty(publicDraftStatusResult.Data.Data)
+
+	ownerListingsResp := s.makeRequest(http.MethodGet, "/auth/me/listings?status=draft", nil, token)
+	s.Equal(http.StatusOK, ownerListingsResp.StatusCode)
+	ownerListingsResult := decodePaginatedEnvelope(s.T(), ownerListingsResp)
+	s.Len(ownerListingsResult.Data.Data, 1)
+	s.Equal(draftListing.Title, ownerListingsResult.Data.Data[0].Title)
 }
 
 func (s *ListingHandlerTestSuite) TestUpdateListing() {
