@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -41,12 +42,12 @@ export function ListingFilters({ values, total, visibleCount }: { values: Listin
   );
 
   return (
-    <section className="space-y-3" data-testid="listing-filters">
+    <section className="space-y-2" data-testid="listing-filters">
       <form action="/listings" className="grid gap-2 xl:grid-cols-[minmax(0,1.8fr)_repeat(5,minmax(0,1fr))]">
-        <label className="flex min-h-12 flex-col justify-center gap-1 rounded-md border border-[#ddd] bg-white px-3 py-2">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8a8a86]">Enter property address</span>
+        <label className="flex min-h-11 flex-col justify-center gap-1 rounded-md border border-[#ddd9d1] bg-[#fffdf9] px-3 py-2">
+          <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-[#8a8a86]">Enter property address</span>
           <input
-            className="bg-transparent text-[13px] text-[var(--ink)] outline-none placeholder:text-[#9a978f]"
+            className="bg-transparent text-[12px] text-[var(--ink)] outline-none placeholder:text-[#9a978f]"
             defaultValue={values.city ?? ""}
             name="city"
             placeholder="Jakarta, Bandung, Surabaya"
@@ -54,9 +55,9 @@ export function ListingFilters({ values, total, visibleCount }: { values: Listin
           />
         </label>
 
-        <label className="flex min-h-12 flex-col justify-center gap-1 rounded-md border border-[#ddd] bg-white px-3 py-2">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8a8a86]">Neighborhoods</span>
-          <select className="bg-transparent text-[13px] text-[var(--ink)] outline-none" defaultValue={values.category_id ?? ""} name="category_id">
+        <label className="flex min-h-11 flex-col justify-center gap-1 rounded-md border border-[#ddd9d1] bg-[#fffdf9] px-3 py-2">
+          <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-[#8a8a86]">Neighborhoods</span>
+          <select className="bg-transparent text-[12px] text-[var(--ink)] outline-none" defaultValue={values.category_id ?? ""} name="category_id">
             <option value="">All categories</option>
             {(categoriesQuery.data ?? []).map((category) => (
               <option key={category.id} value={category.id}>
@@ -66,9 +67,9 @@ export function ListingFilters({ values, total, visibleCount }: { values: Listin
           </select>
         </label>
 
-        <label className="flex min-h-12 flex-col justify-center gap-1 rounded-md border border-[#ddd] bg-white px-3 py-2">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8a8a86]">For sale</span>
-          <select className="bg-transparent text-[13px] text-[var(--ink)] outline-none" defaultValue={values.status ?? "active"} name="status">
+        <label className="flex min-h-11 flex-col justify-center gap-1 rounded-md border border-[#ddd9d1] bg-[#fffdf9] px-3 py-2">
+          <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-[#8a8a86]">For sale</span>
+          <select className="bg-transparent text-[12px] text-[var(--ink)] outline-none" defaultValue={values.status ?? ""} name="status">
             <option value="">Any status</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
@@ -76,31 +77,31 @@ export function ListingFilters({ values, total, visibleCount }: { values: Listin
           </select>
         </label>
 
-        <label className="flex min-h-12 flex-col justify-center gap-1 rounded-md border border-[#ddd] bg-white px-3 py-2">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8a8a86]">Price</span>
-          <input className="bg-transparent text-[13px] text-[var(--ink)] outline-none placeholder:text-[#9a978f]" defaultValue={values.price_min ?? ""} inputMode="numeric" name="price_min" placeholder="Min budget" type="text" />
+        <label className="flex min-h-11 flex-col justify-center gap-1 rounded-md border border-[#ddd9d1] bg-[#fffdf9] px-3 py-2">
+          <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-[#8a8a86]">Price</span>
+          <input className="bg-transparent text-[12px] text-[var(--ink)] outline-none placeholder:text-[#9a978f]" defaultValue={values.price_min ?? ""} inputMode="numeric" name="price_min" placeholder="Min budget" type="text" />
         </label>
 
-        <label className="flex min-h-12 flex-col justify-center gap-1 rounded-md border border-[#ddd] bg-white px-3 py-2">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8a8a86]">Residential</span>
-          <input className="bg-transparent text-[13px] text-[var(--ink)] outline-none placeholder:text-[#9a978f]" defaultValue={values.price_max ?? ""} inputMode="numeric" name="price_max" placeholder="Max budget" type="text" />
+        <label className="flex min-h-11 flex-col justify-center gap-1 rounded-md border border-[#ddd9d1] bg-[#fffdf9] px-3 py-2">
+          <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-[#8a8a86]">Residential</span>
+          <input className="bg-transparent text-[12px] text-[var(--ink)] outline-none placeholder:text-[#9a978f]" defaultValue={values.price_max ?? ""} inputMode="numeric" name="price_max" placeholder="Max budget" type="text" />
         </label>
 
-        <div className="flex min-h-12 items-stretch gap-2 xl:justify-end">
+        <div className="flex min-h-11 items-stretch gap-2 xl:justify-end">
           <input name="limit" type="hidden" value={values.limit ?? "12"} />
-          <button className="inline-flex flex-1 items-center justify-center rounded-md border border-[#ddd] bg-white px-3 py-2 text-[13px] font-medium text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] xl:flex-none" type="reset">
+          <Link className="inline-flex flex-1 items-center justify-center rounded-md border border-[#ddd9d1] bg-[#fffdf9] px-3 py-2 text-[12px] font-medium text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] xl:flex-none" href="/listings">
             Clear
-          </button>
-          <button className="inline-flex flex-[1.1] items-center justify-center rounded-md bg-[var(--ink)] px-4 py-2 text-[13px] font-medium text-white transition hover:bg-[var(--accent)] xl:flex-none" type="submit">
+          </Link>
+          <button className="inline-flex flex-[1.1] items-center justify-center rounded-md bg-[var(--ink)] px-4 py-2 text-[12px] font-medium text-white transition hover:bg-[var(--accent)] xl:flex-none" type="submit">
             Search
           </button>
         </div>
       </form>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#ece9e2] pb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-[#77746d]">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#ede8df] pb-2 text-[10px] font-medium uppercase tracking-[0.14em] text-[#77746d]">
         <div className="flex flex-wrap gap-2">
           {quickStats.map((item) => (
-            <span key={item.label} className="rounded-full bg-[#f2f1ed] px-2.5 py-1">
+            <span key={item.label} className="rounded-full bg-[#f2f0eb] px-2 py-1">
               {item.label}: {item.value}
             </span>
           ))}
