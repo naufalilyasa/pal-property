@@ -52,9 +52,14 @@ export default async function DashboardOverviewPage() {
         <Link className="inline-flex h-9 items-center justify-center rounded-md border border-slate-200 bg-white px-4 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 hover:text-slate-900" href="/dashboard/listings">
           Review listings table
         </Link>
-        <Link className="inline-flex h-9 items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-slate-50 shadow transition-colors hover:bg-slate-900/90" href="/dashboard/listings/new">
-          Create listing
-        </Link>
+        <div
+          className="inline-flex h-9 items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-slate-50 shadow transition-colors hover:bg-slate-900/90"
+        >
+          <Link
+            href="/dashboard/listings/new">
+            Create listing
+          </Link>
+        </div>
       </section>
     </div>
   );
