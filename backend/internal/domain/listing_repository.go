@@ -26,11 +26,23 @@ type ListingRepository interface {
 }
 
 type ListingFilter struct {
-	Status       string
-	CategoryID   *uuid.UUID
-	LocationCity string
-	PriceMin     *int64
-	PriceMax     *int64
-	Page         int
-	Limit        int
+	Status           string
+	Statuses         []string
+	TransactionType  string
+	CategoryID       *uuid.UUID
+	LocationProvince string
+	LocationCity     string
+	PriceMin         *int64
+	PriceMax         *int64
+	BedroomCount     *int
+	BathroomCount    *int
+	LandAreaMin      *int
+	LandAreaMax      *int
+	BuildingAreaMin  *int
+	BuildingAreaMax  *int
+	CertificateType  string
+	Condition        string
+	Furnishing       string
+	Page             int
+	Limit            int
 }
