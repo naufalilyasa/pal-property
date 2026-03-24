@@ -50,6 +50,7 @@ listingHandler := http.NewListingHandler(listingSvc)
 
 **Config sync**:
 - Runtime authority is `pkg/config/config.go`, which uses `caarlos0/env/v11` to parse env and decode AES secrets so OAuth provider tokens stay encrypted at rest.
+- Broker/search runtime config also flows through `pkg/config/config.go`, with `KAFKA_BROKERS`, `KAFKA_GROUP_ID`, `KAFKA_CLIENT_ID`, topic names, and `ELASTIC_ADDRESS` / optional auth fields reserved for Redpanda and Elasticsearch wiring.
 - Any new env var still requires updates to `.env-example` and `.env.docker` when local startup depends on it.
 - **Prices:** Listing and commerce values stay `int64` in IDR to protect precision across services.
 
