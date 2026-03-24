@@ -94,6 +94,7 @@ cd frontend && npm run test:e2e
 - Money is always `int64` in IDR.
 - UUIDs use `uuid.UUID`; entities commonly generate UUID v7 in hooks.
 - Listing-image tests must use fake storage, never live Cloudinary.
+- Listing contract is currently in a compatibility phase: new typed property fields may coexist with legacy `specifications` JSON until cleanup is explicitly planned.
 
 ## FRONTEND RULES
 

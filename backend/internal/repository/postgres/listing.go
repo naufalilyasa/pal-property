@@ -382,9 +382,17 @@ func (r *listingRepository) FindByUserID(ctx context.Context, userID uuid.UUID, 
 func (r *listingRepository) applyFilter(db *gorm.DB, filter domain.ListingFilter) *gorm.DB {
 	if filter.Status != "" {
 		db = db.Where("listings.status = ?", filter.Status)
+	} else if len(filter.Statuses) > 0 {
+		db = db.Where("listings.status IN ?", filter.Statuses)
+	}
+	if filter.TransactionType != "" {
+		db = db.Where("listings.transaction_type = ?", filter.TransactionType)
 	}
 	if filter.CategoryID != nil {
 		db = db.Where("listings.category_id = ?", filter.CategoryID)
+	}
+	if filter.LocationProvince != "" {
+		db = db.Where("listings.location_province ILIKE ?", fmt.Sprintf("%%%s%%", filter.LocationProvince))
 	}
 	if filter.LocationCity != "" {
 		db = db.Where("listings.location_city ILIKE ?", fmt.Sprintf("%%%s%%", filter.LocationCity))
@@ -394,6 +402,33 @@ func (r *listingRepository) applyFilter(db *gorm.DB, filter domain.ListingFilter
 	}
 	if filter.PriceMax != nil {
 		db = db.Where("listings.price <= ?", *filter.PriceMax)
+	}
+	if filter.BedroomCount != nil {
+		db = db.Where("listings.bedroom_count >= ?", *filter.BedroomCount)
+	}
+	if filter.BathroomCount != nil {
+		db = db.Where("listings.bathroom_count >= ?", *filter.BathroomCount)
+	}
+	if filter.LandAreaMin != nil {
+		db = db.Where("listings.land_area_sqm >= ?", *filter.LandAreaMin)
+	}
+	if filter.LandAreaMax != nil {
+		db = db.Where("listings.land_area_sqm <= ?", *filter.LandAreaMax)
+	}
+	if filter.BuildingAreaMin != nil {
+		db = db.Where("listings.building_area_sqm >= ?", *filter.BuildingAreaMin)
+	}
+	if filter.BuildingAreaMax != nil {
+		db = db.Where("listings.building_area_sqm <= ?", *filter.BuildingAreaMax)
+	}
+	if filter.CertificateType != "" {
+		db = db.Where("listings.certificate_type = ?", filter.CertificateType)
+	}
+	if filter.Condition != "" {
+		db = db.Where("listings.condition = ?", filter.Condition)
+	}
+	if filter.Furnishing != "" {
+		db = db.Where("listings.furnishing = ?", filter.Furnishing)
 	}
 	return db
 }
