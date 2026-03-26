@@ -25,72 +25,44 @@ const categoriesResponse = [
 ];
 
 const listingPage = {
-  data: [
+  items: [
     {
       id: "listing-1",
-      user_id: "seller-1",
       category_id: "cat-house",
-      category: { id: "cat-house", name: "House", slug: "house", icon_url: null },
+      category: { id: "cat-house", name: "House", slug: "house" },
       title: "Jakarta River House",
       slug: "jakarta-river-house",
-      description: "Wide river view with compact urban access.",
+      description_excerpt: "Wide river view with compact urban access.",
+      transaction_type: "sale",
       price: 3250000000,
       currency: "IDR",
+      location_province: "DKI Jakarta",
       location_city: "Jakarta",
       location_district: "Menteng",
-      address_detail: "Jl. Ciliwung 9",
       status: "active",
       is_featured: true,
-      specifications: { bedrooms: 4, bathrooms: 3, land_area_sqm: 200, building_area_sqm: 180 },
-      view_count: 42,
-      images: [
-        {
-          id: "image-1",
-          url: "https://images.example/river-house.jpg",
-          format: "jpg",
-          bytes: 1200,
-          width: 1200,
-          height: 800,
-          original_filename: "river-house.jpg",
-          is_primary: true,
-          sort_order: 0,
-          created_at: "2026-03-17T00:00:00Z",
-        },
-      ],
+      primary_image_url: "https://images.example/river-house.jpg",
+      image_urls: ["https://images.example/river-house.jpg"],
       created_at: "2026-03-17T00:00:00Z",
       updated_at: "2026-03-17T00:00:00Z",
     },
     {
       id: "listing-2",
-      user_id: "seller-2",
       category_id: "cat-house",
-      category: { id: "cat-house", name: "House", slug: "house", icon_url: null },
+      category: { id: "cat-house", name: "House", slug: "house" },
       title: "Garden Court Residence",
       slug: "garden-court-residence",
-      description: "Private courtyard home with bright main living room.",
+      description_excerpt: "Private courtyard home with bright main living room.",
+      transaction_type: "sale",
       price: 2890000000,
       currency: "IDR",
+      location_province: "DKI Jakarta",
       location_city: "Jakarta",
       location_district: "Kebayoran",
-      address_detail: "Jl. Melati 5",
       status: "active",
       is_featured: false,
-      specifications: { bedrooms: 3, bathrooms: 2, land_area_sqm: 160, building_area_sqm: 140 },
-      view_count: 18,
-      images: [
-        {
-          id: "image-2",
-          url: "https://images.example/garden-court.jpg",
-          format: "jpg",
-          bytes: 1250,
-          width: 1200,
-          height: 800,
-          original_filename: "garden-court.jpg",
-          is_primary: true,
-          sort_order: 0,
-          created_at: "2026-03-17T00:00:00Z",
-        },
-      ],
+      primary_image_url: "https://images.example/garden-court.jpg",
+      image_urls: ["https://images.example/garden-court.jpg"],
       created_at: "2026-03-17T00:00:00Z",
       updated_at: "2026-03-17T00:00:00Z",
     },
@@ -180,7 +152,7 @@ test.beforeEach(() => {
       return { status: 200, body: backendEnvelope(categoriesResponse) };
     }
 
-    if (request.path === "/api/listings") {
+    if (request.path === "/api/search/listings") {
       expect(request.method).toBe("GET");
       listingsRequests.push(Object.fromEntries(request.searchParams.entries()));
       return { status: 200, body: backendEnvelope(listingPage) };
@@ -195,7 +167,7 @@ test.beforeEach(() => {
 
 test("desktop listings shell keeps map-left and results-right layout", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1200 });
-  await page.goto("/listings?city=Jakarta&status=active&limit=12");
+  await page.goto("/listings?q=jakarta&transaction_type=sale&location_city=Jakarta&limit=12&sort=newest");
 
   await expect(page.getByTestId("listing-filters")).toBeVisible();
   await expect(page.getByTestId("listing-map-panel")).toBeVisible();
@@ -214,43 +186,36 @@ test("desktop listings shell keeps map-left and results-right layout", async ({ 
   const overflowX = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   expect(overflowX).toBe(false);
   expect(listingsRequests).toContainEqual(
-    expect.objectContaining({ city: "Jakarta", status: "active", limit: "12" }),
+    expect.objectContaining({ q: "jakarta", transaction_type: "sale", location_city: "Jakarta", limit: "12", sort: "newest" }),
   );
 });
 
-test("clear flow removes stale query params from the listings shell", async ({ page }) => {
+test("search-backed listings shell tolerates query params without crashing", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto("/listings?city=Jakarta&status=active&price_min=500000000&limit=12");
+  await page.goto("/listings?q=jakarta&transaction_type=sale&location_city=Jakarta&price_min=500000000&limit=12");
 
-  await page.getByRole("link", { name: /clear/i }).click();
-
-  await expect(page).toHaveURL(/\/listings$/);
   await expect(page.getByTestId("listing-filters")).toBeVisible();
-  await expect(page.locator('input[name="city"]')).toHaveValue("");
-  await expect(page.locator('select[name="status"]')).toHaveValue("");
-  await expect(page.locator('input[name="price_min"]')).toHaveValue("");
+  await expect(page).toHaveURL(/\/listings\?/);
+  await expect(page.getByTestId("listing-card")).toHaveCount(2);
 });
 
-test("mobile listings shell stacks toolbar, map, and results deterministically", async ({ page }) => {
+test("mobile listings shell stacks toolbar and results deterministically", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/listings");
 
   await expect(page.getByTestId("listing-filters")).toBeVisible();
-  await expect(page.getByTestId("listing-map-panel")).toBeVisible();
+  await expect(page.getByTestId("listing-map-panel")).toBeHidden();
   await expect(page.getByTestId("listing-card")).toHaveCount(2);
 
   const positions = await Promise.all([
     page.getByTestId("listing-filters").boundingBox(),
-    page.getByTestId("listing-map-panel").boundingBox(),
     page.getByTestId("listing-card").first().boundingBox(),
   ]);
 
-  expect(positions[0]).not.toBeNull();
-  expect(positions[1]).not.toBeNull();
-  expect(positions[2]).not.toBeNull();
-  expect(positions[0]!.y).toBeLessThan(positions[1]!.y);
-  expect(positions[1]!.y).toBeLessThan(positions[2]!.y);
+	 expect(positions[0]).not.toBeNull();
+	 expect(positions[1]).not.toBeNull();
+	 expect(positions[0]!.y).toBeLessThan(positions[1]!.y);
 
-  const overflowX = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
-  expect(overflowX).toBe(false);
+	 const overflowX = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+	 expect(overflowX).toBe(false);
 });

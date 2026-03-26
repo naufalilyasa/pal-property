@@ -44,6 +44,7 @@ func Register(
 	authzService *authz.Service,
 	authHandler *http.AuthHandler,
 	listingHandler *http.ListingHandler,
+	searchHandler *http.SearchHandler,
 	categoryHandler *http.CategoryHandler,
 ) {
 	// Global Middlewares
@@ -102,6 +103,7 @@ func Register(
 	// 3. Listing Routes (Public)
 	// ==========================================
 	api := app.Group("/api")
+	api.Get("/search/listings", searchHandler.SearchListings)
 	api.Get("/listings", listingHandler.List)
 	api.Get("/listings/slug/:slug", listingHandler.GetBySlug)
 	api.Get("/listings/:id", listingHandler.GetByID)

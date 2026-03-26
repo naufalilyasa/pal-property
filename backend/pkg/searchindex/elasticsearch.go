@@ -142,3 +142,31 @@ func (c *Client) DeleteDocument(ctx context.Context, index, id string) error {
 	}
 	return nil
 }
+
+func (c *Client) Search(ctx context.Context, index string, query any, target any) error {
+	body, err := json.Marshal(query)
+	if err != nil {
+		return fmt.Errorf("searchindex: marshal search query: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/%s/_search", c.address, index), bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("searchindex: create search request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if c.username != "" || c.password != "" {
+		req.SetBasicAuth(c.username, c.password)
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("searchindex: search request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= http.StatusBadRequest {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("searchindex: search failed with status %d: %s", resp.StatusCode, strings.TrimSpace(string(bodyBytes)))
+	}
+	if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
+		return fmt.Errorf("searchindex: decode search response: %w", err)
+	}
+	return nil
+}
