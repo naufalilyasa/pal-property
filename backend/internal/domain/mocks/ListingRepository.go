@@ -232,6 +232,35 @@ func (_m *ListingRepository) FindBySlug(ctx context.Context, slug string) (*enti
 	return r0, r1
 }
 
+func (_m *ListingRepository) FindByCategoryID(ctx context.Context, categoryID uuid.UUID) ([]*entity.Listing, error) {
+	ret := _m.Called(ctx, categoryID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByCategoryID")
+	}
+
+	var r0 []*entity.Listing
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) ([]*entity.Listing, error)); ok {
+		return rf(ctx, categoryID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) []*entity.Listing); ok {
+		r0 = rf(ctx, categoryID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*entity.Listing)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
+		r1 = rf(ctx, categoryID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // FindByUserID provides a mock function with given fields: ctx, userID, filter
 func (_m *ListingRepository) FindByUserID(ctx context.Context, userID uuid.UUID, filter domain.ListingFilter) ([]*entity.Listing, int64, error) {
 	ret := _m.Called(ctx, userID, filter)

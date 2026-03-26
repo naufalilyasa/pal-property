@@ -23,6 +23,7 @@ type ListingRepository interface {
 	ExistsBySlug(ctx context.Context, slug string) (bool, error)
 	IncrementViewCount(ctx context.Context, id uuid.UUID) error
 	FindByUserID(ctx context.Context, userID uuid.UUID, filter ListingFilter) ([]*entity.Listing, int64, error)
+	FindByCategoryID(ctx context.Context, categoryID uuid.UUID) ([]*entity.Listing, error)
 }
 
 type ListingFilter struct {
