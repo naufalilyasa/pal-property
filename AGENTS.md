@@ -9,7 +9,7 @@ Property listing platform for Indonesia. The Go backend remains the system-of-re
 
 **Stack:** Go 1.26 + Fiber v3 + GORM + PostgreSQL 17 + Redis + Goth OAuth | Next.js 16 App Router + React 19 + TypeScript + Tailwind v4 + TanStack Query + RHF + Zod | Cloudinary-backed listing images via backend APIs
 
-**Implemented:** Google OAuth with httpOnly cookie auth, refresh rotation, `/auth/me`, listing CRUD, category APIs, listing image upload/delete/set-primary/reorder, Casbin-backed backend authorization with DB-fresh principals, seller dashboard/listing create-edit-image flows, public listings browse/detail pages, Vitest + Playwright frontend coverage
+**Implemented:** Google OAuth with httpOnly cookie auth, refresh rotation, `/auth/me`, listing CRUD, category APIs, listing image upload/delete/set-primary/reorder, Casbin-backed backend authorization with DB-fresh principals, seller dashboard/listing create-edit-image flows, Elasticsearch-backed public listings browse plus detail pages, Vitest + Playwright frontend coverage
 **Infrastructure:** Redpanda already serves as the message broker, and the recent security/config cleanup aligned DB SSL config, legacy OAuth token reads, auth refresh semantics, and env guidance. Planned next steps remain producers/consumers, Elasticsearch indexing, and broader buyer-facing/product flows.
 
 ## SOURCE OF TRUTH ARCHITECTURE
@@ -50,6 +50,7 @@ pal-property/
 | Task | Location | Notes |
 |------|----------|-------|
 | Backend feature work | `backend/internal/` | flow = domain -> repository -> service -> handler -> router |
+| Backend search read path | `backend/internal/handler/http/search.go` + `backend/internal/service/search_read_service.go` | public Elasticsearch-backed listing search |
 | Auth routes + cookies | `backend/internal/handler/http/auth.go` | OAuth callback, `/auth/me`, refresh rotation |
 | Backend authz foundation | `backend/pkg/authz/` | Casbin model, enforcer wiring, authz vocabulary |
 | Listing transport | `backend/internal/handler/http/listing.go` | CRUD + multipart image endpoints |
@@ -119,7 +120,7 @@ cd frontend && npm run test:e2e
 
 - Host Postgres port is `5433`, not `5432`.
 - `backend/postman_collection.json` covers Authentication, Categories, Listings, and listing-image routes.
-- `frontend` currently implements seller dashboard flows and public listing browse/detail pages; broader buyer/product flows are still future work.
+- `frontend` currently implements seller dashboard flows and public listing browse/detail pages, with public browse now backed by `/api/search/listings`; broader buyer/product flows beyond search/discovery are still future work.
 - `workers/`, `infra/`, and `deploy/` are planned areas but are not present in the repo yet.
 - `.sisyphus/boulder.json` is local session state; do not treat it as product code unless the task is specifically about planning workflow.
 - `plan/` contains sensitive local OAuth material; avoid printing or copying secret values into commits, docs, or issues.

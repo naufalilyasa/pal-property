@@ -88,7 +88,7 @@ describe("DashboardPage", () => {
 
     expect(screen.getByTestId("dashboard-shell")).toBeInTheDocument();
     expect(screen.getByText(/total listings/i)).toBeInTheDocument();
-    expect(screen.getByText(/current page/i)).toBeInTheDocument();
+    expect(screen.getByText(/active page/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /review listings table/i })).toBeInTheDocument();
     expect(screen.getByTestId("dashboard-refresh-button")).toBeInTheDocument();
   });
