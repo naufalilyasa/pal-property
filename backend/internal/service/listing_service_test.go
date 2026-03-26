@@ -21,9 +21,25 @@ import (
 	"gorm.io/datatypes"
 )
 
+type fakeEventPublisher struct {
+	listingEvents  []domain.ListingEvent
+	categoryEvents []domain.CategoryEvent
+}
+
+func (f *fakeEventPublisher) PublishListingEvent(_ context.Context, event domain.ListingEvent) error {
+	f.listingEvents = append(f.listingEvents, event)
+	return nil
+}
+
+func (f *fakeEventPublisher) PublishCategoryEvent(_ context.Context, event domain.CategoryEvent) error {
+	f.categoryEvents = append(f.categoryEvents, event)
+	return nil
+}
+
 func TestListingService_Create_Success(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
+	publisher := &fakeEventPublisher{}
+	svc := service.NewListingServiceWithAuthzAndPublisher(repo, newTestAuthzService(t), publisher)
 
 	userID := uuid.New()
 	categoryID := uuid.New()
@@ -63,6 +79,9 @@ func TestListingService_Create_Success(t *testing.T) {
 	assert.NotNil(t, res)
 	assert.Equal(t, "modern-villa-in-bali", res.Slug)
 	assert.Equal(t, req.Title, res.Title)
+	assert.Len(t, publisher.listingEvents, 1)
+	assert.Equal(t, domain.EventTypeListingCreated, publisher.listingEvents[0].Metadata.EventType)
+	assert.Equal(t, req.Title, publisher.listingEvents[0].Payload.Title)
 }
 
 func TestListingService_Create_SlugCollision(t *testing.T) {
@@ -243,7 +262,7 @@ func TestListingService_Update_ExpandedFields_RegeneratesCompatibilitySpecificat
 		Facilities:       &facilities,
 	}
 
-	repo.On("FindByID", mock.Anything, id).Return(listing, nil)
+	repo.On("FindByID", mock.Anything, id).Return(listing, nil).Once()
 	repo.On("Update", mock.Anything, mock.MatchedBy(func(l *entity.Listing) bool {
 		if l.TransactionType != transactionType {
 			return false
@@ -316,7 +335,7 @@ func TestListingService_GetByID_Success(t *testing.T) {
 		Status:     "active",
 	}
 
-	repo.On("FindByID", mock.Anything, id).Return(listing, nil)
+	repo.On("FindByID", mock.Anything, id).Return(listing, nil).Once()
 	repo.On("IncrementViewCount", mock.Anything, id).Return(nil).Maybe()
 
 	res, err := svc.GetByID(context.Background(), id)
@@ -364,7 +383,8 @@ func TestListingService_GetBySlug_Success(t *testing.T) {
 
 func TestListingService_Update_SuccessOwner(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
+	publisher := &fakeEventPublisher{}
+	svc := service.NewListingServiceWithAuthzAndPublisher(repo, newTestAuthzService(t), publisher)
 
 	id := uuid.New()
 	userID := uuid.New()
@@ -379,7 +399,7 @@ func TestListingService_Update_SuccessOwner(t *testing.T) {
 		Title: &newTitle,
 	}
 
-	repo.On("FindByID", mock.Anything, id).Return(listing, nil)
+	repo.On("FindByID", mock.Anything, id).Return(listing, nil).Once()
 	repo.On("ExistsBySlug", mock.Anything, "new-title").Return(false, nil)
 	repo.On("Update", mock.Anything, mock.MatchedBy(func(l *entity.Listing) bool {
 		return l.Title == newTitle
@@ -389,12 +409,20 @@ func TestListingService_Update_SuccessOwner(t *testing.T) {
 		Title:      newTitle,
 		Slug:       "new-title",
 	}, nil)
+	repo.On("FindByID", mock.Anything, id).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: id},
+		UserID:     userID,
+		Title:      newTitle,
+		Slug:       "new-title",
+	}, nil).Once()
 
 	res, err := svc.Update(context.Background(), id, pkgauthz.Principal{UserID: userID, Role: "user"}, req)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.Equal(t, newTitle, res.Title)
+	assert.Len(t, publisher.listingEvents, 1)
+	assert.Equal(t, domain.EventTypeListingUpdated, publisher.listingEvents[0].Metadata.EventType)
 }
 
 func TestListingService_Update_SuccessAdmin(t *testing.T) {
@@ -477,7 +505,8 @@ func TestListingService_Update_NoChanges(t *testing.T) {
 
 func TestListingService_Delete_Success(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
-	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
+	publisher := &fakeEventPublisher{}
+	svc := service.NewListingServiceWithAuthzAndPublisher(repo, newTestAuthzService(t), publisher)
 
 	id := uuid.New()
 	userID := uuid.New()
@@ -492,6 +521,8 @@ func TestListingService_Delete_Success(t *testing.T) {
 	err := svc.Delete(context.Background(), id, pkgauthz.Principal{UserID: userID, Role: "user"})
 
 	assert.NoError(t, err)
+	assert.Len(t, publisher.listingEvents, 1)
+	assert.Equal(t, domain.EventTypeListingDeleted, publisher.listingEvents[0].Metadata.EventType)
 }
 
 func TestListingService_Delete_Forbidden(t *testing.T) {
@@ -702,7 +733,8 @@ func TestListingService_UploadImage_Success(t *testing.T) {
 		Height:           800,
 		OriginalFilename: "villa.jpg",
 	}
-	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t), storage)
+	publisher := &fakeEventPublisher{}
+	svc := service.NewListingServiceWithAuthzAndPublisher(repo, newTestAuthzService(t), publisher, storage)
 
 	listingID := uuid.New()
 	userID := uuid.New()
@@ -718,6 +750,16 @@ func TestListingService_UploadImage_Success(t *testing.T) {
 			img.URL == storage.uploadResult.SecureURL &&
 			img.PublicID != nil && *img.PublicID == storage.uploadResult.PublicID
 	})).Return(&entity.ListingImage{ID: createdImageID}, nil).Once()
+	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: listingID},
+		UserID:     userID,
+		Images: []entity.ListingImage{{
+			ID:        createdImageID,
+			URL:       storage.uploadResult.SecureURL,
+			IsPrimary: true,
+			SortOrder: 0,
+		}},
+	}, nil).Once()
 	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
 		BaseEntity: entity.BaseEntity{ID: listingID},
 		UserID:     userID,
@@ -744,6 +786,8 @@ func TestListingService_UploadImage_Success(t *testing.T) {
 	assert.Equal(t, mediaasset.DefaultDeliveryType, storage.uploadCalls[0].DeliveryType)
 	assert.NotEmpty(t, storage.uploadCalls[0].PublicID)
 	assert.Len(t, storage.destroyCalls, 0)
+	assert.Len(t, publisher.listingEvents, 1)
+	assert.Equal(t, domain.EventTypeListingImagesChanged, publisher.listingEvents[0].Metadata.EventType)
 	repo.AssertNotCalled(t, "ListActiveImagesByListingID", mock.Anything, mock.Anything)
 }
 

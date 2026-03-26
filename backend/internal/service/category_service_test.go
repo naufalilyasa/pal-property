@@ -147,7 +147,8 @@ func TestCategoryService_GetBySlug_NotFound(t *testing.T) {
 
 func TestCategoryService_Create_Success(t *testing.T) {
 	repo := mocks.NewCategoryRepository(t)
-	svc := service.NewCategoryService(repo)
+	publisher := &fakeEventPublisher{}
+	svc := service.NewCategoryServiceWithPublisher(repo, publisher)
 
 	req := request.CreateCategoryRequest{
 		Name: "Residential",
@@ -167,6 +168,9 @@ func TestCategoryService_Create_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.Equal(t, "residential", res.Slug)
+	assert.Len(t, publisher.categoryEvents, 1)
+	assert.Equal(t, domain.EventTypeCategoryCreated, publisher.categoryEvents[0].Metadata.EventType)
+	assert.Equal(t, req.Name, publisher.categoryEvents[0].Payload.Name)
 }
 
 func TestCategoryService_Create_SlugCollision(t *testing.T) {
@@ -243,7 +247,8 @@ func TestCategoryService_Create_RepoError(t *testing.T) {
 
 func TestCategoryService_Update_Success_NameOnly(t *testing.T) {
 	repo := mocks.NewCategoryRepository(t)
-	svc := service.NewCategoryService(repo)
+	publisher := &fakeEventPublisher{}
+	svc := service.NewCategoryServiceWithPublisher(repo, publisher)
 
 	id := uuid.New()
 	existing := &entity.Category{
@@ -270,6 +275,8 @@ func TestCategoryService_Update_Success_NameOnly(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.Equal(t, "New Name", res.Name)
+	assert.Len(t, publisher.categoryEvents, 1)
+	assert.Equal(t, domain.EventTypeCategoryUpdated, publisher.categoryEvents[0].Metadata.EventType)
 }
 
 func TestCategoryService_Update_Success_IconURL(t *testing.T) {
@@ -390,7 +397,8 @@ func TestCategoryService_Update_NotFound(t *testing.T) {
 
 func TestCategoryService_Delete_Success(t *testing.T) {
 	repo := mocks.NewCategoryRepository(t)
-	svc := service.NewCategoryService(repo)
+	publisher := &fakeEventPublisher{}
+	svc := service.NewCategoryServiceWithPublisher(repo, publisher)
 
 	id := uuid.New()
 	repo.On("FindByID", mock.Anything, id).Return(&entity.Category{ID: id}, nil)
@@ -401,6 +409,8 @@ func TestCategoryService_Delete_Success(t *testing.T) {
 	err := svc.Delete(context.Background(), id)
 
 	assert.NoError(t, err)
+	assert.Len(t, publisher.categoryEvents, 1)
+	assert.Equal(t, domain.EventTypeCategoryDeleted, publisher.categoryEvents[0].Metadata.EventType)
 }
 
 func TestCategoryService_Delete_HasChildren(t *testing.T) {

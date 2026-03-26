@@ -54,6 +54,11 @@ listingHandler := http.NewListingHandler(listingSvc)
 - Any new env var still requires updates to `.env-example` and `.env.docker` when local startup depends on it.
 - **Prices:** Listing and commerce values stay `int64` in IDR to protect precision across services.
 
+**Eventing/search behavior**:
+- Producer hooks in listing/category services are currently best-effort: publish failures are logged, and index repair relies on the `listing-indexer rebuild` path rather than request rollback.
+- `cmd/listing-indexer` ensures the target Elasticsearch index exists on normal startup and can fully recreate it in `rebuild` mode.
+- The future public search-read proposal currently lives in `backend/search-read-contract.md`.
+
 ## CURRENT FEATURE AREAS
 
 - Auth + refresh rotation
