@@ -89,16 +89,16 @@ Publish stable listing-domain events from backend writes and consume them into a
 - Focused tests and build checks pass.
 
 ## TODOs
-- [ ] 1. Define broker/search config contract and update env guidance
-- [ ] 2. Add event envelope + listing/category event payload definitions
-- [ ] 3. Wire producers into listing/category success paths
-- [ ] 4. Add consumer/indexer worker entrypoint
-- [ ] 5. Implement Elasticsearch document mapping and upsert/delete logic
-- [ ] 6. Add replay/backfill path for index rebuilds
-- [ ] 7. Add focused tests and runtime verification
+- [x] 1. Define broker/search config contract and update env guidance
+- [x] 2. Add event envelope + listing/category event payload definitions
+- [x] 3. Wire producers into listing/category success paths
+- [x] 4. Add consumer/indexer worker entrypoint
+- [x] 5. Implement Elasticsearch document mapping and upsert/delete logic
+- [x] 6. Add replay/backfill path for index rebuilds
+- [x] 7. Add focused tests and runtime verification
 
 ## Final Verification Wave
-- [ ] F1. Producer contract review
-- [ ] F2. Consumer idempotency review
-- [ ] F3. Search document quality review
-- [ ] F4. Env/docs accuracy review
+- [x] F1. Producer contract review
+- [x] F2. Consumer idempotency review
+- [x] F3. Search document quality review
+- [x] F4. Env/docs accuracy review
