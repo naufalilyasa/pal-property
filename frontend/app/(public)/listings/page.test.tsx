@@ -3,56 +3,39 @@ import { describe, expect, it, vi } from "vitest";
 
 import PublicListingsPage from "./page";
 
-const { getListingsMock, listingFiltersMock, listingCardMock } = vi.hoisted(() => ({
-  getListingsMock: vi.fn(),
+const { getSearchListingsMock, listingFiltersMock } = vi.hoisted(() => ({
+  getSearchListingsMock: vi.fn(),
   listingFiltersMock: vi.fn(),
-  listingCardMock: vi.fn(),
 }));
 
-vi.mock("@/features/listings/server/get-listings", () => ({
-  getListings: getListingsMock,
+vi.mock("@/features/listings/server/get-search-listings", () => ({
+  getSearchListings: getSearchListingsMock,
 }));
 
 vi.mock("@/features/listings/components/listing-filters", () => ({
-  ListingFilters: (props: {
-    values: {
-      city?: string;
-      category_id?: string;
-      price_min?: string;
-      price_max?: string;
-      status?: string;
-      limit?: string;
-    };
-    total: number;
-    visibleCount: number;
-  }) => {
+  ListingFilters: (props: { view: "map" | "list" }) => {
     listingFiltersMock(props);
 
     return (
       <div data-testid="listing-filters">
-        <span>{`city:${props.values.city ?? ""}`}</span>
-        <span>{`status:${props.values.status ?? ""}`}</span>
-        <span>{`limit:${props.values.limit ?? ""}`}</span>
-        <span>{`total:${props.total}`}</span>
-        <span>{`visible:${props.visibleCount}`}</span>
+        <span>{`view:${props.view}`}</span>
       </div>
     );
   },
 }));
 
-vi.mock("@/features/listings/components/listing-card", () => ({
-  ListingCard: (props: { href: string; listing: { title: string } }) => {
-    listingCardMock(props);
-    return <article>{props.listing.title}</article>;
+vi.mock("@/features/listings/components/search-listing-card", () => ({
+  SearchListingCardItem: (props: { href: string; listing: { title: string } }) => {
+    return <article data-testid="listing-card">{props.listing.title}</article>;
   },
 }));
 
 describe("PublicListingsPage", () => {
   it("renders the listings shell with resolved query defaults", async () => {
-    getListingsMock.mockResolvedValue({
-      data: [
-        { id: "listing-1", slug: "city-loft", title: "City Loft" },
-        { id: "listing-2", slug: "garden-home", title: "Garden Home" },
+    getSearchListingsMock.mockResolvedValue({
+      items: [
+        { id: "listing-1", slug: "city-loft", title: "City Loft", transaction_type: "sale", price: 1000, currency: "IDR", status: "active", is_featured: false, created_at: "2026-03-17T00:00:00Z", updated_at: "2026-03-17T00:00:00Z" },
+        { id: "listing-2", slug: "garden-home", title: "Garden Home", transaction_type: "sale", price: 2000, currency: "IDR", status: "active", is_featured: false, created_at: "2026-03-17T00:00:00Z", updated_at: "2026-03-17T00:00:00Z" },
       ],
       total: 18,
       page: 3,
@@ -63,30 +46,34 @@ describe("PublicListingsPage", () => {
     render(
       await PublicListingsPage({
         searchParams: Promise.resolve({
-          city: "Jakarta",
-          status: "active",
+          q: "jakarta",
+          transaction_type: "sale",
           limit: "12",
           category_id: "category-1",
+          location_province: "DKI Jakarta",
+          location_city: "Jakarta",
           price_min: "500000000",
           price_max: "5000000000",
+          sort: "newest",
           page: "3",
         }),
       }),
     );
 
-    expect(getListingsMock).toHaveBeenCalledWith({
+    expect(getSearchListingsMock).toHaveBeenCalledWith({
       page: "3",
       limit: "12",
-      city: "Jakarta",
+      q: "jakarta",
+      transaction_type: "sale",
       category_id: "category-1",
+      location_province: "DKI Jakarta",
+      location_city: "Jakarta",
       price_min: "500000000",
       price_max: "5000000000",
-      status: "active",
+      sort: "newest",
     });
     expect(screen.getByTestId("listing-filters")).toBeInTheDocument();
-    expect(screen.getByText("city:Jakarta")).toBeInTheDocument();
-    expect(screen.getByText("status:active")).toBeInTheDocument();
-    expect(screen.getByText("limit:12")).toBeInTheDocument();
+    expect(screen.getByText("view:map")).toBeInTheDocument();
     expect(screen.getByTestId("listing-map-panel")).toBeInTheDocument();
     expect(screen.getByTestId("listing-pagination")).toBeInTheDocument();
     expect(screen.getAllByTestId("listing-card")).toHaveLength(2);
@@ -95,8 +82,8 @@ describe("PublicListingsPage", () => {
   });
 
   it("renders the empty state without crashing", async () => {
-    getListingsMock.mockResolvedValue({
-      data: [],
+    getSearchListingsMock.mockResolvedValue({
+      items: [],
       total: 0,
       page: 1,
       limit: 12,
@@ -109,18 +96,19 @@ describe("PublicListingsPage", () => {
       }),
     );
 
-    expect(getListingsMock).toHaveBeenCalledWith({
+    expect(getSearchListingsMock).toHaveBeenCalledWith({
       page: "1",
       limit: "12",
-      city: undefined,
+      q: undefined,
+      transaction_type: undefined,
       category_id: undefined,
+      location_province: undefined,
+      location_city: undefined,
       price_min: undefined,
       price_max: undefined,
-      status: undefined,
+      sort: undefined,
     });
-    expect(screen.getByText(/try broadening the search/i)).toBeInTheDocument();
-    expect(screen.getByText("status:")).toBeInTheDocument();
-    expect(screen.getByText("limit:12")).toBeInTheDocument();
-    expect(screen.getByText("visible:0")).toBeInTheDocument();
+    expect(screen.getByText(/no properties matched your search/i)).toBeInTheDocument();
+    expect(screen.getByText("view:map")).toBeInTheDocument();
   });
 });
