@@ -4,7 +4,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
-  fullyParallel: true,
+  fullyParallel: false,
+  workers: 1,
   outputDir: path.join(process.cwd(), "node_modules/.cache/playwright/test-results"),
   retries: 0,
   use: {

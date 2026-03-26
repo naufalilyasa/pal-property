@@ -1,8 +1,8 @@
 import Link from "next/link";
 
 import { ListingFilters } from "@/features/listings/components/listing-filters";
-import { ListingCard } from "@/features/listings/components/listing-card";
-import { getListings } from "@/features/listings/server/get-listings";
+import { SearchListingCardItem } from "@/features/listings/components/search-listing-card";
+import { getSearchListings } from "@/features/listings/server/get-search-listings";
 import { TopNav } from "@/features/listings/components/top-nav";
 import { Footer } from "@/features/listings/components/footer";
 
@@ -19,45 +19,31 @@ export default async function PublicListingsPage({
 
   // Filter values
   const filterValues = {
-    city: getQueryValue(resolvedSearchParams.city),
+    q: getQueryValue(resolvedSearchParams.q),
+    transaction_type: getQueryValue(resolvedSearchParams.transaction_type),
     category_id: getQueryValue(resolvedSearchParams.category_id),
+    location_province: getQueryValue(resolvedSearchParams.location_province),
+    location_city: getQueryValue(resolvedSearchParams.location_city),
     price_min: getQueryValue(resolvedSearchParams.price_min),
     price_max: getQueryValue(resolvedSearchParams.price_max),
-    status: getQueryValue(resolvedSearchParams.status),
+    sort: getQueryValue(resolvedSearchParams.sort),
     limit: getQueryValue(resolvedSearchParams.limit) ?? "12",
   };
 
-  const listingsPage = await getListings({
+  const listingsPage = await getSearchListings({
     page: getQueryValue(resolvedSearchParams.page) ?? "1",
     limit: filterValues.limit,
-    city: filterValues.city,
+    q: filterValues.q,
+    transaction_type: filterValues.transaction_type,
     category_id: filterValues.category_id,
+    location_province: filterValues.location_province,
+    location_city: filterValues.location_city,
     price_min: filterValues.price_min,
     price_max: filterValues.price_max,
-    status: filterValues.status,
+    sort: filterValues.sort,
   });
-
-  // Inject dummy data to fill the grid if we don't have enough real listings
-  const mockListingsCount = Math.max(0, 12 - listingsPage.data.length);
-  const dummyListings = Array.from({ length: mockListingsCount }).map(
-    (_, i) =>
-      ({
-        id: `dummy-${i}`,
-        title: `Premium Property ${i}`,
-        slug: `dummy-${i}`,
-        price: 0, // Fallback triggering in ListingCard
-        currency: "USD",
-        status: "active",
-        view_count: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        images: [],
-        specifications: {},
-      }) as any, // Cast to any to satisfy the complex ListingRecord type simply
-  );
-
-  const displayListings = [...listingsPage.data, ...dummyListings];
-  const displayTotal = listingsPage.total + mockListingsCount;
+  const displayListings = listingsPage.items;
+  const displayTotal = listingsPage.total;
 
   return (
     <div className="flex min-h-screen flex-col bg-white font-sans text-[#111]">
@@ -70,7 +56,7 @@ export default async function PublicListingsPage({
       {/* Main Content */}
       <main className="flex flex-1">
         {view === "map" && (
-          <div className="hidden w-[45%] border-r border-gray-200 lg:block">
+          <div data-testid="listing-map-panel" className="hidden w-[45%] border-r border-gray-200 lg:block">
             <div className="sticky top-[68px] h-[calc(100vh-68px)] w-full">
               <iframe
                 className="h-full w-full border-0 grayscale-20 opacity-90"
@@ -117,16 +103,16 @@ export default async function PublicListingsPage({
                   No results
                 </p>
                 <h3 className="mt-3 text-xl font-bold tracking-tight text-[#111]">
-                  Try broadening the search
+                  No properties matched your search
                 </h3>
                 <p className="mt-2 text-sm text-gray-600">
-                  Remove filters or search a broader area.
+                  Adjust filters, query text, or sort to explore more listings.
                 </p>
               </div>
             ) : null}
 
             {displayListings.map((listing) => (
-              <ListingCard
+              <SearchListingCardItem
                 key={listing.id}
                 href={`/listings/${listing.slug}`}
                 listing={listing}
@@ -135,29 +121,31 @@ export default async function PublicListingsPage({
           </div>
 
           {/* Pagination */}
-          <div className="mt-12 flex items-center justify-center gap-2">
-            <button className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-300 text-sm font-semibold transition hover:bg-gray-50">
-              &lt;
-            </button>
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black text-sm font-semibold text-white">
-              1
-            </span>
-            <span className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-sm font-semibold hover:bg-gray-50">
-              2
-            </span>
-            <span className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-sm font-semibold hover:bg-gray-50">
-              3
-            </span>
-            <span className="flex h-8 w-8 items-center justify-center text-sm font-semibold">
-              ...
-            </span>
-            <span className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-sm font-semibold hover:bg-gray-50">
-              10
-            </span>
-            <button className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-300 text-sm font-semibold transition hover:bg-gray-50">
-              &gt;
-            </button>
-          </div>
+          {listingsPage.total_pages > 1 ? (
+            <div data-testid="listing-pagination" className="mt-12 flex items-center justify-center gap-2">
+              {Array.from({ length: listingsPage.total_pages }, (_, index) => index + 1).map((pageNumber) => {
+                const params = new URLSearchParams();
+                for (const [key, value] of Object.entries(resolvedSearchParams)) {
+                  const normalized = getQueryValue(value);
+                  if (normalized) params.set(key, normalized);
+                }
+                params.set("page", String(pageNumber));
+
+                const isCurrent = pageNumber === listingsPage.page;
+                return (
+                  <Link
+                    key={pageNumber}
+                    href={`/listings?${params.toString()}`}
+                    className={`flex h-8 min-w-8 items-center justify-center rounded-full px-3 text-sm font-semibold transition ${
+                      isCurrent ? "bg-black text-white" : "border border-gray-300 text-[#111] hover:bg-gray-50"
+                    }`}
+                  >
+                    {pageNumber}
+                  </Link>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       </main>
 
