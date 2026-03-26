@@ -21,6 +21,7 @@ import (
 	"github.com/naufalilyasa/pal-property-backend/pkg/config"
 	pkgeventing "github.com/naufalilyasa/pal-property-backend/pkg/eventing"
 	"github.com/naufalilyasa/pal-property-backend/pkg/logger"
+	"github.com/naufalilyasa/pal-property-backend/pkg/searchindex"
 	goRedis "github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	pgDriver "gorm.io/driver/postgres"
@@ -89,6 +90,15 @@ func main() {
 	listingAuthzService := service.NewAuthzService(authzService)
 	listingService := service.NewListingServiceWithAuthzAndPublisher(listingRepo, listingAuthzService, eventPublisher, listingImageStorage)
 	listingHandler := handler.NewListingHandler(listingService)
+	searchClient, err := searchindex.NewClient(config.Env.ElasticAddress, config.Env.ElasticUsername, config.Env.ElasticPassword, nil)
+	if err != nil {
+		logger.Log.Fatal("Failed to initialize search client", zap.Error(err))
+	}
+	searchService, err := service.NewSearchReadService(config.Env.ElasticListingsIndex, searchClient)
+	if err != nil {
+		logger.Log.Fatal("Failed to initialize search service", zap.Error(err))
+	}
+	searchHandler := handler.NewSearchHandler(searchService)
 
 	categoryRepo := postgres.NewCategoryRepository(db)
 	categoryService := service.NewCategoryServiceWithPublisher(categoryRepo, eventPublisher)
@@ -134,7 +144,7 @@ func main() {
 		},
 	})
 
-	router.Register(app, db, authzService, authHandler, listingHandler, categoryHandler)
+	router.Register(app, db, authzService, authHandler, listingHandler, searchHandler, categoryHandler)
 
 	logger.Log.Info("Server starting", zap.String("port", config.Env.Port))
 	if err := app.Listen(fmt.Sprintf(":%s", config.Env.Port)); err != nil {
