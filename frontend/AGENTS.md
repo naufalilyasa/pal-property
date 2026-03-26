@@ -39,7 +39,7 @@ frontend/
 
 - Backend cookie auth is authoritative; frontend never owns canonical session state.
 - Seller routes are gated server-side via `/auth/me` and redirect to `/login` when unauthenticated.
-- Public listing pages fetch server-side from backend APIs.
+- Public listing browse now fetches server-side from `/api/search/listings`; listing detail still uses the slug-based backend listing read path.
 - Listing create/edit uses RHF + Zod and backend-aligned payload shaping.
 - Listing image actions upload through backend endpoints and rehydrate from backend responses.
 
@@ -51,6 +51,7 @@ frontend/
 - Use `browserFetch` for client mutations/queries and `serverFetch` for server-side reads.
 - Keep frontend env access centralized in `frontend/lib/env/`; when adding, renaming, or removing any frontend env var, update `frontend/.env-example` in the same change.
 - Keep query keys in `frontend/lib/query/keys.ts`.
+- Buyer-facing search query params stay canonical: `q`, `transaction_type`, `category_id`, `location_province`, `location_city`, `price_min`, `price_max`, `sort`, `page`, `limit`.
 - Use `components/ui/` for primitives only, not business logic.
 - Keep feature-owned schemas, mappers, and composed widgets under `features/*`.
 
