@@ -8,7 +8,9 @@ import (
 	"github.com/naufalilyasa/pal-property-backend/internal/domain/entity"
 	"github.com/naufalilyasa/pal-property-backend/internal/dto/request"
 	"github.com/naufalilyasa/pal-property-backend/internal/dto/response"
+	"github.com/naufalilyasa/pal-property-backend/pkg/logger"
 	"github.com/naufalilyasa/pal-property-backend/pkg/utils/slug"
+	"go.uber.org/zap"
 )
 
 type CategoryService interface {
@@ -21,11 +23,16 @@ type CategoryService interface {
 }
 
 type categoryService struct {
-	repo domain.CategoryRepository
+	repo    domain.CategoryRepository
+	publish domain.EventPublisher
 }
 
 func NewCategoryService(repo domain.CategoryRepository) CategoryService {
 	return &categoryService{repo: repo}
+}
+
+func NewCategoryServiceWithPublisher(repo domain.CategoryRepository, publisher domain.EventPublisher) CategoryService {
+	return &categoryService{repo: repo, publish: publisher}
 }
 
 func (s *categoryService) List(ctx context.Context) ([]*response.CategoryResponse, error) {
@@ -75,11 +82,10 @@ func (s *categoryService) Create(ctx context.Context, req request.CreateCategory
 	if err != nil {
 		return nil, err
 	}
+	s.publishCategoryEvent(ctx, domain.EventTypeCategoryCreated, created)
 
 	return mapCategoryToResponse(created), nil
 }
-
-
 
 func (s *categoryService) Update(ctx context.Context, id uuid.UUID, req request.UpdateCategoryRequest) (*response.CategoryResponse, error) {
 	cat, err := s.repo.FindByID(ctx, id)
@@ -105,12 +111,13 @@ func (s *categoryService) Update(ctx context.Context, id uuid.UUID, req request.
 	if err != nil {
 		return nil, err
 	}
+	s.publishCategoryEvent(ctx, domain.EventTypeCategoryUpdated, updated)
 
 	return mapCategoryToResponse(updated), nil
 }
 
 func (s *categoryService) Delete(ctx context.Context, id uuid.UUID) error {
-	_, err := s.repo.FindByID(ctx, id)
+	cat, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -131,7 +138,23 @@ func (s *categoryService) Delete(ctx context.Context, id uuid.UUID) error {
 		return domain.ErrConflict
 	}
 
-	return s.repo.Delete(ctx, id)
+	err = s.repo.Delete(ctx, id)
+	if err != nil {
+		return err
+	}
+	deleted := *cat
+	deleted.Children = nil
+	s.publishCategoryEvent(ctx, domain.EventTypeCategoryDeleted, &deleted)
+	return nil
+}
+
+func (s *categoryService) publishCategoryEvent(ctx context.Context, eventType string, category *entity.Category) {
+	if s.publish == nil || category == nil {
+		return
+	}
+	if err := s.publish.PublishCategoryEvent(ctx, buildCategoryEvent(eventType, category)); err != nil {
+		logger.Log.Warn("Failed to publish category event", zap.String("event_type", eventType), zap.String("category_id", category.ID.String()), zap.Error(err))
+	}
 }
 
 func mapCategoryToResponse(cat *entity.Category) *response.CategoryResponse {
