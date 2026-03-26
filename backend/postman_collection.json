@@ -181,6 +181,38 @@
             ]
         },
         {
+            "name": "Search",
+            "description": "Public Elasticsearch-backed buyer search endpoints.",
+            "item": [
+                {
+                    "name": "1. Search Listings (Public)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/search/listings?q=jakarta&transaction_type=sale&location_province=DKI%20Jakarta&location_city=Jakarta&price_min=500000000&price_max=5000000000&sort=newest&page=1&limit=12",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "search", "listings"],
+                            "query": [
+                                {"key": "q", "value": "jakarta", "description": "Free-text query over title, excerpt, and location fields", "disabled": true},
+                                {"key": "transaction_type", "value": "sale", "description": "Filter by transaction type: sale | rent", "disabled": true},
+                                {"key": "category_id", "value": "{{categoryId}}", "description": "Filter by category UUID", "disabled": true},
+                                {"key": "location_province", "value": "DKI Jakarta", "description": "Canonical province filter name", "disabled": true},
+                                {"key": "location_city", "value": "Jakarta", "description": "Canonical city filter name", "disabled": true},
+                                {"key": "price_min", "value": "500000000", "description": "Minimum price in IDR (int64)", "disabled": true},
+                                {"key": "price_max", "value": "5000000000", "description": "Maximum price in IDR (int64)", "disabled": true},
+                                {"key": "sort", "value": "newest", "description": "Sort: relevance | newest | price_asc | price_desc", "disabled": true},
+                                {"key": "page", "value": "1", "description": "Page number (default: 1)", "disabled": true},
+                                {"key": "limit", "value": "12", "description": "Items per page (default: 20, max: 100)", "disabled": true}
+                            ]
+                        },
+                        "description": "Searches public-safe listing documents from Elasticsearch. This endpoint is separate from the OLTP `/api/listings` list route and does not expose a public `status` filter in MVP. Default sort is `relevance` only when `q` is present; otherwise use `newest`."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
             "name": "Listings",
             "description": "CRUD endpoints for property listings. Create/Update/Delete require a valid access_token cookie. List and Get are public.",
             "item": [
