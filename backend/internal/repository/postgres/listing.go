@@ -345,6 +345,22 @@ func (r *listingRepository) ExistsBySlug(ctx context.Context, slug string) (bool
 	return count > 0, nil
 }
 
+func (r *listingRepository) FindByCategoryID(ctx context.Context, categoryID uuid.UUID) ([]*entity.Listing, error) {
+	var listings []*entity.Listing
+	err := r.db.WithContext(ctx).
+		Preload("Images", r.activeImagePreload).
+		Preload("Category").
+		Joins("User").
+		Where("listings.category_id = ?", categoryID).
+		Where("listings.deleted_at IS NULL").
+		Order("listings.created_at DESC").
+		Find(&listings).Error
+	if err != nil {
+		return nil, fmt.Errorf("find listings by category id: %w", err)
+	}
+	return listings, nil
+}
+
 func (r *listingRepository) IncrementViewCount(ctx context.Context, id uuid.UUID) error {
 	return r.db.WithContext(ctx).
 		Model(&entity.Listing{}).
