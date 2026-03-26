@@ -19,6 +19,7 @@ import (
 	"github.com/naufalilyasa/pal-property-backend/pkg/authz"
 	"github.com/naufalilyasa/pal-property-backend/pkg/cloudinary"
 	"github.com/naufalilyasa/pal-property-backend/pkg/config"
+	pkgeventing "github.com/naufalilyasa/pal-property-backend/pkg/eventing"
 	"github.com/naufalilyasa/pal-property-backend/pkg/logger"
 	goRedis "github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
@@ -57,6 +58,11 @@ func main() {
 		DB:       config.Env.RedisDB,
 	})
 	cacheRepo := redis.NewCacheRepository(rdb)
+	eventPublisher, err := pkgeventing.NewKafkaPublisher(config.Env.KafkaBrokers, config.Env.KafkaClientID, config.Env.KafkaTopicListingEvents, config.Env.KafkaTopicCategoryEvents)
+	if err != nil {
+		logger.Log.Fatal("Failed to initialize event publisher", zap.Error(err))
+	}
+	defer func() { _ = eventPublisher.Close() }()
 
 	var listingImageStorage domain.ListingImageStorage
 	if config.Env.CloudinaryEnabled {
@@ -81,11 +87,11 @@ func main() {
 
 	listingRepo := postgres.NewListingRepository(db)
 	listingAuthzService := service.NewAuthzService(authzService)
-	listingService := service.NewListingServiceWithAuthz(listingRepo, listingAuthzService, listingImageStorage)
+	listingService := service.NewListingServiceWithAuthzAndPublisher(listingRepo, listingAuthzService, eventPublisher, listingImageStorage)
 	listingHandler := handler.NewListingHandler(listingService)
 
 	categoryRepo := postgres.NewCategoryRepository(db)
-	categoryService := service.NewCategoryService(categoryRepo)
+	categoryService := service.NewCategoryServiceWithPublisher(categoryRepo, eventPublisher)
 	categoryHandler := handler.NewCategoryHandler(categoryService)
 
 	app := fiber.New(fiber.Config{

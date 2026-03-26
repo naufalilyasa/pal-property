@@ -9,6 +9,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/naufalilyasa/pal-property-backend/internal/domain"
@@ -16,10 +17,13 @@ import (
 	"github.com/naufalilyasa/pal-property-backend/internal/dto/request"
 	"github.com/naufalilyasa/pal-property-backend/internal/dto/response"
 	pkgauthz "github.com/naufalilyasa/pal-property-backend/pkg/authz"
+	"github.com/naufalilyasa/pal-property-backend/pkg/logger"
 	"github.com/naufalilyasa/pal-property-backend/pkg/mediaasset"
 	"github.com/naufalilyasa/pal-property-backend/pkg/utils/slug"
 	pkgvalidator "github.com/naufalilyasa/pal-property-backend/pkg/validator"
+	"go.uber.org/zap"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 type ListingService interface {
@@ -40,6 +44,7 @@ type listingService struct {
 	repo    domain.ListingRepository
 	storage domain.ListingImageStorage
 	authz   AuthzService
+	publish domain.EventPublisher
 }
 
 func NewListingService(repo domain.ListingRepository, storage ...domain.ListingImageStorage) ListingService {
@@ -52,6 +57,14 @@ func NewListingService(repo domain.ListingRepository, storage ...domain.ListingI
 
 func NewListingServiceWithAuthz(repo domain.ListingRepository, authzService AuthzService, storage ...domain.ListingImageStorage) ListingService {
 	service := &listingService{repo: repo, authz: authzService}
+	if len(storage) > 0 {
+		service.storage = storage[0]
+	}
+	return service
+}
+
+func NewListingServiceWithAuthzAndPublisher(repo domain.ListingRepository, authzService AuthzService, publisher domain.EventPublisher, storage ...domain.ListingImageStorage) ListingService {
+	service := &listingService{repo: repo, authz: authzService, publish: publisher}
 	if len(storage) > 0 {
 		service.storage = storage[0]
 	}
@@ -122,6 +135,7 @@ func (s *listingService) Create(ctx context.Context, principal pkgauthz.Principa
 	if err != nil {
 		return nil, err
 	}
+	s.publishListingEvent(ctx, domain.EventTypeListingCreated, created)
 
 	return s.mapToResponse(created), nil
 }
@@ -345,6 +359,9 @@ func (s *listingService) Update(ctx context.Context, id uuid.UUID, principal pkg
 	if err != nil {
 		return nil, err
 	}
+	if s.publish != nil {
+		s.publishListingEvent(ctx, domain.EventTypeListingUpdated, s.loadListingForEvent(ctx, updated.ID, updated))
+	}
 
 	return s.mapToResponse(updated), nil
 }
@@ -359,7 +376,15 @@ func (s *listingService) Delete(ctx context.Context, id uuid.UUID, principal pkg
 		return err
 	}
 
-	return s.repo.Delete(ctx, id)
+	err = s.repo.Delete(ctx, id)
+	if err != nil {
+		return err
+	}
+	deleted := *listing
+	now := time.Now().UTC()
+	deleted.DeletedAt = gorm.DeletedAt{Time: now, Valid: true}
+	s.publishListingEvent(ctx, domain.EventTypeListingDeleted, &deleted)
+	return nil
 }
 
 func (s *listingService) UploadImage(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal, file *multipart.FileHeader) (*response.ListingResponse, error) {
@@ -393,6 +418,9 @@ func (s *listingService) UploadImage(ctx context.Context, id uuid.UUID, principa
 	}
 
 	listing.Images = append(listing.Images, *image)
+	if s.publish != nil {
+		s.publishListingEvent(ctx, domain.EventTypeListingImagesChanged, s.loadListingForEvent(ctx, id, listing))
+	}
 	return s.fetchListingResponse(ctx, id)
 }
 
@@ -418,6 +446,9 @@ func (s *listingService) DeleteImage(ctx context.Context, id uuid.UUID, imageID 
 	}
 
 	s.destroyListingImageByEntity(ctx, image)
+	if s.publish != nil {
+		s.publishListingEvent(ctx, domain.EventTypeListingImagesChanged, s.loadListingForEvent(ctx, id, nil))
+	}
 
 	return s.fetchListingResponse(ctx, id)
 }
@@ -438,6 +469,9 @@ func (s *listingService) SetPrimaryImage(ctx context.Context, id uuid.UUID, imag
 	if err := s.repo.SetPrimaryImage(ctx, id, imageID); err != nil {
 		return nil, err
 	}
+	if s.publish != nil {
+		s.publishListingEvent(ctx, domain.EventTypeListingImagesChanged, s.loadListingForEvent(ctx, id, nil))
+	}
 
 	return s.fetchListingResponse(ctx, id)
 }
@@ -457,6 +491,9 @@ func (s *listingService) ReorderImages(ctx context.Context, id uuid.UUID, princi
 
 	if err := s.repo.ReorderImages(ctx, id, orderedImageIDs); err != nil {
 		return nil, err
+	}
+	if s.publish != nil {
+		s.publishListingEvent(ctx, domain.EventTypeListingImagesChanged, s.loadListingForEvent(ctx, id, nil))
 	}
 
 	return s.fetchListingResponse(ctx, id)
@@ -523,12 +560,12 @@ func (s *listingService) mapToResponse(l *entity.Listing) *response.ListingRespo
 		AddressDetail:     l.AddressDetail,
 		Latitude:          l.Latitude,
 		Longitude:         l.Longitude,
-		BedroomCount:      resolveIntField(l.BedroomCount, compatSpecs.Bedrooms),
-		BathroomCount:     resolveIntField(l.BathroomCount, compatSpecs.Bathrooms),
+		BedroomCount:      resolveIntFieldWithLegacy(l.BedroomCount, compatSpecs.Bedrooms, compatSpecs.HasBedrooms()),
+		BathroomCount:     resolveIntFieldWithLegacy(l.BathroomCount, compatSpecs.Bathrooms, compatSpecs.HasBathrooms()),
 		FloorCount:        l.FloorCount,
 		CarportCapacity:   l.CarportCapacity,
-		LandAreaSqm:       resolveIntField(l.LandAreaSqm, compatSpecs.LandAreaSqm),
-		BuildingAreaSqm:   resolveIntField(l.BuildingAreaSqm, compatSpecs.BuildingAreaSqm),
+		LandAreaSqm:       resolveIntFieldWithLegacy(l.LandAreaSqm, compatSpecs.LandAreaSqm, compatSpecs.HasLandAreaSqm()),
+		BuildingAreaSqm:   resolveIntFieldWithLegacy(l.BuildingAreaSqm, compatSpecs.BuildingAreaSqm, compatSpecs.HasBuildingAreaSqm()),
 		CertificateType:   l.CertificateType,
 		Condition:         l.Condition,
 		Furnishing:        l.Furnishing,
@@ -675,6 +712,23 @@ func publicListingStatuses() []string {
 
 func isPublicListingStatus(status string) bool {
 	return slices.Contains(publicListingStatuses(), status)
+}
+
+func (s *listingService) publishListingEvent(ctx context.Context, eventType string, listing *entity.Listing) {
+	if s.publish == nil || listing == nil {
+		return
+	}
+	if err := s.publish.PublishListingEvent(ctx, buildListingEvent(eventType, listing)); err != nil {
+		logger.Log.Warn("Failed to publish listing event", zap.String("event_type", eventType), zap.String("listing_id", listing.ID.String()), zap.Error(err))
+	}
+}
+
+func (s *listingService) loadListingForEvent(ctx context.Context, id uuid.UUID, fallback *entity.Listing) *entity.Listing {
+	listing, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return fallback
+	}
+	return listing
 }
 
 func (s *listingService) getAuthorizedListing(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal, action string) (*entity.Listing, error) {
