@@ -28,15 +28,10 @@ type AppConfig struct {
 	RedisPassword string `env:"REDIS_PASSWORD"`
 	RedisDB       int    `env:"REDIS_DB"       envDefault:"0"`
 
-	KafkaBrokers             []string `env:"KAFKA_BROKERS" envSeparator:"," envDefault:"localhost:19092"`
-	KafkaGroupID             string   `env:"KAFKA_GROUP_ID" envDefault:"pal-property-indexer"`
-	KafkaClientID            string   `env:"KAFKA_CLIENT_ID" envDefault:"pal-property-backend"`
-	KafkaTopicListingEvents  string   `env:"KAFKA_TOPIC_LISTING_EVENTS" envDefault:"listing.events"`
-	KafkaTopicCategoryEvents string   `env:"KAFKA_TOPIC_CATEGORY_EVENTS" envDefault:"category.events"`
-	ElasticAddress           string   `env:"ELASTIC_ADDRESS" envDefault:"http://localhost:9200"`
-	ElasticUsername          string   `env:"ELASTIC_USERNAME"`
-	ElasticPassword          string   `env:"ELASTIC_PASSWORD"`
-	ElasticListingsIndex     string   `env:"ELASTIC_INDEX_LISTINGS" envDefault:"listings"`
+	ElasticAddress       string `env:"ELASTIC_ADDRESS" envDefault:"http://localhost:9200"`
+	ElasticUsername      string `env:"ELASTIC_USERNAME"`
+	ElasticPassword      string `env:"ELASTIC_PASSWORD"`
+	ElasticListingsIndex string `env:"ELASTIC_INDEX_LISTINGS" envDefault:"listings"`
 
 	// CORS
 	CorsAllowedOrigins string `env:"CORS_ALLOWED_ORIGINS" envDefault:"http://localhost:3000"`
@@ -116,7 +111,7 @@ func LoadConfig() error {
 	if err := validateCloudinaryConfig(cfg); err != nil {
 		return err
 	}
-	if err := validateEventingAndSearchConfig(cfg); err != nil {
+	if err := validateSearchIndexConfig(cfg); err != nil {
 		return err
 	}
 
@@ -146,11 +141,7 @@ func validateCloudinaryConfig(cfg AppConfig) error {
 	return nil
 }
 
-func validateEventingAndSearchConfig(cfg AppConfig) error {
-	if len(cfg.KafkaBrokers) == 0 {
-		return fmt.Errorf("config: KAFKA_BROKERS must contain at least one broker")
-	}
-
+func validateSearchIndexConfig(cfg AppConfig) error {
 	if cfg.ElasticUsername == "" && cfg.ElasticPassword == "" {
 		return nil
 	}
