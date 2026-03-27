@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/naufalilyasa/pal-property-backend/internal/dto/request"
 	"github.com/naufalilyasa/pal-property-backend/internal/dto/response"
@@ -63,6 +64,12 @@ func (s *searchReadService) SearchListings(ctx context.Context, req request.Sear
 	query := buildSearchListingsQuery(req)
 	var raw elasticsearchSearchResponse[response.SearchListingCardResponse]
 	if err := s.client.Search(ctx, s.index, query, &raw); err != nil {
+		if isMissingSearchIndexError(err) {
+			if ensureErr := s.client.EnsureIndex(ctx, s.index, ListingIndexMapping()); ensureErr != nil {
+				return nil, ensureErr
+			}
+			return &response.SearchListingsPageResponse{Items: []*response.SearchListingCardResponse{}, Total: 0, Page: req.Page, Limit: req.Limit, TotalPages: 0}, nil
+		}
 		return nil, err
 	}
 	items := make([]*response.SearchListingCardResponse, 0, len(raw.Hits.Hits))
@@ -125,4 +132,12 @@ func buildSearchSort(sort string) []map[string]any {
 	default:
 		return []map[string]any{{"_score": map[string]any{"order": "desc"}}, {"created_at": map[string]any{"order": "desc"}}}
 	}
+}
+
+func isMissingSearchIndexError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := err.Error()
+	return strings.Contains(message, "index_not_found_exception") || strings.Contains(message, "status 404")
 }
