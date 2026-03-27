@@ -9,14 +9,14 @@ export default defineConfig({
   outputDir: path.join(process.cwd(), "node_modules/.cache/playwright/test-results"),
   retries: 0,
   use: {
-    baseURL: "http://127.0.0.1:3000",
+    baseURL: "http://127.0.0.1:3100",
     trace: "on-first-retry",
   },
   webServer: {
     command:
-      "NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:45731 API_BASE_URL=http://127.0.0.1:45731 npm run dev -- --hostname 127.0.0.1 --port 3000",
-    url: "http://127.0.0.1:3000",
-    reuseExistingServer: !process.env.CI,
+      "NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:45731 API_BASE_URL=http://127.0.0.1:45731 npm run dev -- --hostname 127.0.0.1 --port 3100",
+    url: "http://127.0.0.1:3100",
+    reuseExistingServer: true,
   },
   projects: [
     {

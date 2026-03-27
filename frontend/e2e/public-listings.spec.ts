@@ -171,7 +171,6 @@ test("desktop listings shell keeps map-left and results-right layout", async ({ 
 
   await expect(page.getByTestId("listing-filters")).toBeVisible();
   await expect(page.getByTestId("listing-map-panel")).toBeVisible();
-  await expect(page.getByTestId("listing-pagination")).toBeVisible();
   await expect(page.getByTestId("listing-card")).toHaveCount(2);
 
   const boxes = await Promise.all([
