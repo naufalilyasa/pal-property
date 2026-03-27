@@ -25,6 +25,8 @@ type CategoryService interface {
 type categoryService struct {
 	repo    domain.CategoryRepository
 	publish domain.EventPublisher
+	jobs    domain.SearchIndexJobRepository
+	txm     domain.SearchIndexTransactionManager
 }
 
 func NewCategoryService(repo domain.CategoryRepository) CategoryService {
@@ -33,6 +35,22 @@ func NewCategoryService(repo domain.CategoryRepository) CategoryService {
 
 func NewCategoryServiceWithPublisher(repo domain.CategoryRepository, publisher domain.EventPublisher) CategoryService {
 	return &categoryService{repo: repo, publish: publisher}
+}
+
+func NewCategoryServiceWithJobs(repo domain.CategoryRepository, jobs domain.SearchIndexJobRepository) CategoryService {
+	return &categoryService{repo: repo, jobs: jobs}
+}
+
+func NewCategoryServiceWithJobsAndTransactions(repo domain.CategoryRepository, jobs domain.SearchIndexJobRepository, txm domain.SearchIndexTransactionManager) CategoryService {
+	return &categoryService{repo: repo, jobs: jobs, txm: txm}
+}
+
+func NewCategoryServiceWithPublisherAndJobs(repo domain.CategoryRepository, publisher domain.EventPublisher, jobs domain.SearchIndexJobRepository) CategoryService {
+	return &categoryService{repo: repo, publish: publisher, jobs: jobs}
+}
+
+func NewCategoryServiceWithPublisherJobsAndTransactions(repo domain.CategoryRepository, publisher domain.EventPublisher, jobs domain.SearchIndexJobRepository, txm domain.SearchIndexTransactionManager) CategoryService {
+	return &categoryService{repo: repo, publish: publisher, jobs: jobs, txm: txm}
 }
 
 func (s *categoryService) List(ctx context.Context) ([]*response.CategoryResponse, error) {
@@ -78,7 +96,30 @@ func (s *categoryService) Create(ctx context.Context, req request.CreateCategory
 		IconURL:  req.IconURL,
 	}
 
-	created, err := s.repo.Create(ctx, cat)
+	var (
+		created *entity.Category
+		err     error
+	)
+	if s.txm != nil && s.jobs != nil {
+		err = s.txm.WithinTransaction(ctx, func(store domain.SearchIndexTransactionStore) error {
+			var txErr error
+			created, txErr = store.Categories().Create(ctx, cat)
+			if txErr != nil {
+				return txErr
+			}
+			job, txErr := buildSearchIndexJobFromCategory(domain.EventTypeCategoryCreated, created)
+			if txErr != nil {
+				return txErr
+			}
+			_, txErr = store.Jobs().Enqueue(ctx, job)
+			return txErr
+		})
+	} else {
+		created, err = s.repo.Create(ctx, cat)
+		if err == nil {
+			s.enqueueCategoryIndexJob(ctx, domain.EventTypeCategoryCreated, created)
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +148,27 @@ func (s *categoryService) Update(ctx context.Context, id uuid.UUID, req request.
 		return mapCategoryToResponse(cat), nil
 	}
 
-	updated, err := s.repo.Update(ctx, cat, fields)
+	var updated *entity.Category
+	if s.txm != nil && s.jobs != nil {
+		err = s.txm.WithinTransaction(ctx, func(store domain.SearchIndexTransactionStore) error {
+			var txErr error
+			updated, txErr = store.Categories().Update(ctx, cat, fields)
+			if txErr != nil {
+				return txErr
+			}
+			job, txErr := buildSearchIndexJobFromCategory(domain.EventTypeCategoryUpdated, updated)
+			if txErr != nil {
+				return txErr
+			}
+			_, txErr = store.Jobs().Enqueue(ctx, job)
+			return txErr
+		})
+	} else {
+		updated, err = s.repo.Update(ctx, cat, fields)
+		if err == nil {
+			s.enqueueCategoryIndexJob(ctx, domain.EventTypeCategoryUpdated, updated)
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -138,12 +199,29 @@ func (s *categoryService) Delete(ctx context.Context, id uuid.UUID) error {
 		return domain.ErrConflict
 	}
 
-	err = s.repo.Delete(ctx, id)
+	deleted := *cat
+	deleted.Children = nil
+	if s.txm != nil && s.jobs != nil {
+		err = s.txm.WithinTransaction(ctx, func(store domain.SearchIndexTransactionStore) error {
+			if txErr := store.Categories().Delete(ctx, id); txErr != nil {
+				return txErr
+			}
+			job, txErr := buildSearchIndexJobFromCategory(domain.EventTypeCategoryDeleted, &deleted)
+			if txErr != nil {
+				return txErr
+			}
+			_, txErr = store.Jobs().Enqueue(ctx, job)
+			return txErr
+		})
+	} else {
+		err = s.repo.Delete(ctx, id)
+		if err == nil {
+			s.enqueueCategoryIndexJob(ctx, domain.EventTypeCategoryDeleted, &deleted)
+		}
+	}
 	if err != nil {
 		return err
 	}
-	deleted := *cat
-	deleted.Children = nil
 	s.publishCategoryEvent(ctx, domain.EventTypeCategoryDeleted, &deleted)
 	return nil
 }
@@ -154,6 +232,20 @@ func (s *categoryService) publishCategoryEvent(ctx context.Context, eventType st
 	}
 	if err := s.publish.PublishCategoryEvent(ctx, buildCategoryEvent(eventType, category)); err != nil {
 		logger.Log.Warn("Failed to publish category event", zap.String("event_type", eventType), zap.String("category_id", category.ID.String()), zap.Error(err))
+	}
+}
+
+func (s *categoryService) enqueueCategoryIndexJob(ctx context.Context, eventType string, category *entity.Category) {
+	if s.jobs == nil || category == nil {
+		return
+	}
+	job, err := buildSearchIndexJobFromCategory(eventType, category)
+	if err != nil {
+		logger.Log.Warn("Failed to build search index job for category", zap.String("event_type", eventType), zap.String("category_id", category.ID.String()), zap.Error(err))
+		return
+	}
+	if _, err := s.jobs.Enqueue(ctx, job); err != nil {
+		logger.Log.Warn("Failed to enqueue search index job for category", zap.String("event_type", eventType), zap.String("category_id", category.ID.String()), zap.Error(err))
 	}
 }
 
