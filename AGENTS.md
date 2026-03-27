@@ -10,7 +10,7 @@ Property listing platform for Indonesia. The Go backend remains the system-of-re
 **Stack:** Go 1.26 + Fiber v3 + GORM + PostgreSQL 17 + Redis + Goth OAuth | Next.js 16 App Router + React 19 + TypeScript + Tailwind v4 + TanStack Query + RHF + Zod | Cloudinary-backed listing images via backend APIs
 
 **Implemented:** Google OAuth with httpOnly cookie auth, refresh rotation, `/auth/me`, listing CRUD, category APIs, listing image upload/delete/set-primary/reorder, Casbin-backed backend authorization with DB-fresh principals, seller dashboard/listing create-edit-image flows, Elasticsearch-backed public listings browse plus detail pages, Vitest + Playwright frontend coverage
-**Infrastructure:** Redpanda already serves as the message broker, and the recent security/config cleanup aligned DB SSL config, legacy OAuth token reads, auth refresh semantics, and env guidance. Planned next steps remain producers/consumers, Elasticsearch indexing, and broader buyer-facing/product flows.
+**Infrastructure:** Search indexing now follows a modular-monolith path: PostgreSQL-backed outbox writes plus an internal `listing-indexer` worker update Elasticsearch without Redpanda/Kafka in the active runtime path. Recent config cleanup aligned DB SSL config, legacy OAuth token reads, auth refresh semantics, and env guidance.
 
 ## SOURCE OF TRUTH ARCHITECTURE
 

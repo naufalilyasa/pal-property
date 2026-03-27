@@ -45,6 +45,8 @@ type listingService struct {
 	storage domain.ListingImageStorage
 	authz   AuthzService
 	publish domain.EventPublisher
+	jobs    domain.SearchIndexJobRepository
+	txm     domain.SearchIndexTransactionManager
 }
 
 func NewListingService(repo domain.ListingRepository, storage ...domain.ListingImageStorage) ListingService {
@@ -65,6 +67,38 @@ func NewListingServiceWithAuthz(repo domain.ListingRepository, authzService Auth
 
 func NewListingServiceWithAuthzAndPublisher(repo domain.ListingRepository, authzService AuthzService, publisher domain.EventPublisher, storage ...domain.ListingImageStorage) ListingService {
 	service := &listingService{repo: repo, authz: authzService, publish: publisher}
+	if len(storage) > 0 {
+		service.storage = storage[0]
+	}
+	return service
+}
+
+func NewListingServiceWithAuthzAndJobs(repo domain.ListingRepository, authzService AuthzService, jobs domain.SearchIndexJobRepository, storage ...domain.ListingImageStorage) ListingService {
+	service := &listingService{repo: repo, authz: authzService, jobs: jobs}
+	if len(storage) > 0 {
+		service.storage = storage[0]
+	}
+	return service
+}
+
+func NewListingServiceWithAuthzJobsAndTransactions(repo domain.ListingRepository, authzService AuthzService, jobs domain.SearchIndexJobRepository, txm domain.SearchIndexTransactionManager, storage ...domain.ListingImageStorage) ListingService {
+	service := &listingService{repo: repo, authz: authzService, jobs: jobs, txm: txm}
+	if len(storage) > 0 {
+		service.storage = storage[0]
+	}
+	return service
+}
+
+func NewListingServiceWithAuthzPublisherJobsAndTransactions(repo domain.ListingRepository, authzService AuthzService, publisher domain.EventPublisher, jobs domain.SearchIndexJobRepository, txm domain.SearchIndexTransactionManager, storage ...domain.ListingImageStorage) ListingService {
+	service := &listingService{repo: repo, authz: authzService, publish: publisher, jobs: jobs, txm: txm}
+	if len(storage) > 0 {
+		service.storage = storage[0]
+	}
+	return service
+}
+
+func NewListingServiceWithAuthzPublisherAndJobs(repo domain.ListingRepository, authzService AuthzService, publisher domain.EventPublisher, jobs domain.SearchIndexJobRepository, storage ...domain.ListingImageStorage) ListingService {
+	service := &listingService{repo: repo, authz: authzService, publish: publisher, jobs: jobs}
 	if len(storage) > 0 {
 		service.storage = storage[0]
 	}
@@ -131,7 +165,34 @@ func (s *listingService) Create(ctx context.Context, principal pkgauthz.Principa
 		Specifications:    datatypes.JSON(specsJSON),
 	}
 
-	created, err := s.repo.Create(ctx, listing)
+	var created *entity.Listing
+	if s.txm != nil && s.jobs != nil {
+		err = s.txm.WithinTransaction(ctx, func(store domain.SearchIndexTransactionStore) error {
+			var txErr error
+			created, txErr = store.Listings().Create(ctx, listing)
+			if txErr != nil {
+				return txErr
+			}
+			created, txErr = store.Listings().FindByID(ctx, created.ID)
+			if txErr != nil {
+				return txErr
+			}
+			job, txErr := buildSearchIndexJobFromListing(domain.EventTypeListingCreated, created)
+			if txErr != nil {
+				return txErr
+			}
+			_, txErr = store.Jobs().Enqueue(ctx, job)
+			return txErr
+		})
+	} else {
+		created, err = s.repo.Create(ctx, listing)
+		if err == nil {
+			created, err = s.repo.FindByID(ctx, created.ID)
+		}
+		if err == nil && s.jobs != nil {
+			s.enqueueListingIndexJob(ctx, domain.EventTypeListingCreated, created)
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +416,31 @@ func (s *listingService) Update(ctx context.Context, id uuid.UUID, principal pkg
 		return s.mapToResponse(listing), nil
 	}
 
-	updated, err := s.repo.Update(ctx, listing, fields)
+	var updated *entity.Listing
+	if s.txm != nil && s.jobs != nil {
+		err = s.txm.WithinTransaction(ctx, func(store domain.SearchIndexTransactionStore) error {
+			var txErr error
+			updated, txErr = store.Listings().Update(ctx, listing, fields)
+			if txErr != nil {
+				return txErr
+			}
+			listingForJob, txErr := store.Listings().FindByID(ctx, updated.ID)
+			if txErr != nil {
+				listingForJob = updated
+			}
+			job, txErr := buildSearchIndexJobFromListing(domain.EventTypeListingUpdated, listingForJob)
+			if txErr != nil {
+				return txErr
+			}
+			_, txErr = store.Jobs().Enqueue(ctx, job)
+			return txErr
+		})
+	} else {
+		updated, err = s.repo.Update(ctx, listing, fields)
+		if err == nil && s.jobs != nil {
+			s.enqueueListingIndexJob(ctx, domain.EventTypeListingUpdated, s.loadListingForEvent(ctx, updated.ID, updated))
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -376,13 +461,30 @@ func (s *listingService) Delete(ctx context.Context, id uuid.UUID, principal pkg
 		return err
 	}
 
-	err = s.repo.Delete(ctx, id)
-	if err != nil {
-		return err
-	}
 	deleted := *listing
 	now := time.Now().UTC()
 	deleted.DeletedAt = gorm.DeletedAt{Time: now, Valid: true}
+	if s.txm != nil && s.jobs != nil {
+		err = s.txm.WithinTransaction(ctx, func(store domain.SearchIndexTransactionStore) error {
+			if txErr := store.Listings().Delete(ctx, id); txErr != nil {
+				return txErr
+			}
+			job, txErr := buildSearchIndexJobFromListing(domain.EventTypeListingDeleted, &deleted)
+			if txErr != nil {
+				return txErr
+			}
+			_, txErr = store.Jobs().Enqueue(ctx, job)
+			return txErr
+		})
+	} else {
+		err = s.repo.Delete(ctx, id)
+		if err == nil && s.jobs != nil {
+			s.enqueueListingIndexJob(ctx, domain.EventTypeListingDeleted, &deleted)
+		}
+	}
+	if err != nil {
+		return err
+	}
 	s.publishListingEvent(ctx, domain.EventTypeListingDeleted, &deleted)
 	return nil
 }
@@ -412,12 +514,37 @@ func (s *listingService) UploadImage(ctx context.Context, id uuid.UUID, principa
 	}
 
 	image := buildListingImageEntity(id, file, uploaded)
-	if _, err := s.repo.CreateImage(ctx, image); err != nil {
+	if s.txm != nil && s.jobs != nil {
+		err = s.txm.WithinTransaction(ctx, func(store domain.SearchIndexTransactionStore) error {
+			if _, txErr := store.Listings().CreateImage(ctx, image); txErr != nil {
+				return txErr
+			}
+			listingForJob, txErr := store.Listings().FindByID(ctx, id)
+			if txErr != nil {
+				listingForJob = listing
+				listingForJob.Images = append(listingForJob.Images, *image)
+			}
+			job, txErr := buildSearchIndexJobFromListing(domain.EventTypeListingImagesChanged, listingForJob)
+			if txErr != nil {
+				return txErr
+			}
+			_, txErr = store.Jobs().Enqueue(ctx, job)
+			return txErr
+		})
+	} else {
+		if _, err := s.repo.CreateImage(ctx, image); err != nil {
+			s.destroyUploadedImage(ctx, uploaded)
+			return nil, err
+		}
+		listing.Images = append(listing.Images, *image)
+		if s.jobs != nil {
+			s.enqueueListingIndexJob(ctx, domain.EventTypeListingImagesChanged, s.loadListingForEvent(ctx, id, listing))
+		}
+	}
+	if err != nil {
 		s.destroyUploadedImage(ctx, uploaded)
 		return nil, err
 	}
-
-	listing.Images = append(listing.Images, *image)
 	if s.publish != nil {
 		s.publishListingEvent(ctx, domain.EventTypeListingImagesChanged, s.loadListingForEvent(ctx, id, listing))
 	}
@@ -441,10 +568,33 @@ func (s *listingService) DeleteImage(ctx context.Context, id uuid.UUID, imageID 
 		return nil, domain.ErrNotFound
 	}
 
-	if err := s.repo.DeleteImage(ctx, id, imageID); err != nil {
+	if s.txm != nil && s.jobs != nil {
+		err = s.txm.WithinTransaction(ctx, func(store domain.SearchIndexTransactionStore) error {
+			if txErr := store.Listings().DeleteImage(ctx, id, imageID); txErr != nil {
+				return txErr
+			}
+			listingForJob, txErr := store.Listings().FindByID(ctx, id)
+			if txErr != nil {
+				return txErr
+			}
+			job, txErr := buildSearchIndexJobFromListing(domain.EventTypeListingImagesChanged, listingForJob)
+			if txErr != nil {
+				return txErr
+			}
+			_, txErr = store.Jobs().Enqueue(ctx, job)
+			return txErr
+		})
+	} else {
+		if err := s.repo.DeleteImage(ctx, id, imageID); err != nil {
+			return nil, err
+		}
+		if s.jobs != nil {
+			s.enqueueListingIndexJob(ctx, domain.EventTypeListingImagesChanged, s.loadListingForEvent(ctx, id, nil))
+		}
+	}
+	if err != nil {
 		return nil, err
 	}
-
 	s.destroyListingImageByEntity(ctx, image)
 	if s.publish != nil {
 		s.publishListingEvent(ctx, domain.EventTypeListingImagesChanged, s.loadListingForEvent(ctx, id, nil))
@@ -466,7 +616,31 @@ func (s *listingService) SetPrimaryImage(ctx context.Context, id uuid.UUID, imag
 		return nil, domain.ErrNotFound
 	}
 
-	if err := s.repo.SetPrimaryImage(ctx, id, imageID); err != nil {
+	if s.txm != nil && s.jobs != nil {
+		err = s.txm.WithinTransaction(ctx, func(store domain.SearchIndexTransactionStore) error {
+			if txErr := store.Listings().SetPrimaryImage(ctx, id, imageID); txErr != nil {
+				return txErr
+			}
+			listingForJob, txErr := store.Listings().FindByID(ctx, id)
+			if txErr != nil {
+				return txErr
+			}
+			job, txErr := buildSearchIndexJobFromListing(domain.EventTypeListingImagesChanged, listingForJob)
+			if txErr != nil {
+				return txErr
+			}
+			_, txErr = store.Jobs().Enqueue(ctx, job)
+			return txErr
+		})
+	} else {
+		if err := s.repo.SetPrimaryImage(ctx, id, imageID); err != nil {
+			return nil, err
+		}
+		if s.jobs != nil {
+			s.enqueueListingIndexJob(ctx, domain.EventTypeListingImagesChanged, s.loadListingForEvent(ctx, id, nil))
+		}
+	}
+	if err != nil {
 		return nil, err
 	}
 	if s.publish != nil {
@@ -489,7 +663,31 @@ func (s *listingService) ReorderImages(ctx context.Context, id uuid.UUID, princi
 		return nil, err
 	}
 
-	if err := s.repo.ReorderImages(ctx, id, orderedImageIDs); err != nil {
+	if s.txm != nil && s.jobs != nil {
+		err = s.txm.WithinTransaction(ctx, func(store domain.SearchIndexTransactionStore) error {
+			if txErr := store.Listings().ReorderImages(ctx, id, orderedImageIDs); txErr != nil {
+				return txErr
+			}
+			listingForJob, txErr := store.Listings().FindByID(ctx, id)
+			if txErr != nil {
+				return txErr
+			}
+			job, txErr := buildSearchIndexJobFromListing(domain.EventTypeListingImagesChanged, listingForJob)
+			if txErr != nil {
+				return txErr
+			}
+			_, txErr = store.Jobs().Enqueue(ctx, job)
+			return txErr
+		})
+	} else {
+		if err := s.repo.ReorderImages(ctx, id, orderedImageIDs); err != nil {
+			return nil, err
+		}
+		if s.jobs != nil {
+			s.enqueueListingIndexJob(ctx, domain.EventTypeListingImagesChanged, s.loadListingForEvent(ctx, id, nil))
+		}
+	}
+	if err != nil {
 		return nil, err
 	}
 	if s.publish != nil {
@@ -720,6 +918,20 @@ func (s *listingService) publishListingEvent(ctx context.Context, eventType stri
 	}
 	if err := s.publish.PublishListingEvent(ctx, buildListingEvent(eventType, listing)); err != nil {
 		logger.Log.Warn("Failed to publish listing event", zap.String("event_type", eventType), zap.String("listing_id", listing.ID.String()), zap.Error(err))
+	}
+}
+
+func (s *listingService) enqueueListingIndexJob(ctx context.Context, eventType string, listing *entity.Listing) {
+	if s.jobs == nil || listing == nil {
+		return
+	}
+	job, err := buildSearchIndexJobFromListing(eventType, listing)
+	if err != nil {
+		logger.Log.Warn("Failed to build search index job for listing", zap.String("event_type", eventType), zap.String("listing_id", listing.ID.String()), zap.Error(err))
+		return
+	}
+	if _, err := s.jobs.Enqueue(ctx, job); err != nil {
+		logger.Log.Warn("Failed to enqueue search index job for listing", zap.String("event_type", eventType), zap.String("listing_id", listing.ID.String()), zap.Error(err))
 	}
 }
 

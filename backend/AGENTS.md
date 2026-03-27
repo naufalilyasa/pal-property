@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-Go 1.26 REST API. Fiber v3 + GORM + PostgreSQL + Redis with strict layering. Listings include Cloudinary-backed image management, and authorization now routes through a shared Casbin-backed authz layer. Redpanda already owns the message broker role, and the recent security/config cleanup aligned DB SSL config, legacy OAuth token reads, auth refresh semantics, and env guidance ahead of the planned producers/consumers, Elasticsearch indexing, and broader buyer-facing/product flows.
+Go 1.26 REST API. Fiber v3 + GORM + PostgreSQL + Redis with strict layering. Listings include Cloudinary-backed image management, authorization routes through a shared Casbin-backed authz layer, and search indexing now targets a modular-monolith outbox flow instead of an external broker.
 
 ## STRUCTURE
 
@@ -50,13 +50,13 @@ listingHandler := http.NewListingHandler(listingSvc)
 
 **Config sync**:
 - Runtime authority is `pkg/config/config.go`, which uses `caarlos0/env/v11` to parse env and decode AES secrets so OAuth provider tokens stay encrypted at rest.
-- Broker/search runtime config also flows through `pkg/config/config.go`, with `KAFKA_BROKERS`, `KAFKA_GROUP_ID`, `KAFKA_CLIENT_ID`, topic names, and `ELASTIC_ADDRESS` / optional auth fields reserved for Redpanda and Elasticsearch wiring.
+- Search runtime config flows through `pkg/config/config.go`, with `ELASTIC_ADDRESS`, optional `ELASTIC_USERNAME` / `ELASTIC_PASSWORD`, and `ELASTIC_INDEX_LISTINGS` for the modular-monolith search index.
 - Any new env var still requires updates to `.env-example` and `.env.docker` when local startup depends on it.
 - **Prices:** Listing and commerce values stay `int64` in IDR to protect precision across services.
 
-**Eventing/search behavior**:
-- Producer hooks in listing/category services are currently best-effort: publish failures are logged, and index repair relies on the `listing-indexer rebuild` path rather than request rollback.
-- `cmd/listing-indexer` ensures the target Elasticsearch index exists on normal startup and can fully recreate it in `rebuild` mode.
+**Search indexing behavior**:
+- Listing/category write paths enqueue search index jobs and keep request semantics best-effort with warning logs on indexing handoff failures.
+- `cmd/listing-indexer` now processes DB-backed outbox jobs by default and can fully recreate the index in `rebuild` mode.
 - The future public search-read proposal currently lives in `backend/search-read-contract.md`.
 
 ## CURRENT FEATURE AREAS
