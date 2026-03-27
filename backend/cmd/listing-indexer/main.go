@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/naufalilyasa/pal-property-backend/internal/repository/postgres"
 	"github.com/naufalilyasa/pal-property-backend/internal/service"
 	"github.com/naufalilyasa/pal-property-backend/pkg/config"
-	pkgeventing "github.com/naufalilyasa/pal-property-backend/pkg/eventing"
 	"github.com/naufalilyasa/pal-property-backend/pkg/logger"
 	"github.com/naufalilyasa/pal-property-backend/pkg/searchindex"
 	"go.uber.org/zap"
@@ -44,6 +44,11 @@ func main() {
 	if err != nil {
 		logger.Log.Fatal("Failed to initialize search projector", zap.Error(err))
 	}
+	jobs := postgres.NewSearchIndexJobRepository(db)
+	processor, err := service.NewIndexingJobProcessor(jobs, projector)
+	if err != nil {
+		logger.Log.Fatal("Failed to initialize indexing job processor", zap.Error(err))
+	}
 	if err := searchClient.EnsureIndex(context.Background(), config.Env.ElasticListingsIndex, service.ListingIndexMapping()); err != nil {
 		logger.Log.Fatal("Failed to ensure search index", zap.Error(err))
 	}
@@ -56,20 +61,8 @@ func main() {
 		return
 	}
 
-	consumer, err := pkgeventing.NewKafkaConsumer(
-		config.Env.KafkaBrokers,
-		config.Env.KafkaGroupID,
-		config.Env.KafkaTopicListingEvents,
-		config.Env.KafkaTopicCategoryEvents,
-		projector,
-	)
-	if err != nil {
-		logger.Log.Fatal("Failed to initialize event consumer", zap.Error(err))
-	}
-	defer func() { _ = consumer.Close() }()
-
 	logger.Log.Info("Listing indexer worker starting")
-	if err := consumer.Consume(context.Background()); err != nil {
+	if err := processor.Run(context.Background(), 3*time.Second, 100); err != nil {
 		logger.Log.Fatal("Listing indexer worker stopped", zap.Error(err))
 	}
 }

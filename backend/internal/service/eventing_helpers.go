@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -110,4 +111,56 @@ func newEventID() uuid.UUID {
 		return uuid.New()
 	}
 	return id
+}
+
+func buildSearchIndexJobFromListing(eventType string, listing *entity.Listing) (*entity.SearchIndexJob, error) {
+	event := buildListingEvent(eventType, listing)
+	payload, err := json.Marshal(domain.SearchIndexJobPayload{Event: domainEventPayloadFromListing(event)})
+	if err != nil {
+		return nil, err
+	}
+	return &entity.SearchIndexJob{
+		AggregateType: domain.AggregateTypeListing,
+		AggregateID:   listing.ID,
+		EventType:     eventType,
+		Payload:       payload,
+		Status:        domain.SearchIndexJobStatusPending,
+		AvailableAt:   time.Now().UTC(),
+	}, nil
+}
+
+func buildSearchIndexJobFromCategory(eventType string, category *entity.Category) (*entity.SearchIndexJob, error) {
+	event := buildCategoryEvent(eventType, category)
+	payload, err := json.Marshal(domain.SearchIndexJobPayload{Event: domainEventPayloadFromCategory(event)})
+	if err != nil {
+		return nil, err
+	}
+	return &entity.SearchIndexJob{
+		AggregateType: domain.AggregateTypeCategory,
+		AggregateID:   category.ID,
+		EventType:     eventType,
+		Payload:       payload,
+		Status:        domain.SearchIndexJobStatusPending,
+		AvailableAt:   time.Now().UTC(),
+	}, nil
+}
+
+func domainEventPayloadFromListing(event domain.ListingEvent) domain.SearchIndexEventPayload {
+	payload, _ := json.Marshal(event.Payload)
+	return domain.SearchIndexEventPayload{
+		AggregateType: domain.AggregateTypeListing,
+		AggregateID:   event.Metadata.AggregateID,
+		EventType:     event.Metadata.EventType,
+		Payload:       payload,
+	}
+}
+
+func domainEventPayloadFromCategory(event domain.CategoryEvent) domain.SearchIndexEventPayload {
+	payload, _ := json.Marshal(event.Payload)
+	return domain.SearchIndexEventPayload{
+		AggregateType: domain.AggregateTypeCategory,
+		AggregateID:   event.Metadata.AggregateID,
+		EventType:     event.Metadata.EventType,
+		Payload:       payload,
+	}
 }
