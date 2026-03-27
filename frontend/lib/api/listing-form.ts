@@ -8,6 +8,9 @@ export type ListingSpecifications = {
   building_area_sqm: number;
 };
 
+export type ListingStatus = "active" | "inactive" | "sold" | "draft" | "archived";
+export type ListingTransactionType = "sale" | "rent";
+
 export type ListingCategory = {
   id: string;
   name: string;
@@ -33,11 +36,31 @@ export type ListingFormRequest = {
   category_id: string | null;
   title: string;
   description: string | null;
+  transaction_type: ListingTransactionType;
   price: number;
+  currency: string;
+  is_negotiable: boolean;
+  special_offers: string[];
+  location_province: string | null;
   location_city: string | null;
   location_district: string | null;
   address_detail: string | null;
-  status: "active" | "inactive" | "sold";
+  latitude: number | null;
+  longitude: number | null;
+  bedroom_count: number | null;
+  bathroom_count: number | null;
+  floor_count: number | null;
+  carport_capacity: number | null;
+  land_area_sqm: number | null;
+  building_area_sqm: number | null;
+  certificate_type: string | null;
+  condition: string | null;
+  furnishing: string | null;
+  electrical_power_va: number | null;
+  facing_direction: string | null;
+  year_built: number | null;
+  facilities: string[];
+  status: ListingStatus;
   specifications: ListingSpecifications;
 };
 
@@ -54,11 +77,30 @@ export type ListingRecord = {
   title: string;
   slug: string;
   description?: string | null;
+  transaction_type?: ListingTransactionType;
   price: number;
   currency: string;
+  is_negotiable?: boolean;
+  special_offers?: string[] | null;
+  location_province?: string | null;
   location_city?: string | null;
   location_district?: string | null;
   address_detail?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  bedroom_count?: number | null;
+  bathroom_count?: number | null;
+  floor_count?: number | null;
+  carport_capacity?: number | null;
+  land_area_sqm?: number | null;
+  building_area_sqm?: number | null;
+  certificate_type?: string | null;
+  condition?: string | null;
+  furnishing?: string | null;
+  electrical_power_va?: number | null;
+  facing_direction?: string | null;
+  year_built?: number | null;
+  facilities?: string[] | null;
   status: string;
   is_featured: boolean;
   specifications: unknown;
@@ -242,6 +284,14 @@ export function parseListingSpecifications(value: unknown): ListingSpecification
   };
 }
 
+export function parseStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+}
+
 export function formatListingFormError(error: unknown): string {
   if (error instanceof ApiError) {
     return error.traceId ? `${error.message} (trace ${error.traceId})` : error.message;
@@ -280,4 +330,21 @@ function normalizeInteger(value: unknown): number {
   }
 
   return 0;
+}
+
+export function normalizeNullableNumber(value: string | undefined) {
+  const parsed = Number.parseFloat(value ?? "");
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function normalizeOptionalIntegerOrNull(value: string | undefined) {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return !Number.isNaN(parsed) && parsed >= 0 ? parsed : null;
+}
+
+export function normalizeStringList(value: string | undefined) {
+  return (value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }

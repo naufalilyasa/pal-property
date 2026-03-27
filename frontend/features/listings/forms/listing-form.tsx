@@ -27,11 +27,16 @@ import {
   getDefaultSpecifications,
   getListingCategories,
   parseListingSpecifications,
+  parseStringList,
+  normalizeNullableNumber,
+  normalizeOptionalIntegerOrNull,
+  normalizeStringList,
   updateSellerListing,
   type ListingCategoryOption,
   type ListingFormRequest,
   type ListingImageRecord,
   type ListingRecord,
+  type ListingTransactionType,
 } from "@/lib/api/listing-form";
 import { queryKeys } from "@/lib/query/keys";
 
@@ -56,6 +61,13 @@ const STATUS_OPTIONS: Array<{ value: ListingFormRequest["status"]; label: string
   { value: "active", label: "Active" },
   { value: "inactive", label: "Inactive" },
   { value: "sold", label: "Sold" },
+  { value: "draft", label: "Draft" },
+  { value: "archived", label: "Archived" },
+];
+
+const TRANSACTION_TYPE_OPTIONS: Array<{ value: ListingTransactionType; label: string }> = [
+  { value: "sale", label: "For sale" },
+  { value: "rent", label: "For rent" },
 ];
 
 export function ListingForm({ initialListing = null, mode, listingId }: ListingFormProps) {
@@ -266,6 +278,26 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
 
                   <FormField
                     control={form.control}
+                    name="transaction_type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel htmlFor="listing-transaction-type">Transaction type</FormLabel>
+                        <FormControl>
+                          <Select aria-label="Transaction type" id="listing-transaction-type" {...field}>
+                            {TRANSACTION_TYPE_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
                     name="status"
                     render={({ field }) => (
                       <FormItem>
@@ -284,6 +316,59 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                     )}
                   />
                 </div>
+
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="currency"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel htmlFor="listing-currency">Currency</FormLabel>
+                        <FormControl>
+                          <Input id="listing-currency" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="is_negotiable"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel htmlFor="listing-is-negotiable">Negotiable price</FormLabel>
+                        <FormControl>
+                          <label className="flex h-10 items-center gap-3 rounded-full border border-[var(--line)] bg-white px-4 text-sm text-[var(--ink)]">
+                            <input
+                              checked={field.value}
+                              id="listing-is-negotiable"
+                              onChange={(event) => field.onChange(event.target.checked)}
+                              type="checkbox"
+                            />
+                            <span>Allow negotiation</span>
+                          </label>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="special_offers"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel htmlFor="listing-special-offers">Special offers</FormLabel>
+                      <FormControl>
+                        <Input id="listing-special-offers" placeholder="Promo, DP_0, Turun_Harga" {...field} value={field.value ?? ""} />
+                      </FormControl>
+                      <FormDescription>Comma-separated tokens matching backend vocabulary.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={form.control}
@@ -305,19 +390,31 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
             <div className="space-y-6 rounded-[1.75rem] border border-[var(--line)] bg-white/80 p-6 sm:p-8">
               <div className="space-y-5">
                 <div className="space-y-2">
-                  <h3 className="text-xl font-semibold tracking-[-0.03em] text-[var(--ink)]">Location and specifications</h3>
-                  <p className="text-sm leading-7 text-[var(--muted)]">Optional location fields and numeric specification values map directly to backend request fields.</p>
+                  <h3 className="text-xl font-semibold tracking-[-0.03em] text-[var(--ink)]">Location and property details</h3>
+                  <p className="text-sm leading-7 text-[var(--muted)]">Richer listing fields map directly to the backend request contract while preserving compatibility `specifications`.</p>
                 </div>
 
                 {(
                   [
+                    ["location_province", "Province"],
                     ["location_city", "City"],
                     ["location_district", "District"],
                     ["address_detail", "Address detail"],
+                    ["latitude", "Latitude"],
+                    ["longitude", "Longitude"],
                     ["bedrooms", "Bedrooms"],
                     ["bathrooms", "Bathrooms"],
+                    ["floor_count", "Floor count"],
+                    ["carport_capacity", "Carport capacity"],
                     ["land_area_sqm", "Land area (sqm)"],
                     ["building_area_sqm", "Building area (sqm)"],
+                    ["certificate_type", "Certificate type"],
+                    ["condition", "Condition"],
+                    ["furnishing", "Furnishing"],
+                    ["electrical_power_va", "Electrical power (VA)"],
+                    ["facing_direction", "Facing direction"],
+                    ["year_built", "Year built"],
+                    ["facilities", "Facilities"],
                   ] as const
                 ).map(([name, label]) => (
                   <FormField
@@ -328,10 +425,10 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                       <FormItem>
                         <FormLabel htmlFor={`field-${name}`}>{label}</FormLabel>
                         <FormControl>
-                          {name === "address_detail" ? (
+                          {name === "address_detail" || name === "facilities" ? (
                             <Textarea className="min-h-28 resize-y" id={`field-${name}`} {...field} value={field.value ?? ""} />
                           ) : (
-                            <Input id={`field-${name}`} inputMode={name.includes("sqm") || name === "bedrooms" || name === "bathrooms" ? "numeric" : undefined} pattern={name.includes("sqm") || name === "bedrooms" || name === "bathrooms" ? "[0-9]*" : undefined} {...field} value={field.value ?? ""} />
+                            <Input id={`field-${name}`} inputMode={name.includes("sqm") || name === "bedrooms" || name === "bathrooms" || name === "floor_count" || name === "carport_capacity" || name === "year_built" || name === "electrical_power_va" || name === "latitude" || name === "longitude" ? "numeric" : undefined} pattern={name.includes("sqm") || name === "bedrooms" || name === "bathrooms" || name === "floor_count" || name === "carport_capacity" || name === "year_built" || name === "electrical_power_va" ? "[0-9]*" : undefined} {...field} value={field.value ?? ""} />
                           )}
                         </FormControl>
                         <FormMessage />
@@ -478,15 +575,31 @@ function toFormValues(listing: ListingRecord | null): ListingFormSchema {
       category_id: "",
       title: "",
       description: "",
+      transaction_type: "sale",
       price: "",
+      currency: "IDR",
+      is_negotiable: false,
+      special_offers: "",
+      location_province: "",
       location_city: "",
       location_district: "",
       address_detail: "",
+      latitude: "",
+      longitude: "",
       status: "active",
       bedrooms: "0",
       bathrooms: "0",
+      floor_count: "",
+      carport_capacity: "",
       land_area_sqm: "0",
       building_area_sqm: "0",
+      certificate_type: "",
+      condition: "",
+      furnishing: "",
+      electrical_power_va: "",
+      facing_direction: "",
+      year_built: "",
+      facilities: "",
     };
   }
 
@@ -496,35 +609,76 @@ function toFormValues(listing: ListingRecord | null): ListingFormSchema {
     category_id: listing.category_id ?? "",
     title: listing.title,
     description: listing.description ?? "",
+    transaction_type: listing.transaction_type ?? "sale",
     price: String(listing.price),
+    currency: listing.currency ?? "IDR",
+    is_negotiable: listing.is_negotiable ?? false,
+    special_offers: parseStringList(listing.special_offers).join(", "),
+    location_province: listing.location_province ?? "",
     location_city: listing.location_city ?? "",
     location_district: listing.location_district ?? "",
     address_detail: listing.address_detail ?? "",
+    latitude: listing.latitude != null ? String(listing.latitude) : "",
+    longitude: listing.longitude != null ? String(listing.longitude) : "",
     status: normalizeStatus(listing.status),
-    bedrooms: String(specifications.bedrooms),
-    bathrooms: String(specifications.bathrooms),
-    land_area_sqm: String(specifications.land_area_sqm),
-    building_area_sqm: String(specifications.building_area_sqm),
+    bedrooms: String(listing.bedroom_count ?? specifications.bedrooms),
+    bathrooms: String(listing.bathroom_count ?? specifications.bathrooms),
+    floor_count: listing.floor_count != null ? String(listing.floor_count) : "",
+    carport_capacity: listing.carport_capacity != null ? String(listing.carport_capacity) : "",
+    land_area_sqm: String(listing.land_area_sqm ?? specifications.land_area_sqm),
+    building_area_sqm: String(listing.building_area_sqm ?? specifications.building_area_sqm),
+    certificate_type: listing.certificate_type ?? "",
+    condition: listing.condition ?? "",
+    furnishing: listing.furnishing ?? "",
+    electrical_power_va: listing.electrical_power_va != null ? String(listing.electrical_power_va) : "",
+    facing_direction: listing.facing_direction ?? "",
+    year_built: listing.year_built != null ? String(listing.year_built) : "",
+    facilities: parseStringList(listing.facilities).join(", "),
   };
 }
 
 function toRequestPayload(values: ListingFormSchema): ListingFormRequest {
   const defaults = getDefaultSpecifications();
 
+  const bedroomCount = normalizeOptionalIntegerOrNull(values.bedrooms);
+  const bathroomCount = normalizeOptionalIntegerOrNull(values.bathrooms);
+  const landAreaSqm = normalizeOptionalIntegerOrNull(values.land_area_sqm);
+  const buildingAreaSqm = normalizeOptionalIntegerOrNull(values.building_area_sqm);
+
   return {
     category_id: normalizeNullableString(values.category_id),
     title: values.title.trim(),
     description: normalizeNullableString(values.description),
+    transaction_type: values.transaction_type,
     price: normalizeRequiredInteger(values.price, 1),
+    currency: values.currency?.trim() || "IDR",
+    is_negotiable: values.is_negotiable ?? false,
+    special_offers: normalizeStringList(values.special_offers),
+    location_province: normalizeNullableString(values.location_province),
     location_city: normalizeNullableString(values.location_city),
     location_district: normalizeNullableString(values.location_district),
     address_detail: normalizeNullableString(values.address_detail),
+    latitude: normalizeNullableNumber(values.latitude),
+    longitude: normalizeNullableNumber(values.longitude),
+    bedroom_count: bedroomCount,
+    bathroom_count: bathroomCount,
+    floor_count: normalizeOptionalIntegerOrNull(values.floor_count),
+    carport_capacity: normalizeOptionalIntegerOrNull(values.carport_capacity),
+    land_area_sqm: landAreaSqm,
+    building_area_sqm: buildingAreaSqm,
+    certificate_type: normalizeNullableString(values.certificate_type),
+    condition: normalizeNullableString(values.condition),
+    furnishing: normalizeNullableString(values.furnishing),
+    electrical_power_va: normalizeOptionalIntegerOrNull(values.electrical_power_va),
+    facing_direction: normalizeNullableString(values.facing_direction),
+    year_built: normalizeOptionalIntegerOrNull(values.year_built),
+    facilities: normalizeStringList(values.facilities),
     status: values.status,
     specifications: {
-      bedrooms: normalizeOptionalInteger(values.bedrooms, defaults.bedrooms),
-      bathrooms: normalizeOptionalInteger(values.bathrooms, defaults.bathrooms),
-      land_area_sqm: normalizeOptionalInteger(values.land_area_sqm, defaults.land_area_sqm),
-      building_area_sqm: normalizeOptionalInteger(values.building_area_sqm, defaults.building_area_sqm),
+      bedrooms: bedroomCount ?? defaults.bedrooms,
+      bathrooms: bathroomCount ?? defaults.bathrooms,
+      land_area_sqm: landAreaSqm ?? defaults.land_area_sqm,
+      building_area_sqm: buildingAreaSqm ?? defaults.building_area_sqm,
     },
   };
 }
@@ -539,13 +693,8 @@ function normalizeRequiredInteger(value: string | undefined, fallback: number) {
   return !Number.isNaN(parsed) && parsed >= fallback ? parsed : fallback;
 }
 
-function normalizeOptionalInteger(value: string | undefined, fallback: number) {
-  const parsed = Number.parseInt(value ?? "", 10);
-  return !Number.isNaN(parsed) && parsed >= 0 ? parsed : fallback;
-}
-
 function normalizeStatus(status: string): ListingFormRequest["status"] {
-  if (status === "inactive" || status === "sold") {
+  if (status === "inactive" || status === "sold" || status === "draft" || status === "archived") {
     return status;
   }
 
@@ -584,11 +733,30 @@ function createEmptyListing(): ListingRecord {
     title: "",
     slug: "",
     description: null,
+    transaction_type: "sale",
     price: 0,
     currency: "IDR",
+    is_negotiable: false,
+    special_offers: [],
+    location_province: null,
     location_city: null,
     location_district: null,
     address_detail: null,
+    latitude: null,
+    longitude: null,
+    bedroom_count: null,
+    bathroom_count: null,
+    floor_count: null,
+    carport_capacity: null,
+    land_area_sqm: null,
+    building_area_sqm: null,
+    certificate_type: null,
+    condition: null,
+    furnishing: null,
+    electrical_power_va: null,
+    facing_direction: null,
+    year_built: null,
+    facilities: [],
     status: "active",
     is_featured: false,
     specifications: {},
