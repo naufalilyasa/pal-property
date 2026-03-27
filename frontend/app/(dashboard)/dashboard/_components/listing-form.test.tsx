@@ -65,11 +65,30 @@ function buildListing(overrides: Partial<import("@/lib/api/listing-form").Listin
     title: "Existing Residence",
     slug: "existing-residence",
     description: "Fresh paint and pool.",
+    transaction_type: "sale",
     price: 3150000000,
     currency: "IDR",
+    is_negotiable: false,
+    special_offers: [],
+    location_province: "Jawa Barat",
     location_city: "Bandung",
     location_district: "Cidadap",
     address_detail: "Jl. Setiabudi 10",
+    latitude: null,
+    longitude: null,
+    bedroom_count: 5,
+    bathroom_count: 3,
+    floor_count: 2,
+    carport_capacity: 1,
+    land_area_sqm: 240,
+    building_area_sqm: 180,
+    certificate_type: "SHM",
+    condition: "second",
+    furnishing: "semi",
+    electrical_power_va: 3500,
+    facing_direction: "east",
+    year_built: 2018,
+    facilities: ["AC", "CCTV"],
     status: "inactive",
     is_featured: false,
     specifications: {
@@ -123,28 +142,52 @@ describe("ListingForm", () => {
     fireEvent.change(screen.getByLabelText(/^title/i), { target: { value: "Garden Residence" } });
     fireEvent.change(screen.getByLabelText(/^price/i), { target: { value: "2750000000" } });
     fireEvent.change(screen.getByLabelText(/^category/i), { target: { value: "cat-child" } });
+    fireEvent.change(screen.getByLabelText(/^transaction type/i), { target: { value: "rent" } });
     fireEvent.change(screen.getByLabelText(/^city/i), { target: { value: "Jakarta" } });
+    fireEvent.change(screen.getByLabelText(/^province/i), { target: { value: "DKI Jakarta" } });
     fireEvent.change(screen.getByLabelText(/^bedrooms/i), { target: { value: "4" } });
 
     fireEvent.click(screen.getByRole("button", { name: /create listing/i }));
 
     await waitFor(() => {
-      expect(createSellerListingMock).toHaveBeenCalledWith({
-        category_id: "cat-child",
-        title: "Garden Residence",
-        description: null,
-        price: 2750000000,
-        location_city: "Jakarta",
-        location_district: null,
-        address_detail: null,
-        status: "active",
-        specifications: {
-          bedrooms: 4,
-          bathrooms: 0,
+      expect(createSellerListingMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          category_id: "cat-child",
+          title: "Garden Residence",
+          description: null,
+          transaction_type: "rent",
+          price: 2750000000,
+          currency: "IDR",
+          is_negotiable: false,
+          special_offers: [],
+          location_province: "DKI Jakarta",
+          location_city: "Jakarta",
+          location_district: null,
+          address_detail: null,
+          latitude: null,
+          longitude: null,
+          bedroom_count: 4,
+          bathroom_count: 0,
+          floor_count: null,
+          carport_capacity: null,
           land_area_sqm: 0,
           building_area_sqm: 0,
-        },
-      });
+          certificate_type: null,
+          condition: null,
+          furnishing: null,
+          electrical_power_va: null,
+          facing_direction: null,
+          year_built: null,
+          facilities: [],
+          status: "active",
+          specifications: {
+            bedrooms: 4,
+            bathrooms: 0,
+            land_area_sqm: 0,
+            building_area_sqm: 0,
+          },
+        }),
+      );
     });
     expect(pushMock).toHaveBeenCalledWith("/dashboard/listings/listing-99/edit?created=1");
   });
@@ -161,6 +204,7 @@ describe("ListingForm", () => {
       target: { value: "   " },
     });
     fireEvent.change(screen.getByLabelText(/^price/i), { target: { value: "0" } });
+    fireEvent.change(screen.getByLabelText(/^transaction type/i), { target: { value: "sale" } });
     fireEvent.change(screen.getByLabelText(/^city/i), { target: { value: "  Surabaya " } });
     fireEvent.change(screen.getByLabelText(/^district/i), { target: { value: "   " } });
     fireEvent.change(screen.getByLabelText(/^address detail/i), { target: { value: "  Tower A  " } });
@@ -172,22 +216,44 @@ describe("ListingForm", () => {
     fireEvent.click(screen.getByRole("button", { name: /create listing/i }));
 
     await waitFor(() => {
-      expect(createSellerListingMock).toHaveBeenCalledWith({
-        category_id: null,
-        title: "Sunset Loft",
-        description: null,
-        price: 1,
-        location_city: "Surabaya",
-        location_district: null,
-        address_detail: "Tower A",
-        status: "sold",
-        specifications: {
-          bedrooms: 0,
-          bathrooms: 0,
+      expect(createSellerListingMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          category_id: null,
+          title: "Sunset Loft",
+          description: null,
+          transaction_type: "sale",
+          price: 1,
+          currency: "IDR",
+          is_negotiable: false,
+          special_offers: [],
+          location_province: null,
+          location_city: "Surabaya",
+          location_district: null,
+          address_detail: "Tower A",
+          latitude: null,
+          longitude: null,
+          bedroom_count: null,
+          bathroom_count: null,
+          floor_count: null,
+          carport_capacity: null,
           land_area_sqm: 120,
           building_area_sqm: 0,
-        },
-      });
+          certificate_type: null,
+          condition: null,
+          furnishing: null,
+          electrical_power_va: null,
+          facing_direction: null,
+          year_built: null,
+          facilities: [],
+          status: "sold",
+          specifications: {
+            bedrooms: 0,
+            bathrooms: 0,
+            land_area_sqm: 120,
+            building_area_sqm: 0,
+          },
+        }),
+      );
     });
   });
 
@@ -208,30 +274,52 @@ describe("ListingForm", () => {
     expect(await screen.findByRole("option", { name: /^house$/i })).toBeInTheDocument();
     expect(screen.getByDisplayValue("Bandung")).toBeInTheDocument();
     expect(screen.getByDisplayValue("3150000000")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Jawa Barat")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("5")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/^title/i), { target: { value: "Existing Residence Updated" } });
     fireEvent.change(screen.getByLabelText(/^price/i), { target: { value: "3300000000" } });
     fireEvent.change(screen.getByLabelText(/^category/i), { target: { value: "cat-root" } });
+    fireEvent.change(screen.getByLabelText(/^transaction type/i), { target: { value: "rent" } });
 
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
     await waitFor(() => {
-      expect(updateSellerListingMock).toHaveBeenCalledWith("listing-7", {
-        category_id: "cat-root",
-        title: "Existing Residence Updated",
-        description: "Fresh paint and pool.",
-        price: 3300000000,
-        location_city: "Bandung",
-        location_district: "Cidadap",
-        address_detail: "Jl. Setiabudi 10",
-        status: "inactive",
-        specifications: {
-          bedrooms: 5,
-          bathrooms: 3,
+      expect(updateSellerListingMock).toHaveBeenCalledWith(
+        "listing-7",
+        expect.objectContaining({
+          category_id: "cat-root",
+          title: "Existing Residence Updated",
+          description: "Fresh paint and pool.",
+          transaction_type: "rent",
+          price: 3300000000,
+          currency: "IDR",
+          location_province: "Jawa Barat",
+          location_city: "Bandung",
+          location_district: "Cidadap",
+          address_detail: "Jl. Setiabudi 10",
+          bedroom_count: 5,
+          bathroom_count: 3,
+          floor_count: 2,
+          carport_capacity: 1,
           land_area_sqm: 240,
           building_area_sqm: 180,
-        },
-      });
+          certificate_type: "SHM",
+          condition: "second",
+          furnishing: "semi",
+          electrical_power_va: 3500,
+          facing_direction: "east",
+          year_built: 2018,
+          facilities: ["AC", "CCTV"],
+          status: "inactive",
+          specifications: {
+            bedrooms: 5,
+            bathrooms: 3,
+            land_area_sqm: 240,
+            building_area_sqm: 180,
+          },
+        }),
+      );
     });
 
     expect(await screen.findByText(/listing changes saved successfully/i)).toBeInTheDocument();
