@@ -43,6 +43,7 @@ func TestListingService_Create_Success(t *testing.T) {
 
 	userID := uuid.New()
 	categoryID := uuid.New()
+	createdID := uuid.New()
 	req := &request.CreateListingRequest{
 		CategoryID:   &categoryID,
 		Title:        "Modern Villa in Bali",
@@ -61,7 +62,19 @@ func TestListingService_Create_Success(t *testing.T) {
 	repo.On("Create", mock.Anything, mock.MatchedBy(func(l *entity.Listing) bool {
 		return l.Title == req.Title && l.UserID == userID && l.Slug == "modern-villa-in-bali"
 	})).Return(&entity.Listing{
-		BaseEntity:     entity.BaseEntity{ID: uuid.New(), CreatedAt: time.Now()},
+		BaseEntity:     entity.BaseEntity{ID: createdID, CreatedAt: time.Now()},
+		UserID:         userID,
+		CategoryID:     req.CategoryID,
+		Title:          req.Title,
+		Slug:           "modern-villa-in-bali",
+		Description:    req.Description,
+		Price:          req.Price,
+		LocationCity:   req.LocationCity,
+		Status:         req.Status,
+		Specifications: datatypes.JSON(`{"bedrooms":3,"bathrooms":3,"land_area_sqm":200,"building_area_sqm":0}`),
+	}, nil)
+	repo.On("FindByID", mock.Anything, createdID).Return(&entity.Listing{
+		BaseEntity:     entity.BaseEntity{ID: createdID, CreatedAt: time.Now()},
 		UserID:         userID,
 		CategoryID:     req.CategoryID,
 		Title:          req.Title,
@@ -89,6 +102,7 @@ func TestListingService_Create_SlugCollision(t *testing.T) {
 	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	userID := uuid.New()
+	createdID := uuid.New()
 	req := &request.CreateListingRequest{
 		Title:  "Test Listing",
 		Price:  1000000,
@@ -102,8 +116,16 @@ func TestListingService_Create_SlugCollision(t *testing.T) {
 	})).Return(false, nil).Once()
 
 	repo.On("Create", mock.Anything, mock.Anything).Return(&entity.Listing{
-		Title: req.Title,
-		Slug:  "test-listing-random",
+		BaseEntity: entity.BaseEntity{ID: createdID},
+		Title:      req.Title,
+		Slug:       "test-listing-random",
+	}, nil)
+	repo.On("FindByID", mock.Anything, createdID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: createdID},
+		Title:      req.Title,
+		Slug:       "test-listing-random",
+		Price:      req.Price,
+		Status:     req.Status,
 	}, nil)
 
 	res, err := svc.Create(context.Background(), pkgauthz.Principal{UserID: userID, Role: "user"}, req)
@@ -140,6 +162,7 @@ func TestListingService_Create_ExpandedFields_PreservesCompatibilitySpecificatio
 
 	userID := uuid.New()
 	categoryID := uuid.New()
+	createdID := uuid.New()
 	negotiable := true
 	province := "Jawa Barat"
 	city := "Bogor"
@@ -198,7 +221,32 @@ func TestListingService_Create_ExpandedFields_PreservesCompatibilitySpecificatio
 		}
 		return specs.Bedrooms == bedrooms && specs.Bathrooms == bathrooms && specs.LandAreaSqm == landArea && specs.BuildingAreaSqm == buildingArea
 	})).Return(&entity.Listing{
-		BaseEntity:        entity.BaseEntity{ID: uuid.New(), CreatedAt: time.Now()},
+		BaseEntity:        entity.BaseEntity{ID: createdID, CreatedAt: time.Now()},
+		UserID:            userID,
+		CategoryID:        &categoryID,
+		Title:             req.Title,
+		Slug:              "rumah-keluarga-besar-bogor",
+		Description:       req.Description,
+		TransactionType:   transactionType,
+		Price:             req.Price,
+		Currency:          "IDR",
+		IsNegotiable:      true,
+		SpecialOffers:     datatypes.JSON(`["Promo","Turun_Harga"]`),
+		LocationProvince:  &province,
+		LocationCity:      &city,
+		Latitude:          &latitude,
+		Longitude:         &longitude,
+		BedroomCount:      &bedrooms,
+		BathroomCount:     &bathrooms,
+		LandAreaSqm:       &landArea,
+		BuildingAreaSqm:   &buildingArea,
+		ElectricalPowerVA: &electricalPower,
+		Facilities:        datatypes.JSON(`["AC","CCTV"]`),
+		Status:            "draft",
+		Specifications:    datatypes.JSON(`{"bedrooms":4,"bathrooms":3,"land_area_sqm":180,"building_area_sqm":140}`),
+	}, nil)
+	repo.On("FindByID", mock.Anything, createdID).Return(&entity.Listing{
+		BaseEntity:        entity.BaseEntity{ID: createdID, CreatedAt: time.Now()},
 		UserID:            userID,
 		CategoryID:        &categoryID,
 		Title:             req.Title,
@@ -611,6 +659,7 @@ func TestListingService_Create_NilCategoryID(t *testing.T) {
 	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
 	userID := uuid.New()
+	createdID := uuid.New()
 	req := &request.CreateListingRequest{
 		CategoryID: nil,
 		Title:      "No Category Listing",
@@ -621,7 +670,13 @@ func TestListingService_Create_NilCategoryID(t *testing.T) {
 	repo.On("ExistsBySlug", mock.Anything, mock.Anything).Return(false, nil)
 	repo.On("Create", mock.Anything, mock.MatchedBy(func(l *entity.Listing) bool {
 		return l.CategoryID == nil
-	})).Return(&entity.Listing{Title: req.Title}, nil)
+	})).Return(&entity.Listing{BaseEntity: entity.BaseEntity{ID: createdID}, Title: req.Title}, nil)
+	repo.On("FindByID", mock.Anything, createdID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: createdID},
+		Title:      req.Title,
+		Price:      req.Price,
+		Status:     req.Status,
+	}, nil)
 
 	res, err := svc.Create(context.Background(), pkgauthz.Principal{UserID: userID, Role: "user"}, req)
 
