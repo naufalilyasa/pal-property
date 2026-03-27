@@ -19,7 +19,6 @@ import (
 	"github.com/naufalilyasa/pal-property-backend/pkg/authz"
 	"github.com/naufalilyasa/pal-property-backend/pkg/cloudinary"
 	"github.com/naufalilyasa/pal-property-backend/pkg/config"
-	pkgeventing "github.com/naufalilyasa/pal-property-backend/pkg/eventing"
 	"github.com/naufalilyasa/pal-property-backend/pkg/logger"
 	"github.com/naufalilyasa/pal-property-backend/pkg/searchindex"
 	goRedis "github.com/redis/go-redis/v9"
@@ -59,11 +58,6 @@ func main() {
 		DB:       config.Env.RedisDB,
 	})
 	cacheRepo := redis.NewCacheRepository(rdb)
-	eventPublisher, err := pkgeventing.NewKafkaPublisher(config.Env.KafkaBrokers, config.Env.KafkaClientID, config.Env.KafkaTopicListingEvents, config.Env.KafkaTopicCategoryEvents)
-	if err != nil {
-		logger.Log.Fatal("Failed to initialize event publisher", zap.Error(err))
-	}
-	defer func() { _ = eventPublisher.Close() }()
 
 	var listingImageStorage domain.ListingImageStorage
 	if config.Env.CloudinaryEnabled {
@@ -87,8 +81,10 @@ func main() {
 	}
 
 	listingRepo := postgres.NewListingRepository(db)
+	indexJobRepo := postgres.NewSearchIndexJobRepository(db)
+	indexTxManager := postgres.NewSearchIndexTransactionManager(db)
 	listingAuthzService := service.NewAuthzService(authzService)
-	listingService := service.NewListingServiceWithAuthzAndPublisher(listingRepo, listingAuthzService, eventPublisher, listingImageStorage)
+	listingService := service.NewListingServiceWithAuthzJobsAndTransactions(listingRepo, listingAuthzService, indexJobRepo, indexTxManager, listingImageStorage)
 	listingHandler := handler.NewListingHandler(listingService)
 	searchClient, err := searchindex.NewClient(config.Env.ElasticAddress, config.Env.ElasticUsername, config.Env.ElasticPassword, nil)
 	if err != nil {
@@ -101,7 +97,7 @@ func main() {
 	searchHandler := handler.NewSearchHandler(searchService)
 
 	categoryRepo := postgres.NewCategoryRepository(db)
-	categoryService := service.NewCategoryServiceWithPublisher(categoryRepo, eventPublisher)
+	categoryService := service.NewCategoryServiceWithJobsAndTransactions(categoryRepo, indexJobRepo, indexTxManager)
 	categoryHandler := handler.NewCategoryHandler(categoryService)
 
 	app := fiber.New(fiber.Config{
