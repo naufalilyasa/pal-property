@@ -5,6 +5,8 @@ go 1.26.0
 require (
 	github.com/bytedance/sonic v1.15.0
 	github.com/caarlos0/env/v11 v11.4.0
+	github.com/casbin/casbin/v3 v3.10.0
+	github.com/casbin/gorm-adapter/v3 v3.41.0
 	github.com/cloudinary/cloudinary-go/v2 v2.15.0
 	github.com/go-playground/validator/v10 v10.27.0
 	github.com/gofiber/fiber/v3 v3.0.0
@@ -15,7 +17,6 @@ require (
 	github.com/lib/pq v1.11.2
 	github.com/markbates/goth v1.82.0
 	github.com/redis/go-redis/v9 v9.18.0
-	github.com/segmentio/kafka-go v0.4.49
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.40.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.40.0
@@ -29,8 +30,6 @@ require (
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.9.1 // indirect
-	github.com/casbin/casbin/v3 v3.10.0 // indirect
-	github.com/casbin/gorm-adapter/v3 v3.41.0 // indirect
 	github.com/casbin/govaluate v1.10.0 // indirect
 	github.com/creasty/defaults v1.7.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
@@ -45,7 +44,6 @@ require (
 	github.com/mdelapenya/tlscert v0.2.0 // indirect
 	github.com/microsoft/go-mssqldb v1.9.5 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
-	github.com/pierrec/lz4/v4 v4.1.16 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
