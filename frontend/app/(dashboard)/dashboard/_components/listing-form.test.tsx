@@ -11,23 +11,31 @@ const { pushMock, refreshMock } = vi.hoisted(() => ({
   refreshMock: vi.fn(),
 }));
 
+const { validateListingVideoSelectionMock } = vi.hoisted(() => ({
+  validateListingVideoSelectionMock: vi.fn(),
+}));
+
 const {
   createSellerListingMock,
   deleteListingImageMock,
+  deleteListingVideoMock,
   getListingByIdMock,
   getListingCategoriesMock,
   reorderListingImagesMock,
   setPrimaryListingImageMock,
-  uploadListingImageMock,
+  uploadListingImagesMock,
+  uploadListingVideoMock,
   updateSellerListingMock,
 } = vi.hoisted(() => ({
   createSellerListingMock: vi.fn(),
   deleteListingImageMock: vi.fn(),
+  deleteListingVideoMock: vi.fn(),
   getListingByIdMock: vi.fn(),
   getListingCategoriesMock: vi.fn(),
   reorderListingImagesMock: vi.fn(),
   setPrimaryListingImageMock: vi.fn(),
-  uploadListingImageMock: vi.fn(),
+  uploadListingImagesMock: vi.fn(),
+  uploadListingVideoMock: vi.fn(),
   updateSellerListingMock: vi.fn(),
 }));
 
@@ -47,12 +55,25 @@ vi.mock("@/lib/api/listing-form", async () => {
     ...actual,
     createSellerListing: createSellerListingMock,
     deleteListingImage: deleteListingImageMock,
+    deleteListingVideo: deleteListingVideoMock,
     getListingById: getListingByIdMock,
     getListingCategories: getListingCategoriesMock,
     reorderListingImages: reorderListingImagesMock,
     setPrimaryListingImage: setPrimaryListingImageMock,
-    uploadListingImage: uploadListingImageMock,
+    uploadListingImages: uploadListingImagesMock,
+    uploadListingVideo: uploadListingVideoMock,
     updateSellerListing: updateSellerListingMock,
+  };
+});
+
+vi.mock("@/features/listings/forms/listing-media", async () => {
+  const actual = await vi.importActual<typeof import("@/features/listings/forms/listing-media")>(
+    "@/features/listings/forms/listing-media",
+  );
+
+  return {
+    ...actual,
+    validateListingVideoSelection: validateListingVideoSelectionMock,
   };
 });
 
@@ -99,6 +120,7 @@ function buildListing(overrides: Partial<import("@/lib/api/listing-form").Listin
     },
     view_count: 12,
     images: [],
+    video: null,
     created_at: "2026-03-17T00:00:00Z",
     updated_at: "2026-03-17T00:00:00Z",
     ...overrides,
@@ -129,6 +151,11 @@ describe("ListingForm", () => {
       { id: "cat-root", name: "House", slug: "house", label: "House" },
       { id: "cat-child", name: "Villa", slug: "villa", label: "House / Villa" },
     ]);
+    validateListingVideoSelectionMock.mockResolvedValue({
+      ok: true,
+      durationSeconds: 42,
+      message: "Ready: tour.mp4 · 8 MB · 42s. Backend validation still decides the final result.",
+    });
   });
 
   it("loads create mode categories and submits the canonical create payload", async () => {
@@ -257,6 +284,16 @@ describe("ListingForm", () => {
     });
   });
 
+  it("keeps media actions gated until the listing has been created", async () => {
+    renderWithProviders(<ListingForm mode="create" />);
+
+    await screen.findByRole("heading", { level: 2, name: /publish a new property draft/i });
+
+    expect(screen.getByText(/publish the listing first, then return here to upload image batches, manage the optional video slot/i)).toBeInTheDocument();
+    expect(screen.queryByTestId("listing-image-upload")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("listing-video-upload")).not.toBeInTheDocument();
+  });
+
   it("hydrates edit mode from seller-owned listing data and saves updates", async () => {
     const initialListing = buildListing();
     updateSellerListingMock.mockResolvedValue(
@@ -349,7 +386,7 @@ describe("ListingForm", () => {
     );
   });
 
-  it("uploads, reorders, sets primary, and deletes images from backend responses", async () => {
+  it("uploads multiple images, reorders, sets primary, and deletes images from backend responses", async () => {
     const initialListing = buildListing({
       images: [
         {
@@ -370,7 +407,7 @@ describe("ListingForm", () => {
         },
       ],
     });
-    uploadListingImageMock.mockResolvedValue(
+    uploadListingImagesMock.mockResolvedValue(
       buildListing({
         images: [
           {
@@ -486,13 +523,15 @@ describe("ListingForm", () => {
     renderWithProviders(<ListingForm initialListing={initialListing} listingId="listing-7" mode="edit" />);
 
     await screen.findByText(/front\.jpg/i);
-    const fileInput = screen.getByLabelText(/choose listing image/i);
-    const file = new File(["image-binary"], "garden.png", { type: "image/png" });
+    const fileInput = screen.getByLabelText(/choose listing images/i);
+    const gardenFile = new File(["image-binary"], "garden.png", { type: "image/png" });
+    const patioFile = new File(["image-binary"], "patio.png", { type: "image/png" });
 
-    fireEvent.change(fileInput, { target: { files: [file] } });
-    fireEvent.click(screen.getByRole("button", { name: /upload image/i }));
+    fireEvent.change(fileInput, { target: { files: [gardenFile, patioFile] } });
+    expect(screen.getByText(/ready: 2 images selected/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /upload images/i }));
 
-    await waitFor(() => expect(uploadListingImageMock).toHaveBeenCalledWith("listing-7", file));
+    await waitFor(() => expect(uploadListingImagesMock).toHaveBeenCalledWith("listing-7", [gardenFile, patioFile]));
     expect(await screen.findByText(/garden\.png/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /move pool\.jpg earlier/i }));
@@ -514,7 +553,7 @@ describe("ListingForm", () => {
   });
 
   it("shows backend image upload errors clearly", async () => {
-    uploadListingImageMock.mockRejectedValue(
+    uploadListingImagesMock.mockRejectedValue(
       new ApiError("invalid image file", {
         status: 400,
         traceId: "trace-image-400",
@@ -524,14 +563,98 @@ describe("ListingForm", () => {
     renderWithProviders(<ListingForm initialListing={buildListing()} listingId="listing-7" mode="edit" />);
 
     await screen.findByText(/no images yet/i);
-    const fileInput = screen.getByLabelText(/choose listing image/i);
+    const fileInput = screen.getByLabelText(/choose listing images/i);
     const file = new File(["not-an-image"], "bad.txt", { type: "text/plain" });
 
     fireEvent.change(fileInput, { target: { files: [file] } });
-    fireEvent.click(screen.getByRole("button", { name: /upload image/i }));
+    fireEvent.click(screen.getByRole("button", { name: /upload images/i }));
 
-    await waitFor(() => expect(uploadListingImageMock).toHaveBeenCalledWith("listing-7", file));
+    await waitFor(() => expect(uploadListingImagesMock).toHaveBeenCalledWith("listing-7", [file]));
     expect(await screen.findByRole("alert")).toHaveTextContent(/invalid image file \(trace trace-image-400\)/i);
+  });
+
+  it("shows a client-side video validation message before upload", async () => {
+    validateListingVideoSelectionMock.mockResolvedValue({
+      ok: false,
+      durationSeconds: null,
+      message: "Choose a video under 100 MB before uploading. Backend validation still decides the final result.",
+    });
+
+    renderWithProviders(<ListingForm initialListing={buildListing()} listingId="listing-7" mode="edit" />);
+
+    await screen.findByText(/optional listing video/i);
+    const file = new File(["video-stream"], "tour.mp4", { type: "video/mp4" });
+
+    fireEvent.change(screen.getByTestId("listing-video-upload"), { target: { files: [file] } });
+
+    await waitFor(() => expect(validateListingVideoSelectionMock).toHaveBeenCalledWith(file));
+    expect(await screen.findByTestId("listing-video-error")).toHaveTextContent(/under 100 mb/i);
+    expect(uploadListingVideoMock).not.toHaveBeenCalled();
+  });
+
+  it("uploads and deletes a single listing video while keeping image state intact", async () => {
+    validateListingVideoSelectionMock.mockResolvedValue({
+      ok: true,
+      durationSeconds: 42,
+      message: "Ready: walkthrough.mp4 · 8 MB · 42s. Backend validation still decides the final result.",
+    });
+
+    const initialListing = buildListing({
+      images: [
+        {
+          id: "image-1",
+          url: "https://images.example/1.jpg",
+          original_filename: "front.jpg",
+          is_primary: true,
+          sort_order: 0,
+          created_at: "2026-03-17T00:00:00Z",
+        },
+      ],
+    });
+
+    uploadListingVideoMock.mockResolvedValue(
+      buildListing({
+        images: initialListing.images,
+        video: {
+          id: "video-1",
+          url: "https://videos.example/tour.mp4",
+          original_filename: "walkthrough.mp4",
+          duration_seconds: 42,
+          created_at: "2026-03-17T00:00:04Z",
+        },
+      }),
+    );
+    deleteListingVideoMock.mockResolvedValue(
+      buildListing({
+        images: initialListing.images,
+        video: null,
+      }),
+    );
+
+    renderWithProviders(<ListingForm initialListing={initialListing} listingId="listing-7" mode="edit" />);
+
+    await screen.findByText(/front\.jpg/i);
+    const video = new File(["video-stream"], "walkthrough.mp4", { type: "video/mp4" });
+
+    fireEvent.change(screen.getByTestId("listing-video-upload"), { target: { files: [video] } });
+
+    await waitFor(() => expect(validateListingVideoSelectionMock).toHaveBeenCalledWith(video));
+    expect(await screen.findByText(/ready: walkthrough\.mp4/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /upload video/i }));
+
+    await waitFor(() => expect(uploadListingVideoMock).toHaveBeenCalledWith("listing-7", video));
+    expect(await screen.findByText(/walkthrough\.mp4/i)).toBeInTheDocument();
+    expect(screen.getByText(/front\.jpg/i)).toBeInTheDocument();
+    expect(screen.getByText(/delete this video before selecting a replacement/i)).toBeInTheDocument();
+    expect(screen.getByTestId("listing-video-upload")).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: /delete video/i }));
+
+    await waitFor(() => expect(deleteListingVideoMock).toHaveBeenCalledWith("listing-7"));
+    expect(await screen.findByText(/no video yet/i)).toBeInTheDocument();
+    expect(screen.queryByText(/walkthrough\.mp4/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/front\.jpg/i)).toBeInTheDocument();
   });
 
   it("renders a bootstrap failure state when categories cannot be loaded", async () => {
