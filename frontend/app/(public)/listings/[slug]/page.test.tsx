@@ -116,6 +116,7 @@ describe("PublicListingDetailPage", () => {
       specifications: {},
       view_count: 0,
       images: [],
+      video: null,
       created_at: "2026-03-17T00:00:00Z",
       updated_at: "2026-03-17T00:00:00Z",
     });
@@ -135,5 +136,79 @@ describe("PublicListingDetailPage", () => {
       }),
     );
     expect(screen.getByTestId("save-listing-button")).toHaveTextContent("listing-2:false:icon");
+    expect(screen.queryByRole("heading", { level: 2, name: /video tour/i })).not.toBeInTheDocument();
+  });
+
+  it("renders a video tour block only when listing.video exists", async () => {
+    getOptionalUserMock.mockResolvedValue(null);
+    getListingBySlugMock.mockResolvedValue({
+      id: "listing-3",
+      user_id: "seller-1",
+      title: "Clifftop Escape",
+      slug: "clifftop-escape",
+      price: 4100000000,
+      currency: "IDR",
+      status: "active",
+      is_featured: true,
+      specifications: {},
+      view_count: 0,
+      images: [
+        {
+          id: "image-1",
+          url: "https://images.example/clifftop.jpg",
+          is_primary: true,
+          sort_order: 0,
+          created_at: "2026-03-17T00:00:00Z",
+        },
+      ],
+      video: {
+        id: "video-1",
+        url: "https://videos.example/clifftop-tour.mp4",
+        original_filename: "clifftop-tour.mp4",
+        duration_seconds: 58,
+        created_at: "2026-03-17T00:00:01Z",
+      },
+      created_at: "2026-03-17T00:00:00Z",
+      updated_at: "2026-03-17T00:00:00Z",
+    });
+
+    render(
+      await PublicListingDetailPage({
+        params: Promise.resolve({ slug: "clifftop-escape" }),
+      }),
+    );
+
+    expect(screen.getByRole("heading", { level: 2, name: /video tour/i })).toBeInTheDocument();
+    expect(screen.getByTestId("listing-video-tour")).toBeInTheDocument();
+    expect(screen.getByTestId("listing-detail-video")).toHaveAttribute("src", "https://videos.example/clifftop-tour.mp4");
+    expect(screen.getByText(/clifftop-tour\.mp4/i)).toBeInTheDocument();
+  });
+
+  it("shows land area derived from legacy specifications when direct field is absent", async () => {
+    getOptionalUserMock.mockResolvedValue(null);
+    getListingBySlugMock.mockResolvedValue({
+      id: "listing-4",
+      user_id: "seller-1",
+      title: "Serenity Villa",
+      slug: "serenity-villa",
+      price: 5200000000,
+      currency: "IDR",
+      status: "active",
+      is_featured: false,
+      specifications: { land_area_sqm: 180 },
+      view_count: 0,
+      images: [],
+      created_at: "2026-03-17T00:00:00Z",
+      updated_at: "2026-03-17T00:00:00Z",
+    });
+
+    render(
+      await PublicListingDetailPage({
+        params: Promise.resolve({ slug: "serenity-villa" }),
+      }),
+    );
+
+    expect(screen.getByText(/land area/i)).toBeInTheDocument();
+    expect(screen.getByText("180 sqm")).toBeInTheDocument();
   });
 });
