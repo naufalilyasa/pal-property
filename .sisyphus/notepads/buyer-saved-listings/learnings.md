@@ -1,0 +1,17 @@
+# Learnings
+- saved_listings now has its own table with cascading FKs, created/updated timestamps, and indexes tailored for user/listing lookups.
+- SavedListing entity avoids BaseEntity (no soft delete) while still generating UUIDv7 IDs and exposing relations for later joins.
+- Repository and service contracts now explicitly cover Save, Remove, Contains, and ListByUserID so the next wave can wire handlers/tests without touching the schema again.
+- Noticed main already defines migration 000008_search_index_jobs, so saved-listings landed in 000009 to avoid numbering conflicts.
+- Added a Postgres repository that joins listings, filters on active status, and orders by saved_listings.created_at before handing entities back to the service layer.
+- The service enforces the 50-listing ID limit, treats non-active listings as not found, and reuses the listingService mapper so PaginatedListings stays consistent with existing responses.
+- Backend tests now cover duplicate saves, repeat deletes, contains subsets/limits, and ListByUserID ordering so regression risk is minimized.
+- Handler now clamps contains queries at the shared SavedListingContainsLimit before calling the service to keep the HTTP surface returning 4xx instead of 5xx on expired downstream errors.
+- 2026-03-29: Built a dedicated saved-listings transport layer that reuses the existing paginated listing shape, switches between browser/server fetch based on cookie headers, and normalizes contains/toggle payloads to camelCase.
+- 2026-03-29: Added server-only wrappers so the protected saved listings page always routes through serverFetch with the request cookies and public pages can pre-hydrate saved IDs safely.
+- 2026-03-29: The reusable SaveListingButton can lazily bootstrap `/auth/me` client-side before mutating so anonymous clicks redirect to `/login`, while authenticated clicks stay optimistic without forcing page-level auth wiring.
+- 2026-03-29: Inline optimistic save/unsave tests are easiest to keep trustworthy by holding the helper promise open, asserting `aria-pressed` flips immediately, then resolving or rejecting to verify commit vs rollback behavior.
+- 2026-03-29: The protected buyer-facing `/saved-listings` route can live under its own App Router group (`app/(protected)`) so it stays outside the seller dashboard shell while still enforcing `requireUser()` at the page boundary.
+- 2026-03-29: Reusing `SearchListingCardItem` on the saved page works cleanly when `SaveListingButton` gets a narrow `refreshOnRemove` escape hatch—successful unsaves stay optimistic but immediately `router.refresh()` back into the server-rendered shortlist/empty state.
+- 2026-03-29: Playwright coverage for the protected saved-listings page needs two cookie scopes: one on the Next app origin (`127.0.0.1:3100`) so SSR `cookies()` can forward something server-side, and one on the mocked API origin (`127.0.0.1:45731`) so the save button's client-side `/auth/me` bootstrap can authenticate before DELETE requests.
+- 2026-03-29: Running both saved-listings and public-listings Playwright suites confirms the protected redirect + removal flows and saved-state prehydration stay solid while mocking the necessary cookies/listings.
