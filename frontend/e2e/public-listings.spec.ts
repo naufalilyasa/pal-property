@@ -73,6 +73,53 @@ const listingPage = {
   total_pages: 8,
 };
 
+const listingDetail = {
+  id: "listing-1",
+  user_id: "seller-1",
+  category_id: "cat-house",
+  category: { id: "cat-house", name: "House", slug: "house", icon_url: null },
+  title: "Jakarta River House",
+  slug: "jakarta-river-house",
+  description: "Wide river view with compact urban access and a dedicated evening walkthrough clip.",
+  transaction_type: "sale",
+  price: 3250000000,
+  currency: "IDR",
+  location_province: "DKI Jakarta",
+  location_city: "Jakarta",
+  location_district: "Menteng",
+  status: "active",
+  is_featured: true,
+  specifications: { bedrooms: 4, bathrooms: 3, land_area_sqm: 210, building_area_sqm: 180 },
+  view_count: 128,
+  images: [
+    {
+      id: "image-1",
+      url: "https://images.example/river-house.jpg",
+      original_filename: "river-house.jpg",
+      is_primary: true,
+      sort_order: 0,
+      created_at: "2026-03-17T00:00:00Z",
+    },
+    {
+      id: "image-2",
+      url: "https://images.example/river-house-lounge.jpg",
+      original_filename: "river-house-lounge.jpg",
+      is_primary: false,
+      sort_order: 1,
+      created_at: "2026-03-17T00:00:01Z",
+    },
+  ],
+  video: {
+    id: "video-1",
+    url: "https://videos.example/river-house-tour.mp4",
+    original_filename: "river-house-tour.mp4",
+    duration_seconds: 52,
+    created_at: "2026-03-17T00:00:02Z",
+  },
+  created_at: "2026-03-17T00:00:00Z",
+  updated_at: "2026-03-17T00:00:00Z",
+};
+
 type MockRequest = {
   method: string;
   path: string;
@@ -166,6 +213,11 @@ test.beforeEach(() => {
       return { status: 200, body: backendEnvelope(listingPage) };
     }
 
+    if (request.path === "/api/listings/slug/jakarta-river-house") {
+      expect(request.method).toBe("GET");
+      return { status: 200, body: backendEnvelope(listingDetail) };
+    }
+
     return {
       status: 404,
       body: { success: false, message: `Unhandled ${request.path}`, data: null, trace_id: "trace-e2e-404" },
@@ -192,9 +244,22 @@ test("desktop listings shell keeps map-left and results-right layout", async ({ 
 
   const overflowX = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   expect(overflowX).toBe(false);
+  await expect(page.locator("[data-testid='listing-card'] video")).toHaveCount(0);
   expect(listingsRequests).toContainEqual(
     expect.objectContaining({ q: "jakarta", transaction_type: "sale", location_city: "Jakarta", limit: "12", sort: "newest" }),
   );
+});
+
+test("public listings detail renders an additive video tour block when video metadata exists", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1200 });
+  await page.goto("/listings/jakarta-river-house");
+
+  await expect(page.getByRole("heading", { level: 1, name: /jakarta river house/i })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: /video tour/i })).toBeVisible();
+  await expect(page.getByTestId("listing-video-tour")).toBeVisible();
+  await expect(page.getByTestId("listing-detail-video")).toBeVisible();
+  await expect(page.getByTestId("listing-detail-video")).toHaveAttribute("src", /river-house-tour\.mp4/);
+  await expect(page.getByText(/river-house-tour\.mp4/i)).toBeVisible();
 });
 
 test("search-backed listings shell tolerates query params without crashing", async ({ page }) => {
