@@ -32,12 +32,16 @@ func newTestAuthzService(t *testing.T) service.AuthzService {
 		{pkgauthz.RoleAdmin, pkgauthz.ResourceListing, pkgauthz.ActionDeleteImage},
 		{pkgauthz.RoleAdmin, pkgauthz.ResourceListing, pkgauthz.ActionSetPrimaryImage},
 		{pkgauthz.RoleAdmin, pkgauthz.ResourceListing, pkgauthz.ActionReorderImages},
+		{pkgauthz.RoleAdmin, pkgauthz.ResourceListing, pkgauthz.ActionUploadVideo},
+		{pkgauthz.RoleAdmin, pkgauthz.ResourceListing, pkgauthz.ActionDeleteVideo},
 		{pkgauthz.SubjectOwner, pkgauthz.ResourceListing, pkgauthz.ActionUpdate},
 		{pkgauthz.SubjectOwner, pkgauthz.ResourceListing, pkgauthz.ActionDelete},
 		{pkgauthz.SubjectOwner, pkgauthz.ResourceListing, pkgauthz.ActionUploadImage},
 		{pkgauthz.SubjectOwner, pkgauthz.ResourceListing, pkgauthz.ActionDeleteImage},
 		{pkgauthz.SubjectOwner, pkgauthz.ResourceListing, pkgauthz.ActionSetPrimaryImage},
 		{pkgauthz.SubjectOwner, pkgauthz.ResourceListing, pkgauthz.ActionReorderImages},
+		{pkgauthz.SubjectOwner, pkgauthz.ResourceListing, pkgauthz.ActionUploadVideo},
+		{pkgauthz.SubjectOwner, pkgauthz.ResourceListing, pkgauthz.ActionDeleteVideo},
 	}
 
 	for _, policy := range policies {

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { type ChangeEvent, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
@@ -42,12 +42,23 @@ import { queryKeys } from "@/lib/query/keys";
 
 import {
   deleteSellerListingImage,
+  deleteSellerListingVideo,
   reorderSellerListingImages,
   setSellerPrimaryListingImage,
-  uploadSellerListingImage,
+  uploadSellerListingImages,
+  uploadSellerListingVideo,
 } from "@/features/listings/images/api";
 
 import { type ListingFormSchema, listingFormSchema } from "./listing-schema";
+import {
+  describeExistingListingVideo,
+  describeSelectedImageFiles,
+  formatDuration,
+  formatVideoBytes,
+  MAX_LISTING_VIDEO_BYTES,
+  MAX_LISTING_VIDEO_DURATION_SECONDS,
+  validateListingVideoSelection,
+} from "./listing-media";
 
 type ListingFormMode = "create" | "edit";
 
@@ -55,6 +66,11 @@ type ListingFormProps = {
   initialListing?: ListingRecord | null;
   mode: ListingFormMode;
   listingId?: string;
+};
+
+type FeedbackMessage = {
+  tone: "error" | "info" | "success";
+  text: string;
 };
 
 const STATUS_OPTIONS: Array<{ value: ListingFormRequest["status"]; label: string }> = [
@@ -74,11 +90,15 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
   const router = useRouter();
   const queryClient = useQueryClient();
   const [listing, setListing] = useState<ListingRecord | null>(initialListing);
-  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [selectedImageFiles, setSelectedImageFiles] = useState<File[]>([]);
+  const [selectedVideoFile, setSelectedVideoFile] = useState<File | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
-  const [imageMessage, setImageMessage] = useState<string | null>(null);
+  const [imageMessage, setImageMessage] = useState<FeedbackMessage | null>(null);
+  const [videoMessage, setVideoMessage] = useState<FeedbackMessage | null>(null);
+  const [isVideoPrecheckPending, setIsVideoPrecheckPending] = useState(false);
   const [uploadInputKey, setUploadInputKey] = useState(0);
+  const [videoInputKey, setVideoInputKey] = useState(0);
 
   const categoriesQuery = useQuery({
     queryKey: queryKeys.categories,
@@ -91,6 +111,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
   });
 
   const orderedImages = useMemo(() => sortListingImages(listing?.images ?? []), [listing]);
+  const listingVideo = listing?.video ?? null;
 
   const submitMutation = useMutation({
     mutationFn: async (values: ListingFormSchema) => {
@@ -127,17 +148,21 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
   });
 
   const imageMutation = useMutation({
-    mutationFn: async (action: { type: "upload" | "set-primary" | "delete" | "reorder"; imageId?: string; direction?: "earlier" | "later" }) => {
+    mutationFn: async (action: {
+      type: "upload" | "set-primary" | "delete" | "reorder";
+      imageId?: string;
+      direction?: "earlier" | "later";
+    }) => {
       if (!listingId) {
         throw new Error("Save the listing first before updating images.");
       }
 
       if (action.type === "upload") {
-        if (!selectedImageFile) {
-          throw new Error("Choose an image file before uploading.");
+        if (selectedImageFiles.length === 0) {
+          throw new Error("Choose at least one image before uploading.");
         }
 
-        return uploadSellerListingImage(listingId, selectedImageFile);
+        return uploadSellerListingImages(listingId, selectedImageFiles);
       }
 
       if (action.type === "set-primary" && action.imageId) {
@@ -167,19 +192,88 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
     },
     onSuccess: (nextListing, action) => {
       setListing(nextListing);
-      setImageMessage(getImageSuccessMessage(action.type));
+      setImageMessage({ tone: "success", text: getImageSuccessMessage(action.type, selectedImageFiles.length) });
       queryClient.invalidateQueries({ queryKey: queryKeys.sellerListings });
       router.refresh();
 
       if (action.type === "upload") {
-        setSelectedImageFile(null);
+        setSelectedImageFiles([]);
         setUploadInputKey((current) => current + 1);
       }
     },
     onError: (error) => {
-      setImageMessage(formatListingFormError(error));
+      setImageMessage({ tone: "error", text: formatListingFormError(error) });
     },
   });
+
+  const videoMutation = useMutation({
+    mutationFn: async (action: { type: "upload" | "delete" }) => {
+      if (!listingId) {
+        throw new Error("Save the listing first before updating media.");
+      }
+
+      if (action.type === "delete") {
+        return deleteSellerListingVideo(listingId);
+      }
+
+      if (listingVideo) {
+        throw new Error("Delete the current video before uploading another.");
+      }
+
+      if (!selectedVideoFile) {
+        throw new Error("Choose a video file before uploading.");
+      }
+
+      return uploadSellerListingVideo(listingId, selectedVideoFile);
+    },
+    onSuccess: (nextListing, action) => {
+      setListing(nextListing);
+      setVideoMessage({
+        tone: "success",
+        text:
+          action.type === "upload"
+            ? "Video uploaded. The slot now reflects the backend response."
+            : "Video removed. The slot now reflects the backend response.",
+      });
+      setSelectedVideoFile(null);
+      setVideoInputKey((current) => current + 1);
+      queryClient.invalidateQueries({ queryKey: queryKeys.sellerListings });
+      router.refresh();
+    },
+    onError: (error) => {
+      setVideoMessage({ tone: "error", text: formatListingFormError(error) });
+    },
+  });
+
+  const handleVideoSelection = async (event: ChangeEvent<HTMLInputElement>) => {
+    const nextFile = event.currentTarget.files?.[0] ?? null;
+
+    setSelectedVideoFile(null);
+
+    if (!nextFile) {
+      setVideoMessage(null);
+      return;
+    }
+
+    if (listingVideo) {
+      setVideoMessage({ tone: "error", text: "Delete the current video before uploading another." });
+      setVideoInputKey((current) => current + 1);
+      return;
+    }
+
+    setIsVideoPrecheckPending(true);
+    const precheck = await validateListingVideoSelection(nextFile);
+    setIsVideoPrecheckPending(false);
+
+    if (!precheck.ok) {
+      setVideoMessage({ tone: "error", text: precheck.message });
+      setVideoInputKey((current) => current + 1);
+      return;
+    }
+
+    setSelectedVideoFile(nextFile);
+    setVideoMessage({ tone: "info", text: precheck.message });
+  };
 
   if (categoriesQuery.isError) {
     return (
@@ -442,90 +536,170 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
 
           <section className="rounded-[1.75rem] border border-[var(--line)] bg-white/80 p-6 sm:p-8">
             <div className="space-y-3">
-              <h3 className="text-xl font-semibold tracking-[-0.03em] text-[var(--ink)]">Listing images</h3>
-              <p className="text-sm leading-7 text-[var(--muted)]">Uploads, primary selection, deletion, and ordering all wait for backend-confirmed listing state before the UI changes.</p>
+              <h3 className="text-xl font-semibold tracking-[-0.03em] text-[var(--ink)]">Listing media</h3>
+              <p className="text-sm leading-7 text-[var(--muted)]">Images stay reorderable and primary-aware, while the optional seller video remains a single backend-confirmed slot.</p>
             </div>
 
             {mode === "edit" && listingId ? (
-              <div className="mt-6 space-y-5">
-                <div className="rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel)] p-5">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-[var(--ink)]">Upload to this listing</p>
-                      <label className="block text-sm font-medium text-[var(--ink)]" htmlFor="listing-image-upload">
-                        <span className="sr-only">Choose listing image</span>
+              <div className="mt-6 space-y-6">
+                <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+                  <div className="rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel)] p-5">
+                    <div className="flex h-full flex-col gap-4 lg:justify-between">
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-[var(--ink)]">Batch image upload</p>
+                        <p className="text-sm leading-7 text-[var(--muted)]">Select one or many images in one action. The gallery refreshes only after the backend returns the updated listing.</p>
+                      </div>
+                      <div className="space-y-3">
+                        <label className="block text-sm font-medium text-[var(--ink)]" htmlFor="listing-image-upload">
+                          <span className="sr-only">Choose listing images</span>
+                          <input
+                            key={uploadInputKey}
+                            accept="image/*"
+                            className="block w-full text-sm text-[var(--muted)] file:mr-4 file:rounded-full file:border-0 file:bg-[var(--accent)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+                            data-testid="listing-image-upload"
+                            id="listing-image-upload"
+                            multiple
+                            name="listing_image_upload"
+                            onChange={(event) => setSelectedImageFiles(Array.from(event.currentTarget.files ?? []))}
+                            type="file"
+                          />
+                        </label>
+                        <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]" style={{ fontFamily: "var(--font-mono), monospace" }}>
+                          {describeSelectedImageFiles(selectedImageFiles)}
+                        </p>
+                        <Button disabled={imageMutation.isPending} onClick={() => imageMutation.mutate({ type: "upload" })} type="button">
+                          {imageMutation.isPending ? "Uploading images..." : "Upload images"}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel)] p-5">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-[var(--ink)]">Optional listing video</p>
+                        <p className="text-sm leading-7 text-[var(--muted)]">One video slot only. Delete the current clip before uploading another. Client hints stay aligned to {formatVideoBytes(MAX_LISTING_VIDEO_BYTES)} and {formatDuration(MAX_LISTING_VIDEO_DURATION_SECONDS)}.</p>
+                      </div>
+
+                      {listingVideo ? (
+                        <div className="space-y-4 rounded-[1.25rem] border border-[var(--line)] bg-white/80 p-4">
+                          <div className="overflow-hidden rounded-[1rem] border border-[var(--line)] bg-black/90">
+                            <video className="aspect-video h-full w-full object-cover" controls preload="metadata" src={listingVideo.url} />
+                          </div>
+                          <div className="space-y-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-full bg-[var(--panel)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Single slot</span>
+                              {listingVideo.duration_seconds != null ? <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{formatDuration(listingVideo.duration_seconds)}</span> : null}
+                            </div>
+                            <p className="text-sm font-medium text-[var(--ink)]">{describeExistingListingVideo(listingVideo.original_filename, listingVideo.duration_seconds)}</p>
+                            <p className="text-sm leading-7 text-[var(--muted)]">Delete this video before selecting a replacement. The backend remains the source of truth for the saved slot.</p>
+                            <Button disabled={videoMutation.isPending} onClick={() => videoMutation.mutate({ type: "delete" })} type="button" variant="destructive">
+                              {videoMutation.isPending ? "Deleting video..." : "Delete video"}
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="rounded-[1.25rem] border border-dashed border-[var(--line)] bg-white/70 p-4 text-sm leading-7 text-[var(--muted)]">
+                          No video yet. Add one optional walkthrough clip after the listing exists.
+                        </div>
+                      )}
+
+                      <label className="block text-sm font-medium text-[var(--ink)]" htmlFor="listing-video-upload">
+                        <span className="sr-only">Choose listing video</span>
                         <input
-                          key={uploadInputKey}
-                          accept="image/*"
-                          className="block w-full text-sm text-[var(--muted)] file:mr-4 file:rounded-full file:border-0 file:bg-[var(--accent)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
-                          data-testid="listing-image-upload"
-                          id="listing-image-upload"
-                          name="listing_image_upload"
-                          onChange={(event) => setSelectedImageFile(event.currentTarget.files?.[0] ?? null)}
+                          key={videoInputKey}
+                          accept="video/*,.mp4,.mov,.m4v,.webm,.mkv,.flv,.avi,.mpg,.mpeg,.ogv"
+                          className="block w-full text-sm text-[var(--muted)] file:mr-4 file:rounded-full file:border-0 file:bg-[var(--accent)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                          data-testid="listing-video-upload"
+                          disabled={Boolean(listingVideo) || isVideoPrecheckPending || videoMutation.isPending}
+                          id="listing-video-upload"
+                          name="listing_video_upload"
+                          onChange={(event) => {
+                            void handleVideoSelection(event);
+                          }}
                           type="file"
                         />
                       </label>
-                      <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]" style={{ fontFamily: "var(--font-mono), monospace" }}>
-                        {selectedImageFile ? `Ready: ${selectedImageFile.name}` : "No image selected yet"}
-                      </p>
+                      <Button
+                        disabled={Boolean(listingVideo) || !selectedVideoFile || isVideoPrecheckPending || videoMutation.isPending}
+                        onClick={() => videoMutation.mutate({ type: "upload" })}
+                        type="button"
+                      >
+                        {isVideoPrecheckPending
+                          ? "Checking video..."
+                          : videoMutation.isPending
+                            ? "Uploading video..."
+                            : "Upload video"}
+                      </Button>
                     </div>
-                    <Button disabled={imageMutation.isPending} onClick={() => imageMutation.mutate({ type: "upload" })} type="button">
-                      {imageMutation.isPending ? "Uploading image..." : "Upload image"}
-                    </Button>
                   </div>
                 </div>
 
                 {imageMessage ? (
-                  <p className={imageMutation.isError ? "text-sm font-medium text-red-700" : "text-sm font-medium text-emerald-700"} data-testid={imageMutation.isError ? "listing-image-error" : undefined} role={imageMutation.isError ? "alert" : undefined}>
-                    {imageMessage}
+                  <p
+                    className={getFeedbackMessageClassName(imageMessage.tone)}
+                    data-testid={imageMessage.tone === "error" ? "listing-image-error" : undefined}
+                    role={imageMessage.tone === "error" ? "alert" : undefined}
+                  >
+                    {imageMessage.text}
+                  </p>
+                ) : null}
+
+                {videoMessage ? (
+                  <p
+                    className={getFeedbackMessageClassName(videoMessage.tone)}
+                    data-testid={videoMessage.tone === "error" ? "listing-video-error" : undefined}
+                    role={videoMessage.tone === "error" ? "alert" : undefined}
+                  >
+                    {videoMessage.text}
                   </p>
                 ) : null}
 
                 {orderedImages.length === 0 ? (
                   <div className="rounded-[1.5rem] border border-dashed border-[var(--line)] bg-white/60 p-5 text-sm leading-7 text-[var(--muted)]">
-                    No images yet. Upload the first seller photo to let the backend assign ordering and primary state.
+                    No images yet. Upload the first seller photos to let the backend assign ordering and primary state.
                   </div>
                 ) : (
                   <div className="grid gap-4 lg:grid-cols-2">
                     {orderedImages.map((image, index) => (
                       <article className="overflow-hidden rounded-[1.5rem] border border-[var(--line)] bg-white/72" data-testid={`listing-image-card-${image.id}`} key={image.id}>
                         <div data-testid="listing-image-item">
-                        <div className="relative aspect-[4/3] bg-[var(--panel)]">
-                          <Image alt={image.original_filename ?? `Listing image ${index + 1}`} fill sizes="(min-width: 1024px) 30vw, 100vw" src={image.url} className="object-cover" unoptimized />
-                        </div>
-                        <div className="space-y-4 p-5">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-[var(--panel)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Order {image.sort_order + 1}</span>
-                            {image.is_primary ? <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Primary</span> : null}
+                          <div className="relative aspect-[4/3] bg-[var(--panel)]">
+                            <Image alt={image.original_filename ?? `Listing image ${index + 1}`} className="object-cover" fill sizes="(min-width: 1024px) 30vw, 100vw" src={image.url} unoptimized />
                           </div>
-                          <p className="text-sm font-medium text-[var(--ink)]">{image.original_filename ?? `Listing image ${index + 1}`}</p>
-                          <div className="flex flex-wrap gap-3">
-                            <Button data-testid="listing-image-make-primary" disabled={imageMutation.isPending || image.is_primary} onClick={() => imageMutation.mutate({ type: "set-primary", imageId: image.id })} type="button" variant="secondary">
-                              Set primary
-                            </Button>
-                            <Button
-                              aria-label={`Move ${image.original_filename ?? `image ${index + 1}`} earlier`}
-                              disabled={imageMutation.isPending || index === 0}
-                              onClick={() => imageMutation.mutate({ type: "reorder", imageId: image.id, direction: "earlier" })}
-                              type="button"
-                              variant="secondary"
-                            >
-                              Move earlier
-                            </Button>
-                            <Button
-                              aria-label={`Move ${image.original_filename ?? `image ${index + 1}`} later`}
-                              disabled={imageMutation.isPending || index === orderedImages.length - 1}
-                              onClick={() => imageMutation.mutate({ type: "reorder", imageId: image.id, direction: "later" })}
-                              type="button"
-                              variant="secondary"
-                            >
-                              Move later
-                            </Button>
-                            <Button disabled={imageMutation.isPending} onClick={() => imageMutation.mutate({ type: "delete", imageId: image.id })} type="button" variant="destructive">
-                              Delete image
-                            </Button>
+                          <div className="space-y-4 p-5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-full bg-[var(--panel)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Order {image.sort_order + 1}</span>
+                              {image.is_primary ? <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Primary</span> : null}
+                            </div>
+                            <p className="text-sm font-medium text-[var(--ink)]">{image.original_filename ?? `Listing image ${index + 1}`}</p>
+                            <div className="flex flex-wrap gap-3">
+                              <Button data-testid="listing-image-make-primary" disabled={imageMutation.isPending || image.is_primary} onClick={() => imageMutation.mutate({ type: "set-primary", imageId: image.id })} type="button" variant="secondary">
+                                Set primary
+                              </Button>
+                              <Button
+                                aria-label={`Move ${image.original_filename ?? `image ${index + 1}`} earlier`}
+                                disabled={imageMutation.isPending || index === 0}
+                                onClick={() => imageMutation.mutate({ type: "reorder", imageId: image.id, direction: "earlier" })}
+                                type="button"
+                                variant="secondary"
+                              >
+                                Move earlier
+                              </Button>
+                              <Button
+                                aria-label={`Move ${image.original_filename ?? `image ${index + 1}`} later`}
+                                disabled={imageMutation.isPending || index === orderedImages.length - 1}
+                                onClick={() => imageMutation.mutate({ type: "reorder", imageId: image.id, direction: "later" })}
+                                type="button"
+                                variant="secondary"
+                              >
+                                Move later
+                              </Button>
+                              <Button disabled={imageMutation.isPending} onClick={() => imageMutation.mutate({ type: "delete", imageId: image.id })} type="button" variant="destructive">
+                                Delete image
+                              </Button>
+                            </div>
                           </div>
-                        </div>
                         </div>
                       </article>
                     ))}
@@ -534,7 +708,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
               </div>
             ) : (
               <div className="mt-6 rounded-[1.5rem] border border-dashed border-[var(--line)] bg-[var(--panel)] p-5 text-sm leading-7 text-[var(--muted)]">
-                Publish the listing first, then return here to upload images, set a primary photo, remove outdated media, and adjust ordering from backend-backed state.
+                Publish the listing first, then return here to upload image batches, manage the optional video slot, set a primary photo, remove outdated media, and adjust ordering from backend-backed state.
               </div>
             )}
           </section>
@@ -711,16 +885,29 @@ function sortListingImages(images: ListingImageRecord[]) {
   });
 }
 
-function getImageSuccessMessage(type: "upload" | "set-primary" | "delete" | "reorder") {
+function getImageSuccessMessage(type: "upload" | "set-primary" | "delete" | "reorder", uploadCount = 0) {
   switch (type) {
     case "upload":
-      return "Image uploaded. The gallery now reflects the backend response.";
+      return uploadCount > 1
+        ? `Uploaded ${uploadCount} images. The gallery now reflects the backend response.`
+        : "Image uploaded. The gallery now reflects the backend response.";
     case "set-primary":
       return "Primary image updated from the backend response.";
     case "delete":
       return "Image removed. Remaining images were refreshed from the backend.";
     case "reorder":
       return "Image order refreshed from the backend response.";
+  }
+}
+
+function getFeedbackMessageClassName(tone: FeedbackMessage["tone"]) {
+  switch (tone) {
+    case "error":
+      return "text-sm font-medium text-red-700";
+    case "success":
+      return "text-sm font-medium text-emerald-700";
+    case "info":
+      return "text-sm font-medium text-[var(--muted)]";
   }
 }
 
@@ -762,6 +949,7 @@ function createEmptyListing(): ListingRecord {
     specifications: {},
     view_count: 0,
     images: [],
+    video: null,
     created_at: new Date(0).toISOString(),
     updated_at: new Date(0).toISOString(),
   };

@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"mime/multipart"
 	"path/filepath"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,77 +33,76 @@ type ListingService interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*response.ListingResponse, error)
 	GetBySlug(ctx context.Context, slugStr string) (*response.ListingResponse, error)
 	Update(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal, req *request.UpdateListingRequest) (*response.ListingResponse, error)
-	UploadImage(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal, file *multipart.FileHeader) (*response.ListingResponse, error)
+	UploadImage(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal, files []*multipart.FileHeader) (*response.ListingResponse, error)
 	DeleteImage(ctx context.Context, id uuid.UUID, imageID uuid.UUID, principal pkgauthz.Principal) (*response.ListingResponse, error)
 	SetPrimaryImage(ctx context.Context, id uuid.UUID, imageID uuid.UUID, principal pkgauthz.Principal) (*response.ListingResponse, error)
 	ReorderImages(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal, orderedImageIDs []uuid.UUID) (*response.ListingResponse, error)
+	UploadVideo(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal, file *multipart.FileHeader) (*response.ListingResponse, error)
+	DeleteVideo(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal) (*response.ListingResponse, error)
 	Delete(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal) error
 	List(ctx context.Context, filter domain.ListingFilter) (*response.PaginatedListings, error)
 	ListByUserID(ctx context.Context, principal pkgauthz.Principal, filter domain.ListingFilter) (*response.PaginatedListings, error)
 }
 
 type listingService struct {
-	repo    domain.ListingRepository
-	storage domain.ListingImageStorage
-	authz   AuthzService
-	publish domain.EventPublisher
-	jobs    domain.SearchIndexJobRepository
-	txm     domain.SearchIndexTransactionManager
+	repo         domain.ListingRepository
+	storage      domain.ListingImageStorage
+	videoStorage domain.ListingVideoStorage
+	authz        AuthzService
+	publish      domain.EventPublisher
+	jobs         domain.SearchIndexJobRepository
+	txm          domain.SearchIndexTransactionManager
+}
+
+func (s *listingService) applyStorage(storage []domain.ListingImageStorage) {
+	if len(storage) == 0 {
+		return
+	}
+	s.storage = storage[0]
+	if vs, ok := storage[0].(domain.ListingVideoStorage); ok {
+		s.videoStorage = vs
+	}
 }
 
 func NewListingService(repo domain.ListingRepository, storage ...domain.ListingImageStorage) ListingService {
 	service := &listingService{repo: repo}
-	if len(storage) > 0 {
-		service.storage = storage[0]
-	}
+	service.applyStorage(storage)
 	return service
 }
 
 func NewListingServiceWithAuthz(repo domain.ListingRepository, authzService AuthzService, storage ...domain.ListingImageStorage) ListingService {
 	service := &listingService{repo: repo, authz: authzService}
-	if len(storage) > 0 {
-		service.storage = storage[0]
-	}
+	service.applyStorage(storage)
 	return service
 }
 
 func NewListingServiceWithAuthzAndPublisher(repo domain.ListingRepository, authzService AuthzService, publisher domain.EventPublisher, storage ...domain.ListingImageStorage) ListingService {
 	service := &listingService{repo: repo, authz: authzService, publish: publisher}
-	if len(storage) > 0 {
-		service.storage = storage[0]
-	}
+	service.applyStorage(storage)
 	return service
 }
 
 func NewListingServiceWithAuthzAndJobs(repo domain.ListingRepository, authzService AuthzService, jobs domain.SearchIndexJobRepository, storage ...domain.ListingImageStorage) ListingService {
 	service := &listingService{repo: repo, authz: authzService, jobs: jobs}
-	if len(storage) > 0 {
-		service.storage = storage[0]
-	}
+	service.applyStorage(storage)
 	return service
 }
 
 func NewListingServiceWithAuthzJobsAndTransactions(repo domain.ListingRepository, authzService AuthzService, jobs domain.SearchIndexJobRepository, txm domain.SearchIndexTransactionManager, storage ...domain.ListingImageStorage) ListingService {
 	service := &listingService{repo: repo, authz: authzService, jobs: jobs, txm: txm}
-	if len(storage) > 0 {
-		service.storage = storage[0]
-	}
+	service.applyStorage(storage)
 	return service
 }
 
 func NewListingServiceWithAuthzPublisherJobsAndTransactions(repo domain.ListingRepository, authzService AuthzService, publisher domain.EventPublisher, jobs domain.SearchIndexJobRepository, txm domain.SearchIndexTransactionManager, storage ...domain.ListingImageStorage) ListingService {
 	service := &listingService{repo: repo, authz: authzService, publish: publisher, jobs: jobs, txm: txm}
-	if len(storage) > 0 {
-		service.storage = storage[0]
-	}
+	service.applyStorage(storage)
 	return service
 }
 
 func NewListingServiceWithAuthzPublisherAndJobs(repo domain.ListingRepository, authzService AuthzService, publisher domain.EventPublisher, jobs domain.SearchIndexJobRepository, storage ...domain.ListingImageStorage) ListingService {
 	service := &listingService{repo: repo, authz: authzService, publish: publisher, jobs: jobs}
-	if len(storage) > 0 {
-		service.storage = storage[0]
-	}
+	service.applyStorage(storage)
 	return service
 }
 
@@ -489,9 +490,9 @@ func (s *listingService) Delete(ctx context.Context, id uuid.UUID, principal pkg
 	return nil
 }
 
-func (s *listingService) UploadImage(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal, file *multipart.FileHeader) (*response.ListingResponse, error) {
-	if err := validateListingImageFile(file); err != nil {
-		return nil, err
+func (s *listingService) UploadImage(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal, files []*multipart.FileHeader) (*response.ListingResponse, error) {
+	if len(files) == 0 {
+		return nil, domain.ErrInvalidImageFile
 	}
 	if err := s.requireImageStorage(); err != nil {
 		return nil, err
@@ -502,27 +503,50 @@ func (s *listingService) UploadImage(ctx context.Context, id uuid.UUID, principa
 		return nil, err
 	}
 
-	uploaded, err := s.storage.UploadListingImage(ctx, mediaasset.UploadInput{
-		File:         file,
-		Folder:       fmt.Sprintf("listings/%s", id.String()),
-		PublicID:     uuid.NewString(),
-		ResourceType: mediaasset.DefaultResourceType,
-		DeliveryType: mediaasset.DefaultDeliveryType,
-	})
-	if err != nil {
-		return nil, err
+	for _, file := range files {
+		if err := validateListingImageFile(file); err != nil {
+			return nil, err
+		}
 	}
 
-	image := buildListingImageEntity(id, file, uploaded)
+	if len(listing.Images)+len(files) > 10 {
+		return nil, domain.ErrImageLimitReached
+	}
+
+	uploads := make([]*mediaasset.UploadResult, 0, len(files))
+	images := make([]*entity.ListingImage, 0, len(files))
+	folder := fmt.Sprintf("listings/%s", id.String())
+	for _, file := range files {
+		uploaded, uploadErr := s.storage.UploadListingImage(ctx, mediaasset.UploadInput{
+			File:         file,
+			Folder:       folder,
+			PublicID:     uuid.NewString(),
+			ResourceType: mediaasset.DefaultResourceType,
+			DeliveryType: mediaasset.DefaultDeliveryType,
+		})
+		if uploadErr != nil {
+			s.destroyUploadedImages(ctx, uploads)
+			return nil, uploadErr
+		}
+		uploads = append(uploads, uploaded)
+		images = append(images, buildListingImageEntity(id, file, uploaded))
+	}
+
+	for _, image := range images {
+		listing.Images = append(listing.Images, *image)
+	}
+
+	var persistErr error
 	if s.txm != nil && s.jobs != nil {
-		err = s.txm.WithinTransaction(ctx, func(store domain.SearchIndexTransactionStore) error {
-			if _, txErr := store.Listings().CreateImage(ctx, image); txErr != nil {
-				return txErr
+		persistErr = s.txm.WithinTransaction(ctx, func(store domain.SearchIndexTransactionStore) error {
+			for _, image := range images {
+				if _, txErr := store.Listings().CreateImage(ctx, image); txErr != nil {
+					return txErr
+				}
 			}
 			listingForJob, txErr := store.Listings().FindByID(ctx, id)
 			if txErr != nil {
 				listingForJob = listing
-				listingForJob.Images = append(listingForJob.Images, *image)
 			}
 			job, txErr := buildSearchIndexJobFromListing(domain.EventTypeListingImagesChanged, listingForJob)
 			if txErr != nil {
@@ -532,22 +556,98 @@ func (s *listingService) UploadImage(ctx context.Context, id uuid.UUID, principa
 			return txErr
 		})
 	} else {
-		if _, err := s.repo.CreateImage(ctx, image); err != nil {
-			s.destroyUploadedImage(ctx, uploaded)
+		for _, image := range images {
+			if _, createErr := s.repo.CreateImage(ctx, image); createErr != nil {
+				persistErr = createErr
+				break
+			}
+		}
+		if persistErr == nil && s.jobs != nil {
+			s.enqueueListingIndexJob(ctx, domain.EventTypeListingImagesChanged, s.loadListingForEvent(ctx, id, listing))
+		}
+	}
+	if persistErr != nil {
+		s.destroyUploadedImages(ctx, uploads)
+		return nil, persistErr
+	}
+	if s.publish != nil {
+		s.publishListingEvent(ctx, domain.EventTypeListingImagesChanged, s.loadListingForEvent(ctx, id, listing))
+	}
+	return s.fetchListingResponse(ctx, id)
+}
+func (s *listingService) UploadVideo(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal, file *multipart.FileHeader) (*response.ListingResponse, error) {
+	if err := validateListingVideoFile(file); err != nil {
+		return nil, err
+	}
+	if err := s.requireVideoStorage(); err != nil {
+		return nil, err
+	}
+
+	listing, err := s.getAuthorizedListing(ctx, id, principal, pkgauthz.ActionUploadVideo)
+	if err != nil {
+		return nil, err
+	}
+
+	if listing.Video != nil {
+		return nil, domain.ErrVideoAlreadyExists
+	}
+
+	uploaded, err := s.videoStorage.UploadListingVideo(ctx, mediaasset.UploadInput{
+		File:         file,
+		Folder:       fmt.Sprintf("listings/%s", id.String()),
+		PublicID:     uuid.NewString(),
+		ResourceType: mediaasset.DefaultVideoResourceType,
+		DeliveryType: mediaasset.DefaultDeliveryType,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	duration := uploaded.DurationSeconds
+	if duration == nil {
+		duration = extractDurationSeconds(uploaded.Metadata)
+	}
+	if duration != nil && *duration > maxVideoDurationSeconds {
+		s.destroyUploadedVideo(ctx, uploaded)
+		return nil, domain.ErrVideoTooLong
+	}
+
+	video := buildListingVideoEntity(id, file, uploaded, duration)
+
+	if s.txm != nil && s.jobs != nil {
+		err = s.txm.WithinTransaction(ctx, func(store domain.SearchIndexTransactionStore) error {
+			if _, txErr := store.Listings().CreateVideo(ctx, video); txErr != nil {
+				return txErr
+			}
+			listingForJob, txErr := store.Listings().FindByID(ctx, id)
+			if txErr != nil {
+				listingForJob = listing
+				listingForJob.Video = video
+			}
+			job, txErr := buildSearchIndexJobFromListing(domain.EventTypeListingImagesChanged, listingForJob)
+			if txErr != nil {
+				return txErr
+			}
+			_, txErr = store.Jobs().Enqueue(ctx, job)
+			return txErr
+		})
+	} else {
+		if _, err := s.repo.CreateVideo(ctx, video); err != nil {
+			s.destroyUploadedVideo(ctx, uploaded)
 			return nil, err
 		}
-		listing.Images = append(listing.Images, *image)
 		if s.jobs != nil {
 			s.enqueueListingIndexJob(ctx, domain.EventTypeListingImagesChanged, s.loadListingForEvent(ctx, id, listing))
 		}
 	}
 	if err != nil {
-		s.destroyUploadedImage(ctx, uploaded)
+		s.destroyUploadedVideo(ctx, uploaded)
 		return nil, err
 	}
 	if s.publish != nil {
 		s.publishListingEvent(ctx, domain.EventTypeListingImagesChanged, s.loadListingForEvent(ctx, id, listing))
 	}
+
 	return s.fetchListingResponse(ctx, id)
 }
 
@@ -600,6 +700,55 @@ func (s *listingService) DeleteImage(ctx context.Context, id uuid.UUID, imageID 
 		s.publishListingEvent(ctx, domain.EventTypeListingImagesChanged, s.loadListingForEvent(ctx, id, nil))
 	}
 
+	return s.fetchListingResponse(ctx, id)
+}
+func (s *listingService) DeleteVideo(ctx context.Context, id uuid.UUID, principal pkgauthz.Principal) (*response.ListingResponse, error) {
+	if err := s.requireVideoStorage(); err != nil {
+		return nil, err
+	}
+
+	listing, err := s.getAuthorizedListing(ctx, id, principal, pkgauthz.ActionDeleteVideo)
+	if err != nil {
+		return nil, err
+	}
+
+	video, err := s.repo.FindVideoByListingID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.txm != nil && s.jobs != nil {
+		err = s.txm.WithinTransaction(ctx, func(store domain.SearchIndexTransactionStore) error {
+			if txErr := store.Listings().DeleteVideoByListingID(ctx, id); txErr != nil {
+				return txErr
+			}
+			listingForJob, txErr := store.Listings().FindByID(ctx, id)
+			if txErr != nil {
+				listingForJob = listing
+			}
+			listingForJob.Video = nil
+			job, txErr := buildSearchIndexJobFromListing(domain.EventTypeListingImagesChanged, listingForJob)
+			if txErr != nil {
+				return txErr
+			}
+			_, txErr = store.Jobs().Enqueue(ctx, job)
+			return txErr
+		})
+	} else {
+		if err := s.repo.DeleteVideoByListingID(ctx, id); err != nil {
+			return nil, err
+		}
+		if s.jobs != nil {
+			s.enqueueListingIndexJob(ctx, domain.EventTypeListingImagesChanged, s.loadListingForEvent(ctx, id, listing))
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	s.destroyListingVideoByEntity(ctx, video)
+	if s.publish != nil {
+		s.publishListingEvent(ctx, domain.EventTypeListingImagesChanged, s.loadListingForEvent(ctx, id, listing))
+	}
 	return s.fetchListingResponse(ctx, id)
 }
 
@@ -776,6 +925,7 @@ func (s *listingService) mapToResponse(l *entity.Listing) *response.ListingRespo
 		Specifications:    l.Specifications,
 		ViewCount:         l.ViewCount,
 		Images:            mapListingImagesToResponse(l.Images),
+		Video:             mapListingVideoToResponse(l.Video),
 		Category: func() *response.CategoryShortResponse {
 			if l.Category == nil {
 				return nil
@@ -995,6 +1145,12 @@ func (s *listingService) destroyUploadedImage(ctx context.Context, uploaded *med
 	})
 }
 
+func (s *listingService) destroyUploadedImages(ctx context.Context, uploads []*mediaasset.UploadResult) {
+	for _, uploaded := range uploads {
+		s.destroyUploadedImage(ctx, uploaded)
+	}
+}
+
 func (s *listingService) destroyListingImageByEntity(ctx context.Context, image *entity.ListingImage) {
 	if s.storage == nil || image == nil || image.PublicID == nil || *image.PublicID == "" {
 		return
@@ -1074,6 +1230,24 @@ func mapListingImagesToResponse(images []entity.ListingImage) []*response.Listin
 	return res
 }
 
+func mapListingVideoToResponse(video *entity.ListingVideo) *response.ListingVideoResponse {
+	if video == nil {
+		return nil
+	}
+
+	return &response.ListingVideoResponse{
+		ID:               video.ID,
+		URL:              video.URL,
+		Format:           video.Format,
+		Bytes:            video.Bytes,
+		Width:            video.Width,
+		Height:           video.Height,
+		DurationSeconds:  video.DurationSeconds,
+		OriginalFilename: video.OriginalFilename,
+		CreatedAt:        video.CreatedAt,
+	}
+}
+
 func validateListingImageFile(file *multipart.FileHeader) error {
 	if file == nil {
 		return domain.ErrInvalidImageFile
@@ -1089,6 +1263,151 @@ func validateListingImageFile(file *multipart.FileHeader) error {
 		return nil
 	default:
 		return domain.ErrInvalidImageFile
+	}
+}
+
+const (
+	maxVideoBytes           = 100 * 1024 * 1024
+	maxVideoDurationSeconds = 60
+)
+
+var allowedVideoExtensions = map[string]struct{}{
+	".mp4":  {},
+	".mov":  {},
+	".m4v":  {},
+	".webm": {},
+	".mkv":  {},
+	".flv":  {},
+	".avi":  {},
+	".mpg":  {},
+	".mpeg": {},
+	".ogv":  {},
+}
+
+func validateListingVideoFile(file *multipart.FileHeader) error {
+	if file == nil {
+		return domain.ErrInvalidVideoFile
+	}
+
+	if file.Size > maxVideoBytes {
+		return domain.ErrVideoTooLarge
+	}
+
+	contentType := strings.TrimSpace(file.Header.Get("Content-Type"))
+	if strings.HasPrefix(strings.ToLower(contentType), "video/") {
+		return nil
+	}
+
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	if _, ok := allowedVideoExtensions[ext]; ok {
+		return nil
+	}
+
+	return domain.ErrInvalidVideoFile
+}
+
+func (s *listingService) requireVideoStorage() error {
+	if s.videoStorage == nil {
+		return domain.ErrVideoStorageUnset
+	}
+	return nil
+}
+
+func (s *listingService) destroyUploadedVideo(ctx context.Context, uploaded *mediaasset.UploadResult) {
+	if s.videoStorage == nil || uploaded == nil || uploaded.PublicID == "" {
+		return
+	}
+
+	resourceType := uploaded.ResourceType
+	if resourceType == "" {
+		resourceType = mediaasset.DefaultVideoResourceType
+	}
+	deliveryType := uploaded.DeliveryType
+	if deliveryType == "" {
+		deliveryType = mediaasset.DefaultDeliveryType
+	}
+
+	_, _ = s.videoStorage.DestroyListingVideo(ctx, mediaasset.DestroyInput{
+		PublicID:     uploaded.PublicID,
+		ResourceType: resourceType,
+		DeliveryType: deliveryType,
+		Invalidate:   true,
+	})
+}
+
+func (s *listingService) destroyListingVideoByEntity(ctx context.Context, video *entity.ListingVideo) {
+	if s.videoStorage == nil || video == nil || video.PublicID == nil || *video.PublicID == "" {
+		return
+	}
+
+	resourceType := mediaasset.DefaultVideoResourceType
+	if video.ResourceType != nil && *video.ResourceType != "" {
+		resourceType = *video.ResourceType
+	}
+	deliveryType := mediaasset.DefaultDeliveryType
+	if video.DeliveryType != nil && *video.DeliveryType != "" {
+		deliveryType = *video.DeliveryType
+	}
+
+	_, _ = s.videoStorage.DestroyListingVideo(ctx, mediaasset.DestroyInput{
+		PublicID:     *video.PublicID,
+		ResourceType: resourceType,
+		DeliveryType: deliveryType,
+		Invalidate:   true,
+	})
+}
+
+func buildListingVideoEntity(listingID uuid.UUID, file *multipart.FileHeader, uploaded *mediaasset.UploadResult, durationSeconds *int) *entity.ListingVideo {
+	video := &entity.ListingVideo{
+		ListingID:       listingID,
+		URL:             uploaded.SecureURL,
+		AssetID:         stringPointer(uploaded.AssetID),
+		PublicID:        stringPointer(uploaded.PublicID),
+		Version:         int64Pointer(uploaded.Version),
+		Format:          stringPointer(uploaded.Format),
+		Bytes:           int64Pointer(uploaded.Bytes),
+		Width:           intPointer(uploaded.Width),
+		Height:          intPointer(uploaded.Height),
+		ResourceType:    stringPointer(uploaded.ResourceType),
+		DeliveryType:    stringPointer(uploaded.DeliveryType),
+		DurationSeconds: durationSeconds,
+	}
+	original := uploaded.OriginalFilename
+	if original == "" && file != nil {
+		original = file.Filename
+	}
+	if original != "" {
+		video.OriginalFilename = stringPointer(original)
+	}
+	return video
+}
+
+func extractDurationSeconds(metadata mediaasset.Metadata) *int {
+	if metadata == nil {
+		return nil
+	}
+	raw, ok := metadata["duration"]
+	if !ok {
+		return nil
+	}
+	switch v := raw.(type) {
+	case int:
+		return &v
+	case int64:
+		value := int(v)
+		return &value
+	case float64:
+		value := int(math.Ceil(v))
+		return &value
+	case string:
+		parsed, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return nil
+		}
+		value := int(math.Ceil(parsed))
+		return &value
+	default:
+		return nil
 	}
 }
 

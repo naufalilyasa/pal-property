@@ -23,6 +23,7 @@ function parseSpecifications(specifications: unknown): Partial<ListingSpecificat
     bedrooms: tonum(candidate.bedrooms),
     bathrooms: tonum(candidate.bathrooms),
     building_area_sqm: tonum(candidate.building_area_sqm),
+    land_area_sqm: tonum(candidate.land_area_sqm),
   };
 }
 
@@ -33,6 +34,17 @@ function formatArea(value?: number | null) {
 
 function formatList(value?: string[] | null) {
   return value && value.length > 0 ? value.join(", ") : null;
+}
+
+function formatVideoDuration(seconds?: number | null) {
+  if (!seconds || seconds <= 0) return null;
+
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+
+  if (minutes === 0) return `${remainder}s`;
+  if (remainder === 0) return `${minutes}m`;
+  return `${minutes}m ${remainder}s`;
 }
 
 export default async function PublicListingDetailPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -97,6 +109,7 @@ export default async function PublicListingDetailPage({ params }: { params: Prom
     : dummy.sqft;
 
   const descriptionText = listing?.description || dummy.description;
+  const listingVideo = listing?.video ?? null;
   const details = [
     { label: "Transaction", value: listing?.transaction_type ?? "sale" },
     { label: "Province", value: listing?.location_province ?? null },
@@ -248,6 +261,49 @@ export default async function PublicListingDetailPage({ params }: { params: Prom
                <Image alt={images[5] ? `${address} gallery image 5` : `${address} gallery image`} fill src={images[5]} className="object-cover" unoptimized/>
             </div>
           </section>
+
+          {listingVideo ? (
+            <section className="mt-16 grid gap-8 lg:grid-cols-[250px_1fr]" data-testid="listing-video-tour">
+              <div>
+                <h2 className="text-2xl leading-[1.1] font-light text-foreground">
+                  Video <br /><span className="text-muted-foreground">tour</span>
+                </h2>
+              </div>
+
+              <div className="space-y-4">
+                <div className="overflow-hidden rounded-[1.5rem] border border-border bg-black/90 shadow-sm">
+                  <video
+                    className="aspect-video h-full w-full object-cover"
+                    controls
+                    data-testid="listing-detail-video"
+                    poster={images[0]}
+                    preload="metadata"
+                    src={listingVideo.url}
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-border px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-foreground shadow-sm">
+                    Seller video
+                  </span>
+                  {listingVideo.original_filename ? (
+                    <span className="rounded-full border border-border px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground shadow-sm">
+                      {listingVideo.original_filename}
+                    </span>
+                  ) : null}
+                  {formatVideoDuration(listingVideo.duration_seconds) ? (
+                    <span className="rounded-full border border-border px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground shadow-sm">
+                      {formatVideoDuration(listingVideo.duration_seconds)}
+                    </span>
+                  ) : null}
+                </div>
+
+                <p className="max-w-2xl text-sm leading-7 text-muted-foreground">
+                  Watch the seller&apos;s walkthrough clip for an added feel of the home before scheduling an in-person visit.
+                </p>
+              </div>
+            </section>
+          ) : null}
 
           <hr className="my-16 border-border" />
 

@@ -60,6 +60,7 @@ func main() {
 	cacheRepo := redis.NewCacheRepository(rdb)
 
 	var listingImageStorage domain.ListingImageStorage
+	var listingVideoStorage domain.ListingVideoStorage
 	if config.Env.CloudinaryEnabled {
 		listingImageStorage, err = cloudinary.New(cloudinary.Config{
 			CloudName: config.Env.CloudinaryCloudName,
@@ -68,6 +69,9 @@ func main() {
 		})
 		if err != nil {
 			logger.Log.Fatal("Failed to initialize Cloudinary storage", zap.Error(err))
+		}
+		if vs, ok := listingImageStorage.(domain.ListingVideoStorage); ok {
+			listingVideoStorage = vs
 		}
 	}
 
@@ -84,7 +88,15 @@ func main() {
 	indexJobRepo := postgres.NewSearchIndexJobRepository(db)
 	indexTxManager := postgres.NewSearchIndexTransactionManager(db)
 	listingAuthzService := service.NewAuthzService(authzService)
-	listingService := service.NewListingServiceWithAuthzJobsAndTransactions(listingRepo, listingAuthzService, indexJobRepo, indexTxManager, listingImageStorage)
+	mediaStorages := []domain.ListingImageStorage{}
+	if listingImageStorage != nil {
+		mediaStorages = append(mediaStorages, listingImageStorage)
+	} else if listingVideoStorage != nil {
+		if storageAsImage, ok := listingVideoStorage.(domain.ListingImageStorage); ok {
+			mediaStorages = append(mediaStorages, storageAsImage)
+		}
+	}
+	listingService := service.NewListingServiceWithAuthzJobsAndTransactions(listingRepo, listingAuthzService, indexJobRepo, indexTxManager, mediaStorages...)
 	listingHandler := handler.NewListingHandler(listingService)
 	savedListingRepo := postgres.NewSavedListingRepository(db)
 	savedListingService := service.NewSavedListingService(savedListingRepo, listingRepo)
@@ -121,6 +133,12 @@ func main() {
 			} else if errors.Is(err, domain.ErrImageLimitReached) {
 				code = fiber.StatusConflict
 			} else if errors.Is(err, domain.ErrImageStorageUnset) {
+				code = fiber.StatusServiceUnavailable
+			} else if errors.Is(err, domain.ErrInvalidVideoFile) || errors.Is(err, domain.ErrVideoTooLarge) || errors.Is(err, domain.ErrVideoTooLong) {
+				code = fiber.StatusBadRequest
+			} else if errors.Is(err, domain.ErrVideoAlreadyExists) {
+				code = fiber.StatusConflict
+			} else if errors.Is(err, domain.ErrVideoStorageUnset) {
 				code = fiber.StatusServiceUnavailable
 			}
 			if e, ok := err.(*fiber.Error); ok {

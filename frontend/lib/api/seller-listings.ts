@@ -1,4 +1,5 @@
 import { ApiError } from "@/lib/api/envelope";
+import type { ListingVideoRecord } from "@/lib/api/listing-form";
 import { browserFetch } from "@/lib/api/browser-fetch";
 import { serverFetch } from "@/lib/api/server-fetch";
 
@@ -40,6 +41,7 @@ export type SellerListing = {
   specifications: unknown;
   view_count: number;
   images: SellerListingImage[];
+  video?: ListingVideoRecord | null;
   created_at: string;
   updated_at: string;
 };

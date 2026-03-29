@@ -3,8 +3,9 @@ package mediaasset
 import "mime/multipart"
 
 const (
-	DefaultResourceType = "image"
-	DefaultDeliveryType = "upload"
+	DefaultResourceType      = "image"
+	DefaultVideoResourceType = "video"
+	DefaultDeliveryType      = "upload"
 )
 
 type UploadInput struct {
@@ -26,7 +27,9 @@ type UploadResult struct {
 	Bytes            int64
 	Width            int
 	Height           int
+	DurationSeconds  *int
 	OriginalFilename string
+	Metadata         Metadata
 }
 
 type DestroyInput struct {
@@ -39,3 +42,5 @@ type DestroyInput struct {
 type DestroyResult struct {
 	Result string
 }
+
+type Metadata map[string]interface{}

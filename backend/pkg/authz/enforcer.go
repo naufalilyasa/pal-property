@@ -33,6 +33,8 @@ const (
 	ActionDeleteImage     = "delete_image"
 	ActionSetPrimaryImage = "set_primary_image"
 	ActionReorderImages   = "reorder_images"
+	ActionUploadVideo     = "upload_video"
+	ActionDeleteVideo     = "delete_video"
 )
 
 //go:embed model.conf

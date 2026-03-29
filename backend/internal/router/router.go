@@ -124,6 +124,8 @@ func Register(
 	listingProtected.Delete("/:id", listingHandler.Delete)
 	listingProtected.Post("/:id/images", listingHandler.UploadImage)
 	listingProtected.Delete("/:id/images/:imageId", listingHandler.DeleteImage)
+	listingProtected.Post("/:id/video", listingHandler.UploadVideo)
+	listingProtected.Delete("/:id/video", listingHandler.DeleteVideo)
 	listingProtected.Patch("/:id/images/:imageId/primary", listingHandler.SetPrimaryImage)
 	listingProtected.Patch("/:id/images/reorder", listingHandler.ReorderImages)
 
