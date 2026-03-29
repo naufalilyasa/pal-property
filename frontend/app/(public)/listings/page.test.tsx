@@ -1,11 +1,28 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import PublicListingsPage from "./page";
 
-const { getSearchListingsMock, listingFiltersMock } = vi.hoisted(() => ({
+const {
+  getOptionalUserMock,
+  getSavedListingIdsForListingsMock,
+  getSearchListingsMock,
+  listingFiltersMock,
+  searchListingCardItemMock,
+} = vi.hoisted(() => ({
+  getOptionalUserMock: vi.fn(),
+  getSavedListingIdsForListingsMock: vi.fn(),
   getSearchListingsMock: vi.fn(),
   listingFiltersMock: vi.fn(),
+  searchListingCardItemMock: vi.fn(),
+}));
+
+vi.mock("@/features/auth/server/current-user", () => ({
+  getOptionalUser: getOptionalUserMock,
+}));
+
+vi.mock("@/features/saved-listings/server/get-saved-listing-ids", () => ({
+  getSavedListingIdsForListings: getSavedListingIdsForListingsMock,
 }));
 
 vi.mock("@/features/listings/server/get-search-listings", () => ({
@@ -25,13 +42,26 @@ vi.mock("@/features/listings/components/listing-filters", () => ({
 }));
 
 vi.mock("@/features/listings/components/search-listing-card", () => ({
-  SearchListingCardItem: (props: { href: string; listing: { title: string } }) => {
-    return <article data-testid="listing-card">{props.listing.title}</article>;
+  SearchListingCardItem: (props: { href: string; initialSaved?: boolean; listing: { title: string } }) => {
+    searchListingCardItemMock(props);
+
+    return <article data-testid="listing-card">{`${props.listing.title}:${String(props.initialSaved ?? false)}`}</article>;
   },
 }));
 
 describe("PublicListingsPage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("renders the listings shell with resolved query defaults", async () => {
+    getOptionalUserMock.mockResolvedValue({
+      id: "user-1",
+      name: "Buyer",
+      email: "buyer@example.com",
+      role: "user",
+      created_at: "2026-03-29T00:00:00Z",
+    });
     getSearchListingsMock.mockResolvedValue({
       items: [
         { id: "listing-1", slug: "city-loft", title: "City Loft", transaction_type: "sale", price: 1000, currency: "IDR", status: "active", is_featured: false, created_at: "2026-03-17T00:00:00Z", updated_at: "2026-03-17T00:00:00Z" },
@@ -41,6 +71,9 @@ describe("PublicListingsPage", () => {
       page: 3,
       limit: 12,
       total_pages: 2,
+    });
+    getSavedListingIdsForListingsMock.mockResolvedValue({
+      listingIds: ["listing-2"],
     });
 
     render(
@@ -72,16 +105,18 @@ describe("PublicListingsPage", () => {
       price_max: "5000000000",
       sort: "newest",
     });
+    expect(getSavedListingIdsForListingsMock).toHaveBeenCalledWith(["listing-1", "listing-2"]);
     expect(screen.getByTestId("listing-filters")).toBeInTheDocument();
     expect(screen.getByText("view:map")).toBeInTheDocument();
     expect(screen.getByTestId("listing-map-panel")).toBeInTheDocument();
     expect(screen.getByTestId("listing-pagination")).toBeInTheDocument();
     expect(screen.getAllByTestId("listing-card")).toHaveLength(2);
-    expect(screen.getByText("City Loft")).toBeInTheDocument();
-    expect(screen.getByText("Garden Home")).toBeInTheDocument();
+    expect(screen.getByText("City Loft:false")).toBeInTheDocument();
+    expect(screen.getByText("Garden Home:true")).toBeInTheDocument();
   });
 
   it("renders the empty state without crashing", async () => {
+    getOptionalUserMock.mockResolvedValue(null);
     getSearchListingsMock.mockResolvedValue({
       items: [],
       total: 0,
@@ -108,7 +143,35 @@ describe("PublicListingsPage", () => {
       price_max: undefined,
       sort: undefined,
     });
+    expect(getSavedListingIdsForListingsMock).not.toHaveBeenCalled();
     expect(screen.getByText(/no properties matched your search/i)).toBeInTheDocument();
     expect(screen.getByText("view:map")).toBeInTheDocument();
+  });
+
+  it("skips saved-listing prehydration when the visitor is anonymous", async () => {
+    getOptionalUserMock.mockResolvedValue(null);
+    getSearchListingsMock.mockResolvedValue({
+      items: [
+        { id: "listing-1", slug: "city-loft", title: "City Loft", transaction_type: "sale", price: 1000, currency: "IDR", status: "active", is_featured: false, created_at: "2026-03-17T00:00:00Z", updated_at: "2026-03-17T00:00:00Z" },
+      ],
+      total: 1,
+      page: 1,
+      limit: 12,
+      total_pages: 1,
+    });
+
+    render(
+      await PublicListingsPage({
+        searchParams: Promise.resolve({}),
+      }),
+    );
+
+    expect(getSavedListingIdsForListingsMock).not.toHaveBeenCalled();
+    expect(searchListingCardItemMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        initialSaved: false,
+      }),
+    );
+    expect(screen.getByText("City Loft:false")).toBeInTheDocument();
   });
 });

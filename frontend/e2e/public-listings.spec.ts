@@ -147,6 +147,14 @@ test.beforeEach(() => {
   listingsRequests = [];
 
   responder = (request) => {
+    if (request.path === "/auth/me") {
+      expect(request.method).toBe("GET");
+      return {
+        status: 401,
+        body: { success: false, message: "unauthenticated", data: null, trace_id: "trace-e2e-401" },
+      };
+    }
+
     if (request.path === "/api/categories") {
       expect(request.method).toBe("GET");
       return { status: 200, body: backendEnvelope(categoriesResponse) };
