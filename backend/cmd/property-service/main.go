@@ -86,6 +86,9 @@ func main() {
 	listingAuthzService := service.NewAuthzService(authzService)
 	listingService := service.NewListingServiceWithAuthzJobsAndTransactions(listingRepo, listingAuthzService, indexJobRepo, indexTxManager, listingImageStorage)
 	listingHandler := handler.NewListingHandler(listingService)
+	savedListingRepo := postgres.NewSavedListingRepository(db)
+	savedListingService := service.NewSavedListingService(savedListingRepo, listingRepo)
+	savedListingHandler := handler.NewSavedListingHandler(savedListingService)
 	searchClient, err := searchindex.NewClient(config.Env.ElasticAddress, config.Env.ElasticUsername, config.Env.ElasticPassword, nil)
 	if err != nil {
 		logger.Log.Fatal("Failed to initialize search client", zap.Error(err))
@@ -140,7 +143,7 @@ func main() {
 		},
 	})
 
-	router.Register(app, db, authzService, authHandler, listingHandler, searchHandler, categoryHandler)
+	router.Register(app, db, authzService, authHandler, listingHandler, savedListingHandler, searchHandler, categoryHandler)
 
 	logger.Log.Info("Server starting", zap.String("port", config.Env.Port))
 	if err := app.Listen(fmt.Sprintf(":%s", config.Env.Port)); err != nil {
