@@ -1,0 +1,12 @@
+# Decisions
+- Keep saved_listings as a lean join table (no soft delete) keyed by UUIDs so future repository mutations stay simple and we can enforce idempotent saves/deletes via the unique constraint.
+- Service contracts will accept the authenticated principal and reuse PaginatedListings through the domain filter so handlers can plug into existing auth/response helpers without extra DTOs.
+- SavedListing service now leans on the existing listingService mapper for ListingResponse/PaginatedListings so we avoid duplication and continue honoring the public DTO.
+- ListByUserID defaults to page 1/limit 20 when callers omit pagination, matching listingService defaults and keeping totalPages calculation sane.
+- The saved-listings handler must enforce the shared contains limit locally before calling the service so HTTP responses stay client-aware on malformed requests.
+- 2026-03-29: Normalized saved listing contains/toggle DTOs to camelCase and reused the existing paginated listing shape so frontend consumers can stay aligned with backend responses without bespoke adapters.
+- 2026-03-29: Server wrappers throw when the protected saved listings page lacks a cookie header while the public pre-hydration helper quietly returns an empty result when authentication is absent so we don't surface unnecessary 401s to unauthenticated flows.
+- 2026-03-29: Keep save/unsave behavior centralized in `SaveListingButton` with a minimal API (`listingId`, `initialSaved`, `variant`, and selector scope) so later page wiring can stay presentational.
+- 2026-03-29: Mutation failures should surface as inline alert text and rollback the optimistic toggle immediately rather than swallowing the error or leaving saved state ambiguous.
+- 2026-03-29: The new saved listings page should sit in a dedicated protected route group instead of `(dashboard)` or `(public)` so buyer auth stays server-enforced without inheriting seller-shell chrome or violating the public-route no-auth convention.
+- 2026-03-29: Removal on `/saved-listings` should stay button-driven and server-authoritative; instead of inventing a separate client list manager, `SaveListingButton` now optionally refreshes the route after a successful unsave so the existing card grid and empty state remain the single source of truth.

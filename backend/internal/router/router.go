@@ -9,7 +9,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/limiter"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/google/uuid"
-	"github.com/naufalilyasa/pal-property-backend/internal/handler/http"
+	handler "github.com/naufalilyasa/pal-property-backend/internal/handler/http"
 	"github.com/naufalilyasa/pal-property-backend/pkg/authz"
 	"github.com/naufalilyasa/pal-property-backend/pkg/config"
 	"github.com/naufalilyasa/pal-property-backend/pkg/logger"
@@ -42,10 +42,11 @@ func Register(
 	app *fiber.App,
 	db *gorm.DB,
 	authzService *authz.Service,
-	authHandler *http.AuthHandler,
-	listingHandler *http.ListingHandler,
-	searchHandler *http.SearchHandler,
-	categoryHandler *http.CategoryHandler,
+	authHandler *handler.AuthHandler,
+	listingHandler *handler.ListingHandler,
+	savedListingHandler *handler.SavedListingHandler,
+	searchHandler *handler.SearchHandler,
+	categoryHandler *handler.CategoryHandler,
 ) {
 	// Global Middlewares
 	app.Use(helmet.New())
@@ -107,6 +108,12 @@ func Register(
 	api.Get("/listings", listingHandler.List)
 	api.Get("/listings/slug/:slug", listingHandler.GetBySlug)
 	api.Get("/listings/:id", listingHandler.GetByID)
+
+	savedProtected := api.Group("/me", middleware.Protected(db, authzService))
+	savedProtected.Get("/saved-listings", savedListingHandler.List)
+	savedProtected.Get("/saved-listings/contains", savedListingHandler.Contains)
+	savedProtected.Post("/saved-listings", savedListingHandler.Save)
+	savedProtected.Delete("/saved-listings/:listingId", savedListingHandler.Remove)
 
 	// ==========================================
 	// 4. Listing Routes (Protected)
