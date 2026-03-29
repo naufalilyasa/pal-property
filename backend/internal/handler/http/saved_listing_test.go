@@ -85,7 +85,7 @@ func (s *SavedListingHandlerTestSuite) SetupSuite() {
 	s.db, err = gorm.Open(pd.Open(dsn), &gorm.Config{})
 	s.Require().NoError(err)
 
-	err = s.db.AutoMigrate(&entity.User{}, &entity.Category{}, &entity.Listing{}, &entity.ListingImage{}, &entity.SavedListing{})
+	err = s.db.AutoMigrate(&entity.User{}, &entity.Category{}, &entity.Listing{}, &entity.ListingImage{}, &entity.ListingVideo{}, &entity.SavedListing{})
 	s.Require().NoError(err)
 	s.Require().NoError(s.db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS ux_saved_listings_user_listing ON saved_listings (user_id, listing_id)").Error)
 
