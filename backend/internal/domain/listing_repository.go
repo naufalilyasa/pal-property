@@ -12,6 +12,9 @@ type ListingRepository interface {
 	CreateImage(ctx context.Context, image *entity.ListingImage) (*entity.ListingImage, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*entity.Listing, error)
 	FindImageByID(ctx context.Context, id uuid.UUID) (*entity.ListingImage, error)
+	CreateVideo(ctx context.Context, video *entity.ListingVideo) (*entity.ListingVideo, error)
+	FindVideoByListingID(ctx context.Context, listingID uuid.UUID) (*entity.ListingVideo, error)
+	DeleteVideoByListingID(ctx context.Context, listingID uuid.UUID) error
 	FindBySlug(ctx context.Context, slug string) (*entity.Listing, error)
 	ListActiveImagesByListingID(ctx context.Context, listingID uuid.UUID) ([]*entity.ListingImage, error)
 	Update(ctx context.Context, listing *entity.Listing, fields []string) (*entity.Listing, error)
