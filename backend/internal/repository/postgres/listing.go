@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/naufalilyasa/pal-property-backend/internal/domain"
@@ -63,6 +64,7 @@ func (r *listingRepository) FindByID(ctx context.Context, id uuid.UUID) (*entity
 	var listing entity.Listing
 	err := r.db.WithContext(ctx).
 		Preload("Images", r.activeImagePreload).
+		Preload("Video").
 		Preload("Category").
 		Joins("User").
 		First(&listing, "listings.id = ?", id).Error
@@ -91,10 +93,46 @@ func (r *listingRepository) FindImageByID(ctx context.Context, id uuid.UUID) (*e
 	return &image, nil
 }
 
+func (r *listingRepository) CreateVideo(ctx context.Context, video *entity.ListingVideo) (*entity.ListingVideo, error) {
+	err := r.db.WithContext(ctx).Create(video).Error
+	if err != nil {
+		if strings.Contains(err.Error(), "23505") {
+			return nil, domain.ErrVideoAlreadyExists
+		}
+		return nil, fmt.Errorf("create video: %w", err)
+	}
+	return video, nil
+}
+
+func (r *listingRepository) FindVideoByListingID(ctx context.Context, listingID uuid.UUID) (*entity.ListingVideo, error) {
+	var video entity.ListingVideo
+	err := r.db.WithContext(ctx).
+		First(&video, "listing_id = ?", listingID).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, domain.ErrNotFound
+		}
+		return nil, fmt.Errorf("find video by listing id: %w", err)
+	}
+	return &video, nil
+}
+
+func (r *listingRepository) DeleteVideoByListingID(ctx context.Context, listingID uuid.UUID) error {
+	result := r.db.WithContext(ctx).Where("listing_id = ?", listingID).Delete(&entity.ListingVideo{})
+	if result.Error != nil {
+		return fmt.Errorf("delete video: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
 func (r *listingRepository) FindBySlug(ctx context.Context, slug string) (*entity.Listing, error) {
 	var listing entity.Listing
 	err := r.db.WithContext(ctx).
 		Preload("Images", r.activeImagePreload).
+		Preload("Video").
 		Preload("Category").
 		Joins("User").
 		First(&listing, "listings.slug = ?", slug).Error
@@ -241,6 +279,7 @@ func (r *listingRepository) List(ctx context.Context, filter domain.ListingFilte
 
 	offset := (filter.Page - 1) * filter.Limit
 	err = db.Preload("Images", r.activeImagePreload).
+		Preload("Video").
 		Preload("Category").
 		Joins("User").
 		Order("listings.created_at DESC").
@@ -349,6 +388,7 @@ func (r *listingRepository) FindByCategoryID(ctx context.Context, categoryID uui
 	var listings []*entity.Listing
 	err := r.db.WithContext(ctx).
 		Preload("Images", r.activeImagePreload).
+		Preload("Video").
 		Preload("Category").
 		Joins("User").
 		Where("listings.category_id = ?", categoryID).
@@ -382,6 +422,7 @@ func (r *listingRepository) FindByUserID(ctx context.Context, userID uuid.UUID, 
 
 	offset := (filter.Page - 1) * filter.Limit
 	err = db.Preload("Images", r.activeImagePreload).
+		Preload("Video").
 		Preload("Category").
 		Joins("User").
 		Order("listings.created_at DESC").

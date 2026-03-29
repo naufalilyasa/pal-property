@@ -826,7 +826,7 @@ func TestListingService_UploadImage_Success(t *testing.T) {
 		}},
 	}, nil).Once()
 
-	res, err := svc.UploadImage(context.Background(), listingID, pkgauthz.Principal{UserID: userID, Role: "user"}, file)
+	res, err := svc.UploadImage(context.Background(), listingID, pkgauthz.Principal{UserID: userID, Role: "user"}, []*multipart.FileHeader{file})
 
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
@@ -846,6 +846,56 @@ func TestListingService_UploadImage_Success(t *testing.T) {
 	repo.AssertNotCalled(t, "ListActiveImagesByListingID", mock.Anything, mock.Anything)
 }
 
+func TestListingService_UploadImages_Success(t *testing.T) {
+	repo := mocks.NewListingRepository(t)
+	storage := newFakeListingImageStorage()
+	publisher := &fakeEventPublisher{}
+	svc := service.NewListingServiceWithAuthzAndPublisher(repo, newTestAuthzService(t), publisher, storage)
+
+	listingID := uuid.New()
+	userID := uuid.New()
+	imageIDs := []uuid.UUID{uuid.New(), uuid.New()}
+	files := []*multipart.FileHeader{
+		testListingImageFileHeader("front.jpg", "image/jpeg"),
+		testListingImageFileHeader("living-room.jpg", "image/jpeg"),
+	}
+
+	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: listingID},
+		UserID:     userID,
+	}, nil).Once()
+	repo.On("CreateImage", mock.Anything, mock.Anything).Return(&entity.ListingImage{ID: imageIDs[0]}, nil).Once()
+	repo.On("CreateImage", mock.Anything, mock.Anything).Return(&entity.ListingImage{ID: imageIDs[1]}, nil).Once()
+	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: listingID},
+		UserID:     userID,
+		Images: []entity.ListingImage{{
+			ID:        imageIDs[0],
+			URL:       "https://cdn.example.com/front.jpg",
+			IsPrimary: true,
+			SortOrder: 0,
+		}, {
+			ID:        imageIDs[1],
+			URL:       "https://cdn.example.com/living-room.jpg",
+			IsPrimary: false,
+			SortOrder: 1,
+		}},
+	}, nil).Twice()
+
+	res, err := svc.UploadImage(context.Background(), listingID, pkgauthz.Principal{UserID: userID, Role: "user"}, files)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.Len(t, res.Images, len(files))
+	assert.Equal(t, imageIDs[0], res.Images[0].ID)
+	assert.True(t, res.Images[0].IsPrimary)
+	assert.False(t, res.Images[1].IsPrimary)
+	assert.Len(t, storage.uploadCalls, len(files))
+	assert.Len(t, storage.destroyCalls, 0)
+	assert.Len(t, publisher.listingEvents, 1)
+	assert.Equal(t, domain.EventTypeListingImagesChanged, publisher.listingEvents[0].Metadata.EventType)
+}
+
 func TestListingService_UploadImage_InvalidFile(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
 	storage := newFakeListingImageStorage()
@@ -863,38 +913,34 @@ func TestListingService_UploadImage_StorageUnset(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
 	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t))
 
-	res, err := svc.UploadImage(context.Background(), uuid.New(), pkgauthz.Principal{UserID: uuid.New(), Role: "user"}, testListingImageFileHeader("unit.jpg", "image/jpeg"))
+	res, err := svc.UploadImage(context.Background(), uuid.New(), pkgauthz.Principal{UserID: uuid.New(), Role: "user"}, []*multipart.FileHeader{testListingImageFileHeader("unit.jpg", "image/jpeg")})
 
 	assert.ErrorIs(t, err, domain.ErrImageStorageUnset)
 	assert.Nil(t, res)
 	repo.AssertNotCalled(t, "FindByID", mock.Anything, mock.Anything)
 }
 
-func TestListingService_UploadImage_OverLimitFromRepository_DestroysUploadedAsset(t *testing.T) {
+func TestListingService_UploadImages_OverflowBeforeUpload(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
 	storage := newFakeListingImageStorage()
 	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t), storage)
 
 	listingID := uuid.New()
 	userID := uuid.New()
-
-	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
+	listing := &entity.Listing{
 		BaseEntity: entity.BaseEntity{ID: listingID},
 		UserID:     userID,
-	}, nil).Once()
-	repo.On("CreateImage", mock.Anything, mock.MatchedBy(func(img *entity.ListingImage) bool {
-		return img.ListingID == listingID &&
-			img.PublicID != nil && *img.PublicID == storage.uploadResult.PublicID
-	})).Return(nil, domain.ErrImageLimitReached).Once()
+		Images:     make([]entity.ListingImage, 10),
+	}
 
-	res, err := svc.UploadImage(context.Background(), listingID, pkgauthz.Principal{UserID: userID, Role: "user"}, testListingImageFileHeader("unit.jpg", "image/jpeg"))
+	repo.On("FindByID", mock.Anything, listingID).Return(listing, nil).Once()
+
+	res, err := svc.UploadImage(context.Background(), listingID, pkgauthz.Principal{UserID: userID, Role: "user"}, []*multipart.FileHeader{testListingImageFileHeader("unit.jpg", "image/jpeg")})
 
 	assert.ErrorIs(t, err, domain.ErrImageLimitReached)
 	assert.Nil(t, res)
-	assert.Len(t, storage.uploadCalls, 1)
-	assert.Len(t, storage.destroyCalls, 1)
-	assert.Equal(t, storage.uploadResult.PublicID, storage.destroyCalls[0].PublicID)
-	repo.AssertNotCalled(t, "ListActiveImagesByListingID", mock.Anything, mock.Anything)
+	assert.Len(t, storage.uploadCalls, 0)
+	repo.AssertNotCalled(t, "CreateImage", mock.Anything, mock.Anything)
 }
 
 func TestListingService_UploadImage_Forbidden(t *testing.T) {
@@ -911,42 +957,38 @@ func TestListingService_UploadImage_Forbidden(t *testing.T) {
 		UserID:     ownerID,
 	}, nil).Once()
 
-	res, err := svc.UploadImage(context.Background(), listingID, pkgauthz.Principal{UserID: otherUserID, Role: "user"}, testListingImageFileHeader("unit.jpg", "image/jpeg"))
+	res, err := svc.UploadImage(context.Background(), listingID, pkgauthz.Principal{UserID: otherUserID, Role: "user"}, []*multipart.FileHeader{testListingImageFileHeader("unit.jpg", "image/jpeg")})
 
 	assert.ErrorIs(t, err, domain.ErrForbidden)
 	assert.Nil(t, res)
 	assert.Len(t, storage.uploadCalls, 0)
 }
 
-func TestListingService_UploadImage_CreateImageFails_DestroysUploadedAsset(t *testing.T) {
+func TestListingService_UploadImages_CreateImageFails_CleansUpAllUploads(t *testing.T) {
 	repo := mocks.NewListingRepository(t)
 	storage := newFakeListingImageStorage()
-	storage.uploadResult = &mediaasset.UploadResult{
-		PublicID:  "orphaned-upload",
-		SecureURL: "https://cdn.example.com/orphaned-upload.jpg",
-	}
 	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t), storage)
 
 	listingID := uuid.New()
 	userID := uuid.New()
+	files := []*multipart.FileHeader{
+		testListingImageFileHeader("first.jpg", "image/jpeg"),
+		testListingImageFileHeader("second.jpg", "image/jpeg"),
+	}
 
 	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
 		BaseEntity: entity.BaseEntity{ID: listingID},
 		UserID:     userID,
 	}, nil).Once()
+	repo.On("CreateImage", mock.Anything, mock.Anything).Return(&entity.ListingImage{}, nil).Once()
 	repo.On("CreateImage", mock.Anything, mock.Anything).Return(nil, domain.ErrConflict).Once()
 
-	res, err := svc.UploadImage(context.Background(), listingID, pkgauthz.Principal{UserID: userID, Role: "user"}, testListingImageFileHeader("unit.jpg", "image/jpeg"))
+	res, err := svc.UploadImage(context.Background(), listingID, pkgauthz.Principal{UserID: userID, Role: "user"}, files)
 
 	assert.ErrorIs(t, err, domain.ErrConflict)
 	assert.Nil(t, res)
-	assert.Len(t, storage.uploadCalls, 1)
-	assert.Len(t, storage.destroyCalls, 1)
-	assert.Equal(t, "orphaned-upload", storage.destroyCalls[0].PublicID)
-	assert.Equal(t, mediaasset.DefaultResourceType, storage.destroyCalls[0].ResourceType)
-	assert.Equal(t, mediaasset.DefaultDeliveryType, storage.destroyCalls[0].DeliveryType)
-	assert.True(t, storage.destroyCalls[0].Invalidate)
-	repo.AssertNotCalled(t, "ListActiveImagesByListingID", mock.Anything, mock.Anything)
+	assert.Len(t, storage.uploadCalls, len(files))
+	assert.Len(t, storage.destroyCalls, len(files))
 }
 
 func TestListingService_DeleteImage_Success(t *testing.T) {
@@ -988,6 +1030,151 @@ func TestListingService_DeleteImage_Success(t *testing.T) {
 	assert.Equal(t, resourceType, storage.destroyCalls[0].ResourceType)
 	assert.Equal(t, deliveryType, storage.destroyCalls[0].DeliveryType)
 	assert.True(t, storage.destroyCalls[0].Invalidate)
+}
+
+func TestListingService_UploadVideo_Success(t *testing.T) {
+	repo := mocks.NewListingRepository(t)
+	storage := newFakeListingImageStorage()
+	storage.videoUploadResult.Metadata = mediaasset.Metadata{"duration": float64(45)}
+	publisher := &fakeEventPublisher{}
+	svc := service.NewListingServiceWithAuthzAndPublisher(repo, newTestAuthzService(t), publisher, storage)
+
+	listingID := uuid.New()
+	userID := uuid.New()
+	videoID := uuid.New()
+	file := testListingVideoFileHeader("tour.mp4", "video/mp4", 20*1024*1024)
+
+	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: listingID},
+		UserID:     userID,
+	}, nil).Once()
+	repo.On("CreateVideo", mock.Anything, mock.MatchedBy(func(v *entity.ListingVideo) bool {
+		return v.ListingID == listingID && v.URL == storage.videoUploadResult.SecureURL
+	})).Return(&entity.ListingVideo{ID: videoID}, nil).Once()
+	videoEntity := &entity.ListingVideo{ID: videoID, ListingID: listingID, URL: storage.videoUploadResult.SecureURL}
+	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: listingID},
+		UserID:     userID,
+		Video:      videoEntity,
+	}, nil).Twice()
+
+	res, err := svc.UploadVideo(context.Background(), listingID, pkgauthz.Principal{UserID: userID, Role: "user"}, file)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.NotNil(t, res.Video)
+	assert.Equal(t, videoID, res.Video.ID)
+	assert.Len(t, storage.videoUploads, 1)
+	assert.Len(t, publisher.listingEvents, 1)
+	assert.Equal(t, domain.EventTypeListingImagesChanged, publisher.listingEvents[0].Metadata.EventType)
+}
+
+func TestListingService_UploadVideo_AlreadyExists(t *testing.T) {
+	repo := mocks.NewListingRepository(t)
+	storage := newFakeListingImageStorage()
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t), storage)
+
+	listingID := uuid.New()
+	userID := uuid.New()
+	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: listingID},
+		UserID:     userID,
+		Video: &entity.ListingVideo{
+			ID:        uuid.New(),
+			ListingID: listingID,
+		},
+	}, nil)
+
+	res, err := svc.UploadVideo(context.Background(), listingID, pkgauthz.Principal{UserID: userID, Role: "user"}, testListingVideoFileHeader("tour.mp4", "video/mp4", 10*1024*1024))
+
+	assert.ErrorIs(t, err, domain.ErrVideoAlreadyExists)
+	assert.Nil(t, res)
+	assert.Len(t, storage.videoUploads, 0)
+}
+
+func TestListingService_UploadVideo_InvalidFile(t *testing.T) {
+	repo := mocks.NewListingRepository(t)
+	storage := newFakeListingImageStorage()
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t), storage)
+
+	res, err := svc.UploadVideo(context.Background(), uuid.New(), pkgauthz.Principal{UserID: uuid.New(), Role: "user"}, nil)
+
+	assert.ErrorIs(t, err, domain.ErrInvalidVideoFile)
+	assert.Nil(t, res)
+	repo.AssertNotCalled(t, "FindByID", mock.Anything, mock.Anything)
+}
+
+func TestListingService_UploadVideo_TooLarge(t *testing.T) {
+	repo := mocks.NewListingRepository(t)
+	storage := newFakeListingImageStorage()
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t), storage)
+
+	largeFile := testListingVideoFileHeader("big.mov", "video/quicktime", 100*1024*1024+1)
+	res, err := svc.UploadVideo(context.Background(), uuid.New(), pkgauthz.Principal{UserID: uuid.New(), Role: "user"}, largeFile)
+
+	assert.ErrorIs(t, err, domain.ErrVideoTooLarge)
+	assert.Nil(t, res)
+	repo.AssertNotCalled(t, "FindByID", mock.Anything, mock.Anything)
+}
+
+func TestListingService_UploadVideo_TooLong(t *testing.T) {
+	repo := mocks.NewListingRepository(t)
+	storage := newFakeListingImageStorage()
+	storage.videoUploadResult.Metadata = mediaasset.Metadata{"duration": float64(70)}
+	svc := service.NewListingServiceWithAuthz(repo, newTestAuthzService(t), storage)
+
+	listingID := uuid.New()
+	userID := uuid.New()
+	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: listingID},
+		UserID:     userID,
+	}, nil)
+	res, err := svc.UploadVideo(context.Background(), listingID, pkgauthz.Principal{UserID: userID, Role: "user"}, testListingVideoFileHeader("long.mp4", "video/mp4", 5*1024*1024))
+
+	assert.ErrorIs(t, err, domain.ErrVideoTooLong)
+	assert.Nil(t, res)
+	assert.Len(t, storage.videoUploads, 1)
+	assert.Len(t, storage.videoDestroyCalls, 1)
+}
+
+func TestListingService_DeleteVideo_Success(t *testing.T) {
+	repo := mocks.NewListingRepository(t)
+	storage := newFakeListingImageStorage()
+	publisher := &fakeEventPublisher{}
+	svc := service.NewListingServiceWithAuthzAndPublisher(repo, newTestAuthzService(t), publisher, storage)
+
+	listingID := uuid.New()
+	userID := uuid.New()
+	videoID := uuid.New()
+	publicID := "listing-video-public"
+	resourceType := mediaasset.DefaultVideoResourceType
+	deliveryType := mediaasset.DefaultDeliveryType
+	video := &entity.ListingVideo{
+		ID:           videoID,
+		ListingID:    listingID,
+		PublicID:     &publicID,
+		ResourceType: &resourceType,
+		DeliveryType: &deliveryType,
+	}
+	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: listingID},
+		UserID:     userID,
+		Video:      video,
+	}, nil).Once()
+	repo.On("FindVideoByListingID", mock.Anything, listingID).Return(video, nil).Once()
+	repo.On("DeleteVideoByListingID", mock.Anything, listingID).Return(nil).Once()
+	repo.On("FindByID", mock.Anything, listingID).Return(&entity.Listing{
+		BaseEntity: entity.BaseEntity{ID: listingID},
+		UserID:     userID,
+	}, nil).Twice()
+
+	res, err := svc.DeleteVideo(context.Background(), listingID, pkgauthz.Principal{UserID: userID, Role: "user"})
+
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.Nil(t, res.Video)
+	assert.Len(t, storage.videoDestroyCalls, 1)
+	assert.Len(t, publisher.listingEvents, 1)
 }
 
 func TestListingService_SetPrimaryImage_Success(t *testing.T) {
@@ -1089,12 +1276,18 @@ func TestListingService_ReorderImages_InvalidPayload(t *testing.T) {
 }
 
 type fakeListingImageStorage struct {
-	uploadResult  *mediaasset.UploadResult
-	uploadErr     error
-	destroyResult *mediaasset.DestroyResult
-	destroyErr    error
-	uploadCalls   []mediaasset.UploadInput
-	destroyCalls  []mediaasset.DestroyInput
+	uploadResult       *mediaasset.UploadResult
+	uploadErr          error
+	destroyResult      *mediaasset.DestroyResult
+	destroyErr         error
+	uploadCalls        []mediaasset.UploadInput
+	destroyCalls       []mediaasset.DestroyInput
+	videoUploadResult  *mediaasset.UploadResult
+	videoUploadErr     error
+	videoDestroyResult *mediaasset.DestroyResult
+	videoDestroyErr    error
+	videoUploads       []mediaasset.UploadInput
+	videoDestroyCalls  []mediaasset.DestroyInput
 }
 
 func newFakeListingImageStorage() *fakeListingImageStorage {
@@ -1106,6 +1299,16 @@ func newFakeListingImageStorage() *fakeListingImageStorage {
 			DeliveryType: mediaasset.DefaultDeliveryType,
 		},
 		destroyResult: &mediaasset.DestroyResult{Result: "ok"},
+		videoUploadResult: &mediaasset.UploadResult{
+			PublicID:     "test-video-public-id",
+			SecureURL:    "https://cdn.example.com/test-video.mp4",
+			ResourceType: mediaasset.DefaultVideoResourceType,
+			DeliveryType: mediaasset.DefaultDeliveryType,
+			Format:       "mp4",
+			Bytes:        50 * 1024 * 1024,
+			Metadata:     mediaasset.Metadata{"duration": float64(30)},
+		},
+		videoDestroyResult: &mediaasset.DestroyResult{Result: "ok"},
 	}
 }
 
@@ -1119,6 +1322,16 @@ func (f *fakeListingImageStorage) DestroyListingImage(_ context.Context, input m
 	return f.destroyResult, f.destroyErr
 }
 
+func (f *fakeListingImageStorage) UploadListingVideo(_ context.Context, input mediaasset.UploadInput) (*mediaasset.UploadResult, error) {
+	f.videoUploads = append(f.videoUploads, input)
+	return f.videoUploadResult, f.videoUploadErr
+}
+
+func (f *fakeListingImageStorage) DestroyListingVideo(_ context.Context, input mediaasset.DestroyInput) (*mediaasset.DestroyResult, error) {
+	f.videoDestroyCalls = append(f.videoDestroyCalls, input)
+	return f.videoDestroyResult, f.videoDestroyErr
+}
+
 func testListingImageFileHeader(filename, contentType string) *multipart.FileHeader {
 	header := textproto.MIMEHeader{}
 	if contentType != "" {
@@ -1128,6 +1341,19 @@ func testListingImageFileHeader(filename, contentType string) *multipart.FileHea
 	return &multipart.FileHeader{
 		Filename: filename,
 		Header:   header,
+	}
+}
+
+func testListingVideoFileHeader(filename, contentType string, size int64) *multipart.FileHeader {
+	header := textproto.MIMEHeader{}
+	if contentType != "" {
+		header.Set("Content-Type", contentType)
+	}
+
+	return &multipart.FileHeader{
+		Filename: filename,
+		Header:   header,
+		Size:     size,
 	}
 }
 
