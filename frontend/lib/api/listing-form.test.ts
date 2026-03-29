@@ -6,9 +6,12 @@ import {
   getListingCategories,
   parseListingSpecifications,
   deleteListingImage,
+  deleteListingVideo,
   reorderListingImages,
   setPrimaryListingImage,
   uploadListingImage,
+  uploadListingImages,
+  uploadListingVideo,
 } from "@/lib/api/listing-form";
 import { ApiError } from "@/lib/api/envelope";
 
@@ -131,7 +134,102 @@ describe("listing image api helpers", () => {
 
     const [, init] = fetchMock.mock.calls[0];
     expect(init?.body).toBeInstanceOf(FormData);
-    expect((init?.body as FormData).get("file")).toBe(file);
+    const formData = init?.body as FormData;
+    expect(formData.get("file")).toBeNull();
+    expect(formData.getAll("files")).toEqual([file]);
+  });
+
+  it("uploads multiple images with repeated files entries", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify(backendEnvelope({ id: "listing-1", images: [] })), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const files = [
+      new File(["first"], "1.png", { type: "image/png" }),
+      new File(["second"], "2.png", { type: "image/png" }),
+    ];
+
+    await uploadListingImages("listing-1", files, {
+      baseUrl: "http://127.0.0.1:8080",
+      fetch: fetchMock,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:8080/api/listings/listing-1/images",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        body: expect.any(FormData),
+      }),
+    );
+
+    const [, init] = fetchMock.mock.calls[0];
+    const formData = init?.body as FormData;
+    expect(formData.get("file")).toBeNull();
+    expect(Array.from(formData.getAll("files"))).toEqual(files);
+  });
+
+  it("propagates errors from the batch upload helper", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockRejectedValue(new Error("boom"));
+    const file = new File(["image"], "front.png", { type: "image/png" });
+
+    await expect(
+      uploadListingImages("listing-1", [file], {
+        baseUrl: "http://127.0.0.1:8080",
+        fetch: fetchMock,
+      }),
+    ).rejects.toThrow("boom");
+  });
+
+  it("uploads a video file with multipart form data", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify(backendEnvelope({ id: "listing-1", images: [] })), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const video = new File(["video-stream"], "tour.mp4", { type: "video/mp4" });
+
+    await uploadListingVideo("listing-1", video, {
+      baseUrl: "http://127.0.0.1:8080",
+      fetch: fetchMock,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:8080/api/listings/listing-1/video",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        body: expect.any(FormData),
+      }),
+    );
+
+    const [, init] = fetchMock.mock.calls[0];
+    const formData = init?.body as FormData;
+    expect(formData.get("file")).toBe(video);
+  });
+
+  it("targets the video delete route", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async () =>
+      new Response(JSON.stringify(backendEnvelope({ id: "listing-1", images: [] })), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await deleteListingVideo("listing-1", {
+      baseUrl: "http://127.0.0.1:8080",
+      fetch: fetchMock,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:8080/api/listings/listing-1/video",
+      expect.objectContaining({ method: "DELETE" }),
+    );
   });
 
   it("targets delete, primary, and reorder image routes with the backend contract", async () => {
