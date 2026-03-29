@@ -106,6 +106,7 @@ export type ListingRecord = {
   specifications: unknown;
   view_count: number;
   images: ListingImageRecord[];
+  video?: ListingVideoRecord | null;
   created_at: string;
   updated_at: string;
 };
@@ -123,10 +124,53 @@ export type ListingImageRecord = {
   created_at: string;
 };
 
+export type ListingVideoRecord = {
+  id: string;
+  url: string;
+  format?: string | null;
+  bytes?: number | null;
+  width?: number | null;
+  height?: number | null;
+  duration_seconds?: number | null;
+  original_filename?: string | null;
+  created_at: string;
+};
+
 export type ListingFormApiOptions = {
   baseUrl?: string;
   fetch?: typeof fetch;
 };
+
+type ListingImageInput = File | File[] | FileList;
+
+function normalizeListingImageInput(input: ListingImageInput): File[] {
+  if (input instanceof FileList) {
+    return Array.from(input);
+  }
+
+  if (Array.isArray(input)) {
+    return input;
+  }
+
+  return [input];
+}
+
+export function createListingImageFormData(input: ListingImageInput) {
+  const files = normalizeListingImageInput(input);
+
+  if (files.length === 0) {
+    throw new Error("at least one file is required");
+  }
+
+  const formData = new FormData();
+
+  files.forEach((file) => {
+    formData.append("files", file);
+  });
+
+
+  return formData;
+}
 
 export async function getListingCategories(
   options: ListingFormApiOptions = {},
@@ -197,8 +241,25 @@ export async function uploadListingImage(
   file: File,
   options: ListingFormApiOptions = {},
 ): Promise<ListingRecord> {
-  const body = new FormData();
-  body.set("file", file);
+  const body = createListingImageFormData(file);
+
+  const response = await browserFetch<ListingRecord>(`/api/listings/${listingId}/images`, {
+    method: "POST",
+    cache: "no-store",
+    baseUrl: options.baseUrl,
+    fetch: options.fetch,
+    body,
+  });
+
+  return response.data;
+}
+
+export async function uploadListingImages(
+  listingId: string,
+  files: File[],
+  options: ListingFormApiOptions = {},
+): Promise<ListingRecord> {
+  const body = createListingImageFormData(files);
 
   const response = await browserFetch<ListingRecord>(`/api/listings/${listingId}/images`, {
     method: "POST",
@@ -255,6 +316,41 @@ export async function reorderListingImages(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ ordered_image_ids: orderedImageIds }),
+  });
+
+  return response.data;
+}
+
+const listingVideoEndpoint = (listingId: string) => `/api/listings/${listingId}/video`;
+
+export async function uploadListingVideo(
+  listingId: string,
+  file: File,
+  options: ListingFormApiOptions = {},
+): Promise<ListingRecord> {
+  const body = new FormData();
+  body.set("file", file);
+
+  const response = await browserFetch<ListingRecord>(listingVideoEndpoint(listingId), {
+    method: "POST",
+    cache: "no-store",
+    baseUrl: options.baseUrl,
+    fetch: options.fetch,
+    body,
+  });
+
+  return response.data;
+}
+
+export async function deleteListingVideo(
+  listingId: string,
+  options: ListingFormApiOptions = {},
+): Promise<ListingRecord> {
+  const response = await browserFetch<ListingRecord>(listingVideoEndpoint(listingId), {
+    method: "DELETE",
+    cache: "no-store",
+    baseUrl: options.baseUrl,
+    fetch: options.fetch,
   });
 
   return response.data;
