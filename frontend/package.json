@@ -9,7 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:guardrails": "node ./scripts/verify-guardrails.mjs",
-    "test:e2e": "rm -rf test-results && playwright test && rm -rf test-results"
+    "test:e2e": "sh -c 'rm -rf test-results && playwright test \"$@\"; status=$?; rm -rf test-results; exit $status' --"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.5",
