@@ -78,6 +78,84 @@ func (_m *ListingRepository) CreateImage(ctx context.Context, image *entity.List
 	return r0, r1
 }
 
+// CreateVideo provides a mock function with given fields: ctx, video
+func (_m *ListingRepository) CreateVideo(ctx context.Context, video *entity.ListingVideo) (*entity.ListingVideo, error) {
+	ret := _m.Called(ctx, video)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateVideo")
+	}
+
+	var r0 *entity.ListingVideo
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *entity.ListingVideo) (*entity.ListingVideo, error)); ok {
+		return rf(ctx, video)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *entity.ListingVideo) *entity.ListingVideo); ok {
+		r0 = rf(ctx, video)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*entity.ListingVideo)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *entity.ListingVideo) error); ok {
+		r1 = rf(ctx, video)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// FindVideoByListingID provides a mock function with given fields: ctx, listingID
+func (_m *ListingRepository) FindVideoByListingID(ctx context.Context, listingID uuid.UUID) (*entity.ListingVideo, error) {
+	ret := _m.Called(ctx, listingID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindVideoByListingID")
+	}
+
+	var r0 *entity.ListingVideo
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) (*entity.ListingVideo, error)); ok {
+		return rf(ctx, listingID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) *entity.ListingVideo); ok {
+		r0 = rf(ctx, listingID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*entity.ListingVideo)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
+		r1 = rf(ctx, listingID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// DeleteVideoByListingID provides a mock function with given fields: ctx, listingID
+func (_m *ListingRepository) DeleteVideoByListingID(ctx context.Context, listingID uuid.UUID) error {
+	ret := _m.Called(ctx, listingID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteVideoByListingID")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) error); ok {
+		r0 = rf(ctx, listingID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Delete provides a mock function with given fields: ctx, id
 func (_m *ListingRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	ret := _m.Called(ctx, id)
