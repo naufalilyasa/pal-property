@@ -82,6 +82,7 @@ type Listing struct {
 	User     *User          `gorm:"foreignKey:UserID" json:"user,omitempty"`
 	Category *Category      `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
 	Images   []ListingImage `gorm:"foreignKey:ListingID" json:"images,omitempty"`
+	Video    *ListingVideo  `gorm:"foreignKey:ListingID" json:"video,omitempty"`
 }
 
 type ListingImage struct {
