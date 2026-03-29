@@ -43,11 +43,17 @@ import (
 )
 
 type fakeListingImageStorage struct {
-	mu         sync.Mutex
-	uploads    []mediaasset.UploadInput
-	destroys   []mediaasset.DestroyInput
-	uploadSeq  int
-	uploadGate *uploadGate
+	mu                 sync.Mutex
+	uploads            []mediaasset.UploadInput
+	destroys           []mediaasset.DestroyInput
+	uploadSeq          int
+	uploadGate         *uploadGate
+	videoUploads       []mediaasset.UploadInput
+	videoDestroys      []mediaasset.DestroyInput
+	videoUploadResult  *mediaasset.UploadResult
+	videoUploadErr     error
+	videoDestroyResult *mediaasset.DestroyResult
+	videoDestroyErr    error
 }
 
 type uploadGate struct {
@@ -92,6 +98,38 @@ func (f *fakeListingImageStorage) DestroyListingImage(_ context.Context, input m
 	return &mediaasset.DestroyResult{Result: "ok"}, nil
 }
 
+func (f *fakeListingImageStorage) UploadListingVideo(_ context.Context, input mediaasset.UploadInput) (*mediaasset.UploadResult, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	seq := len(f.videoUploads)
+	f.videoUploads = append(f.videoUploads, input)
+	result := f.videoUploadResult
+	if result == nil {
+		result = &mediaasset.UploadResult{
+			AssetID:      fmt.Sprintf("video-%d", seq),
+			PublicID:     "listing-video",
+			SecureURL:    fmt.Sprintf("https://fake-cloudinary.example/videos/%s/%s.mp4", input.Folder, input.PublicID),
+			ResourceType: mediaasset.DefaultVideoResourceType,
+			DeliveryType: mediaasset.DefaultDeliveryType,
+			Format:       "mp4",
+			Bytes:        10 * 1024 * 1024,
+			Metadata:     mediaasset.Metadata{"duration": float64(30)},
+		}
+	}
+	return result, f.videoUploadErr
+}
+
+func (f *fakeListingImageStorage) DestroyListingVideo(_ context.Context, input mediaasset.DestroyInput) (*mediaasset.DestroyResult, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.videoDestroys = append(f.videoDestroys, input)
+	result := f.videoDestroyResult
+	if result == nil {
+		result = &mediaasset.DestroyResult{Result: "ok"}
+	}
+	return result, f.videoDestroyErr
+}
+
 func (f *fakeListingImageStorage) Reset() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -100,6 +138,10 @@ func (f *fakeListingImageStorage) Reset() {
 	f.destroys = nil
 	f.uploadSeq = 0
 	f.uploadGate = nil
+	f.videoUploads = nil
+	f.videoDestroys = nil
+	f.videoUploadErr = nil
+	f.videoDestroyErr = nil
 }
 
 func (f *fakeListingImageStorage) ArmUploadGate(expected int) {
@@ -154,6 +196,11 @@ type ListingHandlerTestSuite struct {
 	storage     *fakeListingImageStorage
 }
 
+type uploadFile struct {
+	fileName string
+	content  []byte
+}
+
 func (s *ListingHandlerTestSuite) SetupSuite() {
 	s.ctx = context.Background()
 	logger.Log = zap.NewNop()
@@ -191,12 +238,24 @@ func (s *ListingHandlerTestSuite) SetupSuite() {
 	s.db, err = gorm.Open(pgDriver.Open(dsn), &gorm.Config{})
 	s.Require().NoError(err)
 
-	err = s.db.AutoMigrate(&entity.User{}, &entity.Category{}, &entity.Listing{}, &entity.ListingImage{})
+	err = s.db.AutoMigrate(&entity.User{}, &entity.Category{}, &entity.Listing{}, &entity.ListingImage{}, &entity.ListingVideo{})
 	s.Require().NoError(err)
 	err = setupAuthzTestState(s.db)
 	s.Require().NoError(err)
 
-	s.storage = &fakeListingImageStorage{}
+	s.storage = &fakeListingImageStorage{
+		videoUploadResult: &mediaasset.UploadResult{
+			AssetID:      "fake-video-asset",
+			PublicID:     "listing-video-1",
+			SecureURL:    "https://fake-cloudinary.example/videos/listing-video.mp4",
+			ResourceType: mediaasset.DefaultVideoResourceType,
+			DeliveryType: mediaasset.DefaultDeliveryType,
+			Format:       "mp4",
+			Bytes:        5 * 1024 * 1024,
+			Metadata:     mediaasset.Metadata{"duration": float64(30)},
+		},
+		videoDestroyResult: &mediaasset.DestroyResult{Result: "ok"},
+	}
 	listingRepo := repo.NewListingRepository(s.db)
 	authzService, err := newAuthzService(s.db)
 	s.Require().NoError(err)
@@ -219,6 +278,12 @@ func (s *ListingHandlerTestSuite) SetupSuite() {
 			} else if errors.Is(err, domain.ErrImageLimitReached) {
 				code = fiber.StatusConflict
 			} else if errors.Is(err, domain.ErrImageStorageUnset) {
+				code = fiber.StatusServiceUnavailable
+			} else if errors.Is(err, domain.ErrInvalidVideoFile) || errors.Is(err, domain.ErrVideoTooLarge) || errors.Is(err, domain.ErrVideoTooLong) {
+				code = fiber.StatusBadRequest
+			} else if errors.Is(err, domain.ErrVideoAlreadyExists) {
+				code = fiber.StatusConflict
+			} else if errors.Is(err, domain.ErrVideoStorageUnset) {
 				code = fiber.StatusServiceUnavailable
 			}
 			if e, ok := err.(*fiber.Error); ok {
@@ -248,6 +313,8 @@ func (s *ListingHandlerTestSuite) SetupSuite() {
 	listingProtected.Delete("/:id", listingHandler.Delete)
 	listingProtected.Post("/:id/images", listingHandler.UploadImage)
 	listingProtected.Delete("/:id/images/:imageId", listingHandler.DeleteImage)
+	listingProtected.Post("/:id/video", listingHandler.UploadVideo)
+	listingProtected.Delete("/:id/video", listingHandler.DeleteVideo)
 	listingProtected.Patch("/:id/images/:imageId/primary", listingHandler.SetPrimaryImage)
 	listingProtected.Patch("/:id/images/reorder", listingHandler.ReorderImages)
 
@@ -318,6 +385,28 @@ func (s *ListingHandlerTestSuite) makeMultipartRequest(method, path, fieldName, 
 	s.Require().NoError(err)
 	err = writer.Close()
 	s.Require().NoError(err)
+
+	req := httptest.NewRequest(method, path, body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	if token != "" {
+		req.AddCookie(&http.Cookie{Name: "access_token", Value: token})
+	}
+
+	resp, err := s.app.Test(req, fiber.TestConfig{Timeout: 30 * time.Second})
+	s.Require().NoError(err)
+	return resp
+}
+
+func (s *ListingHandlerTestSuite) makeMultipartFilesRequest(method, path, fieldName string, files []uploadFile, token string) *http.Response {
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	for _, file := range files {
+		part, err := writer.CreateFormFile(fieldName, file.fileName)
+		s.Require().NoError(err)
+		_, err = part.Write(file.content)
+		s.Require().NoError(err)
+	}
+	s.Require().NoError(writer.Close())
 
 	req := httptest.NewRequest(method, path, body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
@@ -649,6 +738,80 @@ func (s *ListingHandlerTestSuite) TestListingImageRoutes_WithFakeStorage() {
 	s.False(uploadAfterDeleteResult.Data.Images[2].IsPrimary)
 	s.Equal(2, uploadAfterDeleteResult.Data.Images[2].SortOrder)
 	s.Equal(4, s.storage.UploadCount())
+}
+
+func (s *ListingHandlerTestSuite) TestListingHandler_MultiFileUpload() {
+	owner := s.createTestUser("user")
+	ownerToken := s.mintJWT(owner.ID)
+	listing := s.createListing(ownerToken, request.CreateListingRequest{Title: "Batch Upload Listing", Price: 1500000, Status: "active"})
+
+	files := []uploadFile{
+		{fileName: "front.jpg", content: []byte("front")},
+		{fileName: "living-room.jpg", content: []byte("living-room")},
+	}
+	resp := s.makeMultipartFilesRequest(http.MethodPost, "/api/listings/"+listing.ID.String()+"/images", "files", files, ownerToken)
+	s.Equal(http.StatusOK, resp.StatusCode)
+	result := decodeListingEnvelope(s.T(), resp)
+	s.Len(result.Data.Images, len(files))
+	s.True(result.Data.Images[0].IsPrimary)
+	s.False(result.Data.Images[1].IsPrimary)
+}
+
+func (s *ListingHandlerTestSuite) TestListingHandler_UploadImages_Overflow() {
+	owner := s.createTestUser("user")
+	ownerToken := s.mintJWT(owner.ID)
+	listing := s.createListing(ownerToken, request.CreateListingRequest{Title: "Overflow Listing", Price: 1500000, Status: "active"})
+
+	for i := 0; i < 10; i++ {
+		resp := s.makeMultipartRequest(http.MethodPost, "/api/listings/"+listing.ID.String()+"/images", "file", fmt.Sprintf("img-%d.jpg", i), []byte(fmt.Sprintf("img-%d", i)), ownerToken)
+		s.Equal(http.StatusOK, resp.StatusCode)
+	}
+	before := s.storage.DestroyCount()
+	overflow := s.makeMultipartFilesRequest(http.MethodPost, "/api/listings/"+listing.ID.String()+"/images", "files", []uploadFile{{fileName: "overflow.jpg", content: []byte("overflow")}}, ownerToken)
+	s.Equal(http.StatusConflict, overflow.StatusCode)
+	errResult := decodeErrorEnvelope(s.T(), overflow)
+	s.Equal(domain.ErrImageLimitReached.Error(), errResult.Message)
+	s.Equal(before, s.storage.DestroyCount())
+}
+
+func (s *ListingHandlerTestSuite) TestListingHandler_VideoRoutes_WithFakeStorage() {
+	owner := s.createTestUser("user")
+	ownerToken := s.mintJWT(owner.ID)
+	listing := s.createListing(ownerToken, request.CreateListingRequest{Title: "Listing With Video", Price: 1500000, Status: "active"})
+
+	uploadResp := s.makeMultipartRequest(http.MethodPost, "/api/listings/"+listing.ID.String()+"/video", "file", "tour.mp4", []byte("video-bytes"), ownerToken)
+	s.Equal(http.StatusOK, uploadResp.StatusCode)
+	uploadResult := decodeListingEnvelope(s.T(), uploadResp)
+	s.NotNil(uploadResult.Data.Video)
+	s.Equal("tour.mp4", *uploadResult.Data.Video.OriginalFilename)
+	s.Len(s.storage.videoUploads, 1)
+	s.Equal(fmt.Sprintf("listings/%s", listing.ID.String()), s.storage.videoUploads[0].Folder)
+
+	deleteResp := s.makeRequest(http.MethodDelete, "/api/listings/"+listing.ID.String()+"/video", nil, ownerToken)
+	s.Equal(http.StatusOK, deleteResp.StatusCode)
+	deleteResult := decodeListingEnvelope(s.T(), deleteResp)
+	s.Nil(deleteResult.Data.Video)
+	s.Len(s.storage.videoDestroys, 1)
+}
+
+func (s *ListingHandlerTestSuite) TestUploadListingVideo_NegativeRoutes() {
+	owner := s.createTestUser("user")
+	ownerToken := s.mintJWT(owner.ID)
+	listing := s.createListing(ownerToken, request.CreateListingRequest{Title: "Video Guard Listing", Price: 1750000, Status: "active"})
+
+	unauthorizedResp := s.makeMultipartRequest(http.MethodPost, "/api/listings/"+listing.ID.String()+"/video", "file", "tour.mp4", []byte("video-bytes"), "")
+	s.Equal(http.StatusUnauthorized, unauthorizedResp.StatusCode)
+	unauthorizedResult := decodeErrorEnvelope(s.T(), unauthorizedResp)
+	s.False(unauthorizedResult.Success)
+	s.Equal("missing access token", unauthorizedResult.Message)
+	s.Len(s.storage.videoUploads, 0)
+
+	invalidResp := s.makeMultipartRequest(http.MethodPost, "/api/listings/"+listing.ID.String()+"/video", "file", "notes.txt", []byte("not-a-video"), ownerToken)
+	s.Equal(http.StatusBadRequest, invalidResp.StatusCode)
+	invalidResult := decodeErrorEnvelope(s.T(), invalidResp)
+	s.False(invalidResult.Success)
+	s.Equal(domain.ErrInvalidVideoFile.Error(), invalidResult.Message)
+	s.Len(s.storage.videoUploads, 0)
 }
 
 func (s *ListingHandlerTestSuite) TestUploadListingImage_NegativeRoutes() {

@@ -1,6 +1,7 @@
 package http
 
 import (
+	"mime/multipart"
 	"strconv"
 
 	"github.com/gofiber/fiber/v3"
@@ -128,12 +129,63 @@ func (h *ListingHandler) UploadImage(c fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusUnauthorized, err.Error())
 	}
 
+	files := make([]*multipart.FileHeader, 0, 1)
+	if file, err := c.FormFile("file"); err == nil && file != nil {
+		files = append(files, file)
+	}
+	if form, err := c.MultipartForm(); err == nil && form != nil {
+		if formFiles, ok := form.File["files"]; ok && len(formFiles) > 0 {
+			files = append(files, formFiles...)
+		}
+	}
+	if len(files) == 0 {
+		return fiber.NewError(fiber.StatusBadRequest, "file is required")
+	}
+
+	res, err := h.svc.UploadImage(c.Context(), id, principal, files)
+	if err != nil {
+		return err
+	}
+
+	return utils.SendResponse(c, fiber.StatusOK, res)
+}
+
+func (h *ListingHandler) UploadVideo(c fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid listing id")
+	}
+
+	principal, err := middleware.CurrentPrincipal(c)
+	if err != nil {
+		return fiber.NewError(fiber.StatusUnauthorized, err.Error())
+	}
+
 	file, err := c.FormFile("file")
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "file is required")
 	}
 
-	res, err := h.svc.UploadImage(c.Context(), id, principal, file)
+	res, err := h.svc.UploadVideo(c.Context(), id, principal, file)
+	if err != nil {
+		return err
+	}
+
+	return utils.SendResponse(c, fiber.StatusOK, res)
+}
+
+func (h *ListingHandler) DeleteVideo(c fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid listing id")
+	}
+
+	principal, err := middleware.CurrentPrincipal(c)
+	if err != nil {
+		return fiber.NewError(fiber.StatusUnauthorized, err.Error())
+	}
+
+	res, err := h.svc.DeleteVideo(c.Context(), id, principal)
 	if err != nil {
 		return err
 	}
