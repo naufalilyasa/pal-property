@@ -44,6 +44,7 @@ type ListingResponse struct {
 	Specifications    datatypes.JSON          `json:"specifications"`
 	ViewCount         int                     `json:"view_count"`
 	Images            []*ListingImageResponse `json:"images"`
+	Video             *ListingVideoResponse   `json:"video,omitempty"`
 	CreatedAt         time.Time               `json:"created_at"`
 	UpdatedAt         time.Time               `json:"updated_at"`
 }
@@ -67,4 +68,17 @@ type PaginatedListings struct {
 	Page       int                `json:"page"`
 	Limit      int                `json:"limit"`
 	TotalPages int                `json:"total_pages"`
+}
+
+
+type ListingVideoResponse struct {
+	ID               uuid.UUID `json:"id"`
+	URL              string    `json:"url"`
+	Format           *string   `json:"format,omitempty"`
+	Bytes            *int64    `json:"bytes,omitempty"`
+	Width            *int      `json:"width,omitempty"`
+	Height           *int      `json:"height,omitempty"`
+	DurationSeconds  *int      `json:"duration_seconds,omitempty"`
+	OriginalFilename *string   `json:"original_filename,omitempty"`
+	CreatedAt        time.Time `json:"created_at"`
 }
