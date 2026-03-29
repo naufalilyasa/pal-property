@@ -1,6 +1,5 @@
 import { browserFetch } from "@/lib/api/browser-fetch";
 import { ApiError } from "@/lib/api/envelope";
-import { serverFetch } from "@/lib/api/server-fetch";
 
 export type SellerSessionUser = {
   id: string;
@@ -24,7 +23,6 @@ export type SellerSession =
 
 export type BootstrapSellerSessionOptions = {
   baseUrl?: string;
-  cookieHeader?: string;
   fetch?: typeof fetch;
 };
 
@@ -37,20 +35,14 @@ export async function bootstrapSellerSession(
     headers.set("Accept", "application/json");
   }
 
-  if (options.cookieHeader) {
-    headers.set("Cookie", options.cookieHeader);
-  }
-
   try {
-    const response = options.cookieHeader
-      ? await fetchSellerSessionOnServer(options, headers)
-      : await browserFetch<SellerSessionUser>("/auth/me", {
-          method: "GET",
-          cache: "no-store",
-          baseUrl: options.baseUrl,
-          fetch: options.fetch,
-          headers,
-        });
+    const response = await browserFetch<SellerSessionUser>("/auth/me", {
+      method: "GET",
+      cache: "no-store",
+      baseUrl: options.baseUrl,
+      fetch: options.fetch,
+      headers,
+    });
 
     return {
       status: "authenticated",
@@ -67,18 +59,4 @@ export async function bootstrapSellerSession(
 
     throw error;
   }
-}
-
-async function fetchSellerSessionOnServer(
-  options: BootstrapSellerSessionOptions,
-  headers: Headers,
-) {
-  return serverFetch<SellerSessionUser>("/auth/me", {
-    method: "GET",
-    cache: "no-store",
-    baseUrl: options.baseUrl,
-    fetch: options.fetch,
-    headers,
-    cookieHeader: options.cookieHeader,
-  });
 }
