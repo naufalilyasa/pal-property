@@ -1,0 +1,3 @@
+- Added listing_videos migration, entity, and relation so each listing can optionally own one video that carries Cloudinary metadata while keeping the table hard-delete only.
+- Batch image uploads now accept repeated `files` parts alongside the legacy `file` field, validate the entire set before persisting, enforce the 10-image cap, and tear down any uploads when a downstream save fails.
+- Verified the new multi-file upload behaviour (including overflow guardrails) via targeted service/handler tests and the required `go test`/`go build`/`go vet` suite.

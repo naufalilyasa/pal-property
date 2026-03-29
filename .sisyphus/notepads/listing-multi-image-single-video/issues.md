@@ -1,0 +1,5 @@
+
+- Full backend `go test ./... -count=1` is environment-blocked in this session because testcontainers cannot reach the Docker daemon (`$XDG_RUNTIME_DIR` / `/var/run/docker.sock`), so contract-level verification relied on targeted domain/service tests plus `go build` and `go vet`.
+- go test/go build currently fail because `pkgauthz.ActionUploadVideo`/`ActionDeleteVideo` and the referenced `math`/`strconv` imports are undefined in this workspace; the video upload/delete paths need upstream adjustments before full backend verification can succeed.
+- The earlier Task 3 compile blockers are resolved now: video auth actions, imports, routing, and backend build/vet all pass; only Docker-backed full handler suite execution remains environment-blocked.
+- Real browser QA for the seller edit media section is environment-blocked in this session because the protected dashboard route requires a live backend/auth stack on `127.0.0.1:8080`; without Docker-backed services, `/dashboard/listings/[listingId]/edit` fails server-side before the form renders.
