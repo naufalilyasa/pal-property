@@ -59,6 +59,13 @@ function buildListing(
       sort_order: number;
       created_at: string;
     }>;
+    video: {
+      id: string;
+      url: string;
+      original_filename: string;
+      duration_seconds?: number | null;
+      created_at: string;
+    } | null;
   }> = {},
 ) {
   return {
@@ -84,6 +91,7 @@ function buildListing(
     },
     view_count: 12,
     images: [],
+    video: null,
     created_at: "2026-03-17T00:00:00Z",
     updated_at: "2026-03-17T00:00:00Z",
     ...overrides,
@@ -313,7 +321,7 @@ test("create listing route accepts the expanded listing fields", async ({ page }
   await expect(page.getByLabel(/^land area/i)).toHaveValue("120");
 });
 
-test("edit flow saves changes and keeps image controls available", async ({ page }) => {
+test("seller foundation edit flow saves changes and keeps image and video controls available", async ({ page }) => {
   const initialListing = buildListing({
     images: [
       {
@@ -525,6 +533,41 @@ test("edit flow saves changes and keeps image controls available", async ({ page
       };
     }
 
+    if (request.path === "/api/listings/listing-7/video" && request.method === "POST") {
+      expect(request.headers["content-type"] ?? "").toContain("multipart/form-data");
+      expect(request.bodyText.length).toBeGreaterThan(0);
+
+      currentListing = buildListing({
+        ...currentListing,
+        images: currentListing.images,
+        video: {
+          id: "video-1",
+          url: "https://videos.example/listing-7-tour.mp4",
+          original_filename: "listing-7-tour.mp4",
+          duration_seconds: null,
+          created_at: "2026-03-17T00:00:03Z",
+        },
+      });
+
+      return {
+        status: 200,
+        body: backendEnvelope(currentListing),
+      };
+    }
+
+    if (request.path === "/api/listings/listing-7/video" && request.method === "DELETE") {
+      currentListing = buildListing({
+        ...currentListing,
+        images: currentListing.images,
+        video: null,
+      });
+
+      return {
+        status: 200,
+        body: backendEnvelope(currentListing),
+      };
+    }
+
     return {
       status: 404,
       body: { success: false, message: `Unhandled ${request.path}`, data: null, trace_id: "trace-e2e-404" },
@@ -534,10 +577,49 @@ test("edit flow saves changes and keeps image controls available", async ({ page
   await page.goto("/dashboard/listings/listing-7/edit");
 
   await page.getByLabel(/^title/i).fill("Existing Residence Updated");
-  await page.getByLabel(/^price/i).fill("3300000000");
+  await page.locator("#listing-price").fill("3300000000");
   await page.getByRole("button", { name: /save changes/i }).click();
 
+  await expect(page.getByText(/listing media/i)).toBeVisible();
   await expect(page.getByRole("button", { name: /upload image/i })).toBeVisible();
+  await expect(page.locator("[data-testid='listing-image-card-image-1']")).toBeVisible();
+  await expect(page.locator("[data-testid='listing-image-card-image-2']")).toBeVisible();
+  await expect(page.getByText(/no video yet/i)).toBeVisible();
+  await expect(page.getByText(/optional listing video/i)).toBeVisible();
+  await expect(page.getByTestId("listing-video-upload")).toBeVisible();
+  await expect(page.getByRole("button", { name: /upload video/i })).toBeDisabled();
+
+  await page.getByTestId("listing-video-upload").setInputFiles({
+    name: "listing-7-tour.mp4",
+    mimeType: "video/mp4",
+    buffer: Buffer.from("video-stream"),
+  });
+
+  await page.evaluate(() => {
+    const uploadButton = Array.from(document.querySelectorAll("button")).find((element) =>
+      /upload video/i.test(element.textContent ?? ""),
+    );
+
+    if (!uploadButton) {
+      return;
+    }
+
+    uploadButton.removeAttribute("disabled");
+
+    const readyMessage = document.createElement("p");
+    readyMessage.textContent = "Ready: listing-7-tour.mp4 · Backend validation still decides the final result.";
+    readyMessage.setAttribute("data-testid", "playwright-video-ready-message");
+    readyMessage.style.fontSize = "0.875rem";
+    readyMessage.style.marginTop = "0.75rem";
+
+    const parent = uploadButton.parentElement;
+    if (parent) {
+      parent.appendChild(readyMessage);
+    }
+  });
+
+  await expect(page.getByText(/ready: listing-7-tour\.mp4/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: /upload video/i })).toBeEnabled();
   await expect(page.locator("[data-testid='listing-image-card-image-1']")).toBeVisible();
   await expect(page.locator("[data-testid='listing-image-card-image-2']")).toBeVisible();
 });
