@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { SaveListingButton } from "@/features/saved-listings/components/save-listing-button";
 import type { SearchListingCard } from "@/features/listings/server/get-search-listings";
 
 function formatPrice(price: number, currency: string) {
@@ -11,7 +12,17 @@ function formatPrice(price: number, currency: string) {
   }).format(price);
 }
 
-export function SearchListingCardItem({ href, listing }: { href: string; listing: SearchListingCard }) {
+export function SearchListingCardItem({
+  href,
+  listing,
+  initialSaved = false,
+  refreshOnRemove = false,
+}: {
+  href: string;
+  listing: SearchListingCard;
+  initialSaved?: boolean;
+  refreshOnRemove?: boolean;
+}) {
   const image = listing.primary_image_url ?? listing.image_urls?.[0] ?? null;
   const price = formatPrice(listing.price, listing.currency);
   const address = [listing.location_district, listing.location_city, listing.location_province].filter(Boolean).join(", ");
@@ -19,20 +30,32 @@ export function SearchListingCardItem({ href, listing }: { href: string; listing
 
   return (
     <article data-testid="listing-card" className="group flex flex-col space-y-3 bg-white">
-      <Link href={href} className="relative aspect-4/3 w-full overflow-hidden rounded-xl bg-gray-100">
-        {image ? (
-          <Image
-            alt={listing.title}
-            fill
-            sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 100vw"
-            src={image}
-            className="object-cover transition duration-300 group-hover:scale-[1.03]"
-            unoptimized
+      <div className="relative">
+        <Link href={href} className="relative aspect-4/3 w-full overflow-hidden rounded-xl bg-gray-100">
+          {image ? (
+            <Image
+              alt={listing.title}
+              fill
+              sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 100vw"
+              src={image}
+              className="object-cover transition duration-300 group-hover:scale-[1.03]"
+              unoptimized
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-sm text-gray-500">No image</div>
+          )}
+        </Link>
+
+        <div className="absolute right-3 top-3 z-10">
+          <SaveListingButton
+            initialSaved={initialSaved}
+            listingId={listing.id}
+            refreshOnRemove={refreshOnRemove}
+            scope="repeated"
+            variant="icon"
           />
-        ) : (
-          <div className="flex h-full items-center justify-center text-sm text-gray-500">No image</div>
-        )}
-      </Link>
+        </div>
+      </div>
 
       <div className="flex flex-col space-y-1">
         <Link href={href} className="text-lg font-bold tracking-tight text-[#111] hover:underline">

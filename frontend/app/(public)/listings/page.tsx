@@ -1,8 +1,10 @@
 import Link from "next/link";
 
+import { getOptionalUser } from "@/features/auth/server/current-user";
 import { ListingFilters } from "@/features/listings/components/listing-filters";
 import { SearchListingCardItem } from "@/features/listings/components/search-listing-card";
 import { getSearchListings } from "@/features/listings/server/get-search-listings";
+import { getSavedListingIdsForListings } from "@/features/saved-listings/server/get-saved-listing-ids";
 import { TopNav } from "@/features/listings/components/top-nav";
 import { Footer } from "@/features/listings/components/footer";
 
@@ -11,27 +13,31 @@ export default async function PublicListingsPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const resolvedSearchParams = (await searchParams) ?? {};
+  const [resolvedSearchParams, user] = await Promise.all([
+    searchParams,
+    getOptionalUser(),
+  ]);
+  const normalizedSearchParams = resolvedSearchParams ?? {};
 
   // View mode
   const view =
-    getQueryValue(resolvedSearchParams.view) === "list" ? "list" : "map";
+    getQueryValue(normalizedSearchParams.view) === "list" ? "list" : "map";
 
   // Filter values
   const filterValues = {
-    q: getQueryValue(resolvedSearchParams.q),
-    transaction_type: getQueryValue(resolvedSearchParams.transaction_type),
-    category_id: getQueryValue(resolvedSearchParams.category_id),
-    location_province: getQueryValue(resolvedSearchParams.location_province),
-    location_city: getQueryValue(resolvedSearchParams.location_city),
-    price_min: getQueryValue(resolvedSearchParams.price_min),
-    price_max: getQueryValue(resolvedSearchParams.price_max),
-    sort: getQueryValue(resolvedSearchParams.sort),
-    limit: getQueryValue(resolvedSearchParams.limit) ?? "12",
+    q: getQueryValue(normalizedSearchParams.q),
+    transaction_type: getQueryValue(normalizedSearchParams.transaction_type),
+    category_id: getQueryValue(normalizedSearchParams.category_id),
+    location_province: getQueryValue(normalizedSearchParams.location_province),
+    location_city: getQueryValue(normalizedSearchParams.location_city),
+    price_min: getQueryValue(normalizedSearchParams.price_min),
+    price_max: getQueryValue(normalizedSearchParams.price_max),
+    sort: getQueryValue(normalizedSearchParams.sort),
+    limit: getQueryValue(normalizedSearchParams.limit) ?? "12",
   };
 
   const listingsPage = await getSearchListings({
-    page: getQueryValue(resolvedSearchParams.page) ?? "1",
+    page: getQueryValue(normalizedSearchParams.page) ?? "1",
     limit: filterValues.limit,
     q: filterValues.q,
     transaction_type: filterValues.transaction_type,
@@ -44,6 +50,10 @@ export default async function PublicListingsPage({
   });
   const displayListings = listingsPage.items;
   const displayTotal = listingsPage.total;
+  const savedListingIds = user
+    ? (await getSavedListingIdsForListings(displayListings.map((listing) => listing.id))).listingIds
+    : [];
+  const savedListingIdSet = new Set(savedListingIds);
 
   return (
     <div className="flex min-h-screen flex-col bg-white font-sans text-[#111]">
@@ -115,6 +125,7 @@ export default async function PublicListingsPage({
               <SearchListingCardItem
                 key={listing.id}
                 href={`/listings/${listing.slug}`}
+                initialSaved={savedListingIdSet.has(listing.id)}
                 listing={listing}
               />
             ))}
@@ -125,7 +136,7 @@ export default async function PublicListingsPage({
             <div data-testid="listing-pagination" className="mt-12 flex items-center justify-center gap-2">
               {Array.from({ length: listingsPage.total_pages }, (_, index) => index + 1).map((pageNumber) => {
                 const params = new URLSearchParams();
-                for (const [key, value] of Object.entries(resolvedSearchParams)) {
+                for (const [key, value] of Object.entries(normalizedSearchParams)) {
                   const normalized = getQueryValue(value);
                   if (normalized) params.set(key, normalized);
                 }
