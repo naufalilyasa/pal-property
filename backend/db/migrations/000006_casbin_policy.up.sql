@@ -25,10 +25,14 @@ INSERT INTO casbin_rule (ptype, v0, v1, v2) VALUES
     ('p', 'admin', 'listing', 'delete_image'),
     ('p', 'admin', 'listing', 'set_primary_image'),
     ('p', 'admin', 'listing', 'reorder_images'),
+    ('p', 'admin', 'listing', 'upload_video'),
+    ('p', 'admin', 'listing', 'delete_video'),
     ('p', 'owner', 'listing', 'update'),
     ('p', 'owner', 'listing', 'delete'),
     ('p', 'owner', 'listing', 'upload_image'),
     ('p', 'owner', 'listing', 'delete_image'),
     ('p', 'owner', 'listing', 'set_primary_image'),
-    ('p', 'owner', 'listing', 'reorder_images')
+    ('p', 'owner', 'listing', 'reorder_images'),
+    ('p', 'owner', 'listing', 'upload_video'),
+    ('p', 'owner', 'listing', 'delete_video')
 ON CONFLICT DO NOTHING;
