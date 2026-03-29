@@ -1,8 +1,11 @@
 import {
   deleteListingImage,
+  deleteListingVideo,
   reorderListingImages,
   setPrimaryListingImage,
   uploadListingImage,
+  uploadListingImages,
+  uploadListingVideo,
   type ListingRecord,
 } from "@/lib/api/listing-form";
 
@@ -11,6 +14,11 @@ export const listingImageRoutePatterns = {
   remove: "/api/listings/:id/images/:imageId",
   primary: "/api/listings/:id/images/:imageId/primary",
   reorder: "/api/listings/:id/images/reorder",
+} as const;
+
+export const listingVideoRoutePatterns = {
+  upload: "/api/listings/:id/video",
+  remove: "/api/listings/:id/video",
 } as const;
 
 export function listingImageEndpoint(listingId: string) {
@@ -29,15 +37,24 @@ export function listingImageReorderEndpoint(listingId: string) {
   return `${listingImageEndpoint(listingId)}/reorder`;
 }
 
-export function createListingImageFormData(file: File) {
-  const formData = new FormData();
-  formData.set("file", file);
-  return formData;
+export function listingVideoEndpoint(listingId: string) {
+  return `/api/listings/${listingId}/video`;
 }
 
 export async function uploadSellerListingImage(listingId: string, file: File): Promise<ListingRecord> {
-  createListingImageFormData(file);
   return uploadListingImage(listingId, file);
+}
+
+export async function uploadSellerListingImages(listingId: string, files: File[]): Promise<ListingRecord> {
+  return uploadListingImages(listingId, files);
+}
+
+export async function uploadSellerListingVideo(listingId: string, file: File): Promise<ListingRecord> {
+  return uploadListingVideo(listingId, file);
+}
+
+export async function deleteSellerListingVideo(listingId: string): Promise<ListingRecord> {
+  return deleteListingVideo(listingId);
 }
 
 export async function deleteSellerListingImage(listingId: string, imageId: string): Promise<ListingRecord> {
