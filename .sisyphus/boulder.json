@@ -1,10 +1,10 @@
 {
-  "active_plan": "/mnt/data/Projects/pal-property/.sisyphus/plans/listing-multi-image-single-video.md",
-  "started_at": "2026-03-29T02:48:18.417Z",
+  "active_plan": "/mnt/data/Projects/pal-property/.sisyphus/plans/seller-public-login-ux-split.md",
+  "started_at": "2026-03-30T08:32:06.340Z",
   "session_ids": [
     "ses_3324f826fffeYsUl8ARRsgmJDN"
   ],
-  "plan_name": "listing-multi-image-single-video",
+  "plan_name": "seller-public-login-ux-split",
   "agent": "atlas",
   "worktree_path": "/mnt/data/Projects/pal-property"
 }
