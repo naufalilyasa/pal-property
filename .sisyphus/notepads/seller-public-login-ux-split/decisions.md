@@ -1,0 +1,2 @@
+- Treat the Google OAuth begin URL builder as the shared contract: accept an explicit AuthIntent, default return paths, and emit a versioned state string so both `/login` and future `/seller/login` can reuse the same backend endpoint without branching on pathname.
+- Keep `/login` as the general entry and add `/seller/login` as a seller-oriented variant, but have both pages call the same shared shell/component so UX divergence stays in copy while the backend OAuth entry mechanism remains identical.
