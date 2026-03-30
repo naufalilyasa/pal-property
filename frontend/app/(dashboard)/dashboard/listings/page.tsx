@@ -6,7 +6,7 @@ import { DashboardListingsTable } from "@/features/listings/components/dashboard
 import { getSellerListingsPage } from "@/features/listings/server/get-seller-listings";
 
 export default async function DashboardListingsPage() {
-  await requireUser();
+  await requireUser({ intent: "seller", returnTo: "/dashboard/listings" });
   const listingsPage = await getSellerListingsPage();
 
   return (

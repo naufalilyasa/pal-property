@@ -130,6 +130,10 @@ func (s *authService) GetMe(ctx context.Context, userID uuid.UUID) (*response.Us
 		Email:     user.Email,
 		AvatarURL: user.AvatarURL,
 		Role:      user.Role,
+		SellerCapabilities: response.SellerCapabilityResponse{
+			CanAccessDashboard: true,
+			RequiresOnboarding: false,
+		},
 		CreatedAt: user.CreatedAt,
 	}, nil
 }

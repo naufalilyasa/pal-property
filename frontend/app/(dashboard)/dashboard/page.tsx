@@ -5,7 +5,7 @@ import { DashboardRefreshButton } from "@/features/listings/components/dashboard
 import { getSellerListingsPage } from "@/features/listings/server/get-seller-listings";
 
 export default async function DashboardOverviewPage() {
-  await requireUser();
+  await requireUser({ intent: "seller", returnTo: "/dashboard" });
   const listingsPage = await getSellerListingsPage();
 
   return (

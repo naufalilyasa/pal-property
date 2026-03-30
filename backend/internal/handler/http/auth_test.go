@@ -315,6 +315,29 @@ func (s *AuthHandlerTestSuite) TestOAuthCallback_Success() {
 	s.Len(keys, 1, "Should have exactly 1 refresh token in redis")
 }
 
+func (s *AuthHandlerTestSuite) TestOAuthCallback_UsesReturnToState() {
+	statePayload := map[string]string{
+		"returnTo": "/seller/onboarding",
+	}
+	rawState, err := json.Marshal(statePayload)
+	s.Require().NoError(err)
+	state := base64.RawURLEncoding.EncodeToString(rawState)
+
+	req := httptest.NewRequest(http.MethodGet, "/auth/oauth/faux/callback?provider=faux&state="+state, nil)
+	req = req.WithContext(context.WithValue(req.Context(), gothic.ProviderParamKey, "faux"))
+	fauxSession := &faux.Session{Name: "Seller Faux", Email: "seller.faux@example.com"}
+	recorder := httptest.NewRecorder()
+	gothic.StoreInSession("faux", fauxSession.Marshal(), req, recorder)
+	for _, cookie := range recorder.Result().Cookies() {
+		req.AddCookie(cookie)
+	}
+
+	res, err := s.app.Test(req, fiber.TestConfig{Timeout: 30 * time.Second})
+	s.Require().NoError(err)
+	s.Equal(http.StatusSeeOther, res.StatusCode)
+	s.Equal("http://localhost:3000/seller/onboarding", res.Header.Get("Location"))
+}
+
 func (s *AuthHandlerTestSuite) TestOAuthCallback_Unauthorized() {
 	// Simulating callback WITHOUT setting session cookie
 	req := httptest.NewRequest(http.MethodGet, "/auth/oauth/faux/callback?provider=faux", nil)
@@ -369,6 +392,7 @@ func (s *AuthHandlerTestSuite) TestGetMe_Success() {
 	s.Equal("John Doe", data["name"])
 	s.Equal("john@example.com", data["email"])
 	s.Equal(userID.String(), data["id"])
+	s.Equal(map[string]interface{}{"canAccessDashboard": true, "requiresOnboarding": false}, data["seller_capabilities"])
 }
 
 func (s *AuthHandlerTestSuite) TestGetMe_Unauthorized() {

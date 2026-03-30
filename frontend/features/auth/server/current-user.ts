@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { SellerCapabilityInfo } from "@/features/auth/auth-destination";
 import { serverFetch } from "@/lib/api/server-fetch";
 import { ApiError } from "@/lib/api/envelope";
 import { getRequestCookieHeader } from "@/lib/server/cookies";
@@ -10,6 +11,7 @@ export type CurrentUser = {
   email: string;
   avatar_url?: string | null;
   role: string;
+  seller_capabilities: SellerCapabilityInfo;
   created_at: string;
 };
 

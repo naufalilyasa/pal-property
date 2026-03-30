@@ -1,5 +1,6 @@
 import { browserFetch } from "@/lib/api/browser-fetch";
 import { ApiError } from "@/lib/api/envelope";
+import type { SellerCapabilityInfo } from "@/features/auth/auth-destination";
 
 export type SellerSessionUser = {
   id: string;
@@ -8,6 +9,7 @@ export type SellerSessionUser = {
   avatar_url?: string | null;
   role: string;
   created_at: string;
+  seller_capabilities?: SellerCapabilityInfo;
 };
 
 export type SellerSession =

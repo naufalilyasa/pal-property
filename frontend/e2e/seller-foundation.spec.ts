@@ -208,7 +208,7 @@ test("unauthenticated users are redirected away from the dashboard subtree", asy
 
   await page.goto("/dashboard");
 
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(page).toHaveURL(/\/seller\/login$/);
   await expect(page.getByTestId("login-google-button")).toBeVisible();
   await expect(page.getByTestId("dashboard-shell")).toHaveCount(0);
 });
