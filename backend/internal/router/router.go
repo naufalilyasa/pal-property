@@ -1,6 +1,7 @@
 package router
 
 import (
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -48,10 +49,15 @@ func Register(
 	searchHandler *handler.SearchHandler,
 	categoryHandler *handler.CategoryHandler,
 ) {
+	allowedOrigins := strings.Split(config.Env.CorsAllowedOrigins, ",")
+	for index, origin := range allowedOrigins {
+		allowedOrigins[index] = strings.TrimSpace(origin)
+	}
+
 	// Global Middlewares
 	app.Use(helmet.New())
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{config.Env.CorsAllowedOrigins},
+		AllowOrigins:     allowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		AllowCredentials: true,

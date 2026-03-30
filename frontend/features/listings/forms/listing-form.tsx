@@ -55,8 +55,10 @@ import {
   describeSelectedImageFiles,
   formatDuration,
   formatVideoBytes,
+  inspectListingImageSelection,
   MAX_LISTING_VIDEO_BYTES,
   MAX_LISTING_VIDEO_DURATION_SECONDS,
+  RECOMMENDED_LISTING_IMAGE_RATIO_LABEL,
   validateListingVideoSelection,
 } from "./listing-media";
 
@@ -96,6 +98,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const [imageMessage, setImageMessage] = useState<FeedbackMessage | null>(null);
   const [videoMessage, setVideoMessage] = useState<FeedbackMessage | null>(null);
+  const [isImagePrecheckPending, setIsImagePrecheckPending] = useState(false);
   const [isVideoPrecheckPending, setIsVideoPrecheckPending] = useState(false);
   const [uploadInputKey, setUploadInputKey] = useState(0);
   const [videoInputKey, setVideoInputKey] = useState(0);
@@ -273,6 +276,22 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
 
     setSelectedVideoFile(nextFile);
     setVideoMessage({ tone: "info", text: precheck.message });
+  };
+
+  const handleImageSelection = async (event: ChangeEvent<HTMLInputElement>) => {
+    const nextFiles = Array.from(event.currentTarget.files ?? []);
+
+    setSelectedImageFiles(nextFiles);
+
+    if (nextFiles.length === 0) {
+      setImageMessage(null);
+      return;
+    }
+
+    setIsImagePrecheckPending(true);
+    const precheck = await inspectListingImageSelection(nextFiles);
+    setIsImagePrecheckPending(false);
+    setImageMessage({ tone: "info", text: precheck.message });
   };
 
   if (categoriesQuery.isError) {
@@ -548,6 +567,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                       <div className="space-y-2">
                         <p className="text-sm font-medium text-[var(--ink)]">Batch image upload</p>
                         <p className="text-sm leading-7 text-[var(--muted)]">Select one or many images in one action. The gallery refreshes only after the backend returns the updated listing.</p>
+                        <p className="text-sm leading-7 text-[var(--muted)]">Recommended image ratio: {RECOMMENDED_LISTING_IMAGE_RATIO_LABEL}. Listings cards now keep the full image visible, so non-matching ratios will show with padding instead of cropping.</p>
                       </div>
                       <div className="space-y-3">
                         <label className="block text-sm font-medium text-[var(--ink)]" htmlFor="listing-image-upload">
@@ -560,15 +580,17 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                             id="listing-image-upload"
                             multiple
                             name="listing_image_upload"
-                            onChange={(event) => setSelectedImageFiles(Array.from(event.currentTarget.files ?? []))}
+                            onChange={(event) => {
+                              void handleImageSelection(event);
+                            }}
                             type="file"
                           />
                         </label>
                         <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]" style={{ fontFamily: "var(--font-mono), monospace" }}>
                           {describeSelectedImageFiles(selectedImageFiles)}
                         </p>
-                        <Button disabled={imageMutation.isPending} onClick={() => imageMutation.mutate({ type: "upload" })} type="button">
-                          {imageMutation.isPending ? "Uploading images..." : "Upload images"}
+                        <Button disabled={imageMutation.isPending || isImagePrecheckPending || selectedImageFiles.length === 0} onClick={() => imageMutation.mutate({ type: "upload" })} type="button">
+                          {isImagePrecheckPending ? "Checking images..." : imageMutation.isPending ? "Uploading images..." : "Upload images"}
                         </Button>
                       </div>
                     </div>
@@ -584,7 +606,9 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                       {listingVideo ? (
                         <div className="space-y-4 rounded-[1.25rem] border border-[var(--line)] bg-white/80 p-4">
                           <div className="overflow-hidden rounded-[1rem] border border-[var(--line)] bg-black/90">
-                            <video className="aspect-video h-full w-full object-cover" controls preload="metadata" src={listingVideo.url} />
+                            <video className="aspect-video h-full w-full object-cover" controls preload="metadata" src={listingVideo.url}>
+                              <track kind="captions" label="Listing video captions unavailable" />
+                            </video>
                           </div>
                           <div className="space-y-3">
                             <div className="flex flex-wrap items-center gap-2">

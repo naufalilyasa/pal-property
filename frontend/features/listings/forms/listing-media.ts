@@ -1,4 +1,7 @@
 const BYTES_PER_MEGABYTE = 1024 * 1024;
+const RECOMMENDED_LISTING_IMAGE_RATIO = 4 / 3;
+export const RECOMMENDED_LISTING_IMAGE_RATIO_LABEL = "4:3";
+const IMAGE_RATIO_TOLERANCE = 0.08;
 
 export const MAX_LISTING_VIDEO_BYTES = 100 * BYTES_PER_MEGABYTE;
 export const MAX_LISTING_VIDEO_DURATION_SECONDS = 60;
@@ -7,10 +10,19 @@ type ListingVideoPrecheckOptions = {
   readDuration?: (file: File) => Promise<number | null>;
 };
 
+type ListingImagePrecheckOptions = {
+  readDimensions?: (file: File) => Promise<{ width: number; height: number } | null>;
+};
+
 export type ListingVideoPrecheckResult = {
   ok: boolean;
   durationSeconds: number | null;
   message: string;
+};
+
+export type ListingImagePrecheckResult = {
+  message: string;
+  offRatioCount: number;
 };
 
 export async function validateListingVideoSelection(
@@ -43,6 +55,45 @@ export async function validateListingVideoSelection(
   };
 }
 
+export async function inspectListingImageSelection(
+  files: File[],
+  options: ListingImagePrecheckOptions = {},
+): Promise<ListingImagePrecheckResult> {
+  if (files.length === 0) {
+    return {
+      message: describeSelectedImageFiles(files),
+      offRatioCount: 0,
+    };
+  }
+
+  const readDimensions = options.readDimensions ?? readListingImageDimensions;
+  let offRatioCount = 0;
+
+  for (const file of files) {
+    const dimensions = await readDimensions(file);
+    if (!dimensions || dimensions.height <= 0) {
+      continue;
+    }
+
+    const ratio = dimensions.width / dimensions.height;
+    if (Math.abs(ratio - RECOMMENDED_LISTING_IMAGE_RATIO) > IMAGE_RATIO_TOLERANCE) {
+      offRatioCount += 1;
+    }
+  }
+
+  if (offRatioCount === 0) {
+    return {
+      message: `${describeSelectedImageFiles(files)}. Recommended ratio ${RECOMMENDED_LISTING_IMAGE_RATIO_LABEL} looks good for listings cards.`,
+      offRatioCount,
+    };
+  }
+
+  return {
+    message: `${describeSelectedImageFiles(files)}. Recommended ratio is ${RECOMMENDED_LISTING_IMAGE_RATIO_LABEL}; ${offRatioCount} image${offRatioCount > 1 ? "s differ" : " differs"} and will show with padding so nothing gets cropped in listings cards.`,
+    offRatioCount,
+  };
+}
+
 export function describeSelectedImageFiles(files: File[]) {
   if (files.length === 0) {
     return "No images selected yet";
@@ -68,6 +119,40 @@ export function describeExistingListingVideo(fileName: string | null | undefined
   }
 
   return parts.join(" · ");
+}
+
+async function readListingImageDimensions(file: File): Promise<{ width: number; height: number } | null> {
+  const objectUrl = URL.createObjectURL(file);
+
+  try {
+    return await new Promise<{ width: number; height: number } | null>((resolve, reject) => {
+      const image = new Image();
+
+      const cleanup = () => {
+        image.src = "";
+        URL.revokeObjectURL(objectUrl);
+      };
+
+      image.onload = () => {
+        const width = image.naturalWidth;
+        const height = image.naturalHeight;
+        cleanup();
+        if (width > 0 && height > 0) {
+          resolve({ width, height });
+          return;
+        }
+        resolve(null);
+      };
+      image.onerror = () => {
+        cleanup();
+        reject(new Error("We could not inspect that image file."));
+      };
+
+      image.src = objectUrl;
+    });
+  } catch {
+    return null;
+  }
 }
 
 export function formatVideoBytes(bytes: number) {

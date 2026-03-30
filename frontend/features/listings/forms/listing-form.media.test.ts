@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   describeSelectedImageFiles,
+  inspectListingImageSelection,
   MAX_LISTING_VIDEO_BYTES,
+  RECOMMENDED_LISTING_IMAGE_RATIO_LABEL,
   validateListingVideoSelection,
 } from "./listing-media";
 
@@ -17,6 +19,18 @@ describe("listing media helpers", () => {
     expect(describeSelectedImageFiles([])).toBe("No images selected yet");
     expect(describeSelectedImageFiles(files.slice(0, 1))).toBe("Ready: front.png");
     expect(describeSelectedImageFiles(files)).toBe("Ready: 3 images selected (front.png, pool.png, ...)");
+  });
+
+  it("warns when selected images do not match the recommended listings ratio", async () => {
+    const files = [new File(["image-1"], "portrait.png", { type: "image/png" })];
+
+    const result = await inspectListingImageSelection(files, {
+      readDimensions: vi.fn().mockResolvedValue({ width: 900, height: 1600 }),
+    });
+
+    expect(result.offRatioCount).toBe(1);
+    expect(result.message).toContain(`Recommended ratio is ${RECOMMENDED_LISTING_IMAGE_RATIO_LABEL}`);
+    expect(result.message).toContain("padding");
   });
 
   it("rejects videos that exceed the client-side size hint before reading duration", async () => {

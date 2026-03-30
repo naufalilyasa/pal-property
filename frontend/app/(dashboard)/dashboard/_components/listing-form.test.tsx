@@ -15,6 +15,10 @@ const { validateListingVideoSelectionMock } = vi.hoisted(() => ({
   validateListingVideoSelectionMock: vi.fn(),
 }));
 
+const { inspectListingImageSelectionMock } = vi.hoisted(() => ({
+  inspectListingImageSelectionMock: vi.fn(),
+}));
+
 const {
   createSellerListingMock,
   deleteListingImageMock,
@@ -73,6 +77,7 @@ vi.mock("@/features/listings/forms/listing-media", async () => {
 
   return {
     ...actual,
+    inspectListingImageSelection: inspectListingImageSelectionMock,
     validateListingVideoSelection: validateListingVideoSelectionMock,
   };
 });
@@ -151,6 +156,10 @@ describe("ListingForm", () => {
       { id: "cat-root", name: "House", slug: "house", label: "House" },
       { id: "cat-child", name: "Villa", slug: "villa", label: "House / Villa" },
     ]);
+    inspectListingImageSelectionMock.mockResolvedValue({
+      message: "Ready: 2 images selected (garden.png, patio.png). Recommended ratio: 4:3.",
+      offRatioCount: 0,
+    });
     validateListingVideoSelectionMock.mockResolvedValue({
       ok: true,
       durationSeconds: 42,
@@ -529,7 +538,11 @@ describe("ListingForm", () => {
 
     fireEvent.change(fileInput, { target: { files: [gardenFile, patioFile] } });
     expect(screen.getByText(/ready: 2 images selected/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /upload images/i }));
+    expect(await screen.findByText(/recommended ratio: 4:3/i)).toBeInTheDocument();
+
+    const uploadImagesButton = await screen.findByRole("button", { name: /upload images/i });
+    await waitFor(() => expect(uploadImagesButton).toBeEnabled());
+    fireEvent.click(uploadImagesButton);
 
     await waitFor(() => expect(uploadListingImagesMock).toHaveBeenCalledWith("listing-7", [gardenFile, patioFile]));
     expect(await screen.findByText(/garden\.png/i)).toBeInTheDocument();
@@ -565,9 +578,16 @@ describe("ListingForm", () => {
     await screen.findByText(/no images yet/i);
     const fileInput = screen.getByLabelText(/choose listing images/i);
     const file = new File(["not-an-image"], "bad.txt", { type: "text/plain" });
+    inspectListingImageSelectionMock.mockResolvedValueOnce({
+      message: "Ready: bad.txt. Recommended ratio: 4:3.",
+      offRatioCount: 0,
+    });
 
     fireEvent.change(fileInput, { target: { files: [file] } });
-    fireEvent.click(screen.getByRole("button", { name: /upload images/i }));
+
+    const uploadImagesButton = await screen.findByRole("button", { name: /upload images/i });
+    await waitFor(() => expect(uploadImagesButton).toBeEnabled());
+    fireEvent.click(uploadImagesButton);
 
     await waitFor(() => expect(uploadListingImagesMock).toHaveBeenCalledWith("listing-7", [file]));
     expect(await screen.findByRole("alert")).toHaveTextContent(/invalid image file \(trace trace-image-400\)/i);
