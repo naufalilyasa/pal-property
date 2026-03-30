@@ -1,8 +1,11 @@
 package http
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/adaptor"
@@ -94,8 +97,8 @@ func (h *AuthHandler) Callback(c fiber.Ctx) error {
 		MaxAge:   config.Env.JwtRefreshExpiration,
 	})
 
-	// Redirect back to frontend
-	return c.Redirect().To("http://localhost:3000/dashboard")
+	// Redirect back to frontend using state-aware return path when present.
+	return c.Redirect().To(resolveFrontendRedirectURL(c.Query("state")))
 }
 
 func (h *AuthHandler) GetMe(c fiber.Ctx) error {
@@ -174,4 +177,57 @@ func (h *AuthHandler) Logout(c fiber.Ctx) error {
 	c.ClearCookie("access_token", "refresh_token")
 
 	return utils.SendResponse(c, fiber.StatusOK, fiber.Map{"message": "logged out successfully"})
+}
+
+type authIntentStatePayload struct {
+	ReturnTo string `json:"returnTo"`
+}
+
+func resolveFrontendRedirectURL(state string) string {
+	const baseURL = "http://localhost:3000"
+	const defaultPath = "/dashboard"
+
+	path := defaultPath
+	if state != "" {
+		if decoded, err := decodeAuthState(state); err == nil {
+			if sanitized, ok := sanitizeReturnPath(decoded.ReturnTo); ok {
+				path = sanitized
+			}
+		}
+	}
+
+	return baseURL + path
+}
+
+func decodeAuthState(state string) (*authIntentStatePayload, error) {
+	replacer := strings.NewReplacer("-", "+", "_", "/")
+	base := replacer.Replace(state)
+	switch len(base) % 4 {
+	case 2:
+		base += "=="
+	case 3:
+		base += "="
+	}
+
+	raw, err := base64.StdEncoding.DecodeString(base)
+	if err != nil {
+		return nil, err
+	}
+
+	var payload authIntentStatePayload
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, err
+	}
+	return &payload, nil
+}
+
+func sanitizeReturnPath(path string) (string, bool) {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "" {
+		return "", false
+	}
+	if !strings.HasPrefix(trimmed, "/") || strings.HasPrefix(trimmed, "//") {
+		return "", false
+	}
+	return trimmed, true
 }
