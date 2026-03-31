@@ -4,19 +4,20 @@ import { describe, expect, it } from "vitest";
 import Home from "./page";
 
 describe("Home", () => {
-  it("renders the seller app foundation shell", () => {
+  it("renders the Pal Property public landing shell", () => {
     render(<Home />);
 
     expect(
       screen.getByRole("heading", {
         level: 1,
-        name: /a calm workspace for sellers to prepare listing operations/i,
+        name: /jual beli properti mewah & eksklusif di indonesia\./i,
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/seller app foundation/i)).toBeInTheDocument();
-    expect(screen.getByText(/dashboard-ready shell/i)).toBeInTheDocument();
-    expect(screen.getByText(/listing create, edit, and image tools are live/i)).toBeInTheDocument();
+    expect(screen.getByText(/agen properti tepercaya/i)).toBeInTheDocument();
+    expect(screen.getByText(/jual beli mudah/i)).toBeInTheDocument();
+    expect(screen.getByText(/properti pilihan/i)).toBeInTheDocument();
     expect(screen.getByTestId("home-shell")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /go to login/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /jelajahi properti/i })).toHaveAttribute("href", "/listings");
+    expect(screen.getByRole("link", { name: /login public/i })).toHaveAttribute("href", "/login");
   });
 });
