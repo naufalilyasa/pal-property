@@ -29,7 +29,7 @@ export function Footer() {
             </div>
             <div>
               <p className="mb-2 font-semibold text-white">Emails</p>
-              <p>hello@findrealestate.com</p>
+              <p>hello@palproperty.id</p>
             </div>
             <div>
               <p className="mb-2 font-semibold text-white">Calls</p>
@@ -42,7 +42,7 @@ export function Footer() {
             </div>
             <div>
               <p className="mb-2 pt-4 font-semibold text-white">Emails</p>
-              <p>hello@findrealestate.com</p>
+              <p>hello@palproperty.id</p>
             </div>
             <div>
               <p className="mb-2 pt-4 font-semibold text-white">Calls</p>
@@ -75,7 +75,7 @@ export function Footer() {
       {/* Bottom Area: Massive Logo and Copyright */}
       <div className="mx-auto mt-20 max-w-[1580px] border-t border-gray-800 pt-8">
         <h1 className="text-[12vw] font-black leading-none tracking-tighter sm:text-[10rem]">
-          FIND
+          Pal Property
         </h1>
         <div className="mt-8 flex flex-wrap items-center justify-between gap-4 text-[10px] text-gray-500 uppercase tracking-wider">
           <div className="flex gap-4">
@@ -87,7 +87,7 @@ export function Footer() {
             <Link href="/do-not-sell" className="hover:text-white">Do Not Sell or Share My Personal Information</Link>
           </div>
           <div>
-            Copyright © 2024 FIND Real Estate
+            Copyright © 2024 Pal Property
           </div>
         </div>
       </div>
