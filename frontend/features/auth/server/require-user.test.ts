@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CurrentUser } from "./current-user";
 
-const redirectMock = vi.fn<(target: string) => never>();
-const getOptionalUserMock = vi.fn<Promise<CurrentUser | null>, []>();
+const { redirectMock, getOptionalUserMock } = vi.hoisted(() => ({
+  redirectMock: vi.fn<(target: string) => never>(),
+  getOptionalUserMock: vi.fn<Promise<CurrentUser | null>, []>(),
+}));
 
 vi.mock("next/navigation", () => ({
   redirect: (target: string) => {
