@@ -11,20 +11,15 @@ export default async function SellerLoginPage({
   return (
     <AuthEntryShell
       intent="seller"
-      badge="Seller workspace"
-      title="Access your listing desk"
-      description="Start the same backend-owned Google OAuth flow, then return to the seller workspace to manage drafts, images, and publishing tasks."
-      primaryCtaLabel="Continue with Google for sellers"
+      badge="Portal Agen / Seller"
+      title="Manajemen Listing Anda"
+      description="Masuk untuk menambah, mengedit, dan mengelola daftar properti yang Anda jual dengan mudah."
+      primaryCtaLabel="Masuk dengan akun Google Agen"
       secondaryHref="/login"
-      secondaryLabel="Need the general login page?"
+      secondaryLabel="Bukan Agen? Masuk Publik"
       reason={reason}
       returnTo={returnTo}
-      statusMessage="Your seller session expired. Sign in again to continue managing listings."
-      highlights={[
-        "Return to the seller workspace intent without changing the backend OAuth entrypoint.",
-        "Keep listing creation, edits, and image management in one secure place.",
-        "Use the same backend-owned cookie session once Google sign-in completes.",
-      ]}
+      statusMessage="Sesi Anda telah berakhir. Silakan masuk kembali."
       accentClassName="bg-primary/15 ring-8 ring-primary/5"
     />
   );

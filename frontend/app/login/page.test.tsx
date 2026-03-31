@@ -12,11 +12,11 @@ describe("LoginPage", () => {
     expect(
       screen.getByRole("heading", {
         level: 1,
-        name: /sign in across find/i,
+        name: /selamat datang di pal property/i,
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/general access/i)).toBeInTheDocument();
-    expect(screen.getByText(/shared with the seller workspace route/i)).toBeInTheDocument();
+    expect(screen.getByText(/akses publik/i)).toBeInTheDocument();
+    expect(screen.getByText(/dapatkan properti impian anda dengan lebih mudah dan cepat/i)).toBeInTheDocument();
 
     const googleButton = screen.getByTestId("login-google-button");
     const href = googleButton.getAttribute("href");
@@ -55,6 +55,6 @@ describe("LoginPage", () => {
   it("shows the general session-expired banner when requested", async () => {
     render(await LoginPage({ searchParams: Promise.resolve({ reason: "session-expired" }) }));
 
-    expect(screen.getByTestId("auth-status-banner")).toHaveTextContent(/your session expired\. sign in again to continue\./i);
+    expect(screen.getByTestId("auth-status-banner")).toHaveTextContent(/sesi anda telah berakhir\. silakan masuk kembali\./i);
   });
 });

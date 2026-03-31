@@ -14,7 +14,6 @@ type AuthEntryShellProps = {
   secondaryLabel: string;
   reason?: string;
   statusMessage: string;
-  highlights: [string, string, string];
   accentClassName: string;
   returnTo?: string;
 };
@@ -29,7 +28,6 @@ export function AuthEntryShell({
   secondaryLabel,
   reason,
   statusMessage,
-  highlights,
   accentClassName,
   returnTo,
 }: AuthEntryShellProps) {
@@ -75,14 +73,7 @@ export function AuthEntryShell({
             </div>
           ) : null}
 
-          <div className="mt-8 grid gap-3 rounded-xl border border-border/70 bg-muted/30 p-4 text-left">
-            {highlights.map((highlight) => (
-              <div key={highlight} className="flex items-start gap-3 text-sm text-muted-foreground">
-                <span className="mt-1 h-2 w-2 rounded-full bg-primary" aria-hidden="true" />
-                <span>{highlight}</span>
-              </div>
-            ))}
-          </div>
+
 
           <div className="mt-10 flex flex-col gap-3">
             <a

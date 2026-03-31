@@ -12,12 +12,12 @@ describe("SellerLoginPage", () => {
     expect(
       screen.getByRole("heading", {
         level: 1,
-        name: /access your listing desk/i,
+        name: /manajemen listing anda/i,
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/seller workspace/i)).toBeInTheDocument();
-    expect(screen.getByText(/listing creation, edits, and image management/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /need the general login page\?/i })).toHaveAttribute("href", "/login");
+    expect(screen.getByText(/portal agen \/ seller/i)).toBeInTheDocument();
+    expect(screen.getByText(/menambah, mengedit, dan mengelola daftar properti/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /bukan agen\? masuk publik/i })).toHaveAttribute("href", "/login");
 
     const googleButton = screen.getByTestId("login-google-button");
     const href = googleButton.getAttribute("href");
@@ -57,7 +57,7 @@ describe("SellerLoginPage", () => {
     render(await SellerLoginPage({ searchParams: Promise.resolve({ reason: "session-expired" }) }));
 
     expect(screen.getByTestId("auth-status-banner")).toHaveTextContent(
-      /your seller session expired\. sign in again to continue managing listings\./i,
+      /sesi anda telah berakhir\. silakan masuk kembali\./i,
     );
   });
 });

@@ -13,10 +13,10 @@ describe("login entry experiences", () => {
 
     render(element);
 
-    expect(screen.getByText(/general access/i)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /sign in across find/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /back to home/i })).toHaveAttribute("href", "/");
-    expect(screen.getByTestId("auth-status-banner")).toHaveTextContent(/Your session expired/i);
+    expect(screen.getByText(/akses publik/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /selamat datang di pal property/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /kembali ke beranda/i })).toHaveAttribute("href", "/");
+    expect(screen.getByTestId("auth-status-banner")).toHaveTextContent(/sesi anda telah berakhir/i);
 
     const googleButton = screen.getByTestId("login-google-button");
     const href = googleButton.getAttribute("href");
@@ -34,13 +34,13 @@ describe("login entry experiences", () => {
 
     render(element);
 
-    expect(screen.getByText(/seller workspace/i)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /access your listing desk/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /need the general login page\?/i })).toHaveAttribute(
+    expect(screen.getByText(/portal agen \/ seller/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /manajemen listing anda/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /bukan agen\? masuk publik/i })).toHaveAttribute(
       "href",
       "/login",
     );
-    expect(screen.getByTestId("auth-status-banner")).toHaveTextContent(/Your seller session expired/i);
+    expect(screen.getByTestId("auth-status-banner")).toHaveTextContent(/sesi anda telah berakhir/i);
 
     const googleButton = screen.getByTestId("login-google-button");
     const href = googleButton.getAttribute("href");
