@@ -1,12 +1,17 @@
 package postgres
 
 import (
+	"context"
 	"encoding/base64"
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
+	"github.com/naufalilyasa/pal-property-backend/internal/domain/entity"
 	"github.com/naufalilyasa/pal-property-backend/pkg/config"
 	"github.com/naufalilyasa/pal-property-backend/pkg/crypto"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 var testTokenEncryptionKey = []byte("01234567890123456789012345678901")
@@ -118,4 +123,76 @@ func TestAuthRepository_RejectsNonPlaintextGarbage(t *testing.T) {
 	if !strings.Contains(err.Error(), "failed to decrypt access token") {
 		t.Fatalf("unexpected error for non-plaintext garbage: %v", err)
 	}
+}
+
+func TestAuthRepository_FindOAuthAccount_IgnoresUndecryptableTokens(t *testing.T) {
+	setTestEncryptionKey(t)
+	originalKey := append([]byte(nil), config.Env.OAuthTokenEncryptionKey...)
+	t.Cleanup(func() {
+		config.Env.OAuthTokenEncryptionKey = originalKey
+	})
+
+	db := newInMemoryDB(t)
+	repo := NewAuthRepository(db)
+
+	userID := uuid.New()
+	user := &entity.User{
+		BaseEntity: entity.BaseEntity{ID: userID},
+		Name:       "Test User",
+		Email:      "test@example.com",
+	}
+	if err := db.Create(user).Error; err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+
+	plaintext := "stale-token"
+	encrypted, err := crypto.Encrypt(plaintext, config.Env.OAuthTokenEncryptionKey)
+	if err != nil {
+		t.Fatalf("failed to encrypt token: %v", err)
+	}
+
+	account := &entity.OAuthAccount{
+		ID:             uuid.New(),
+		UserID:         userID,
+		Provider:       "google",
+		ProviderUserID: "provider-uid",
+		AccessToken:    &encrypted,
+		RefreshToken:   &encrypted,
+	}
+	if err := db.Create(account).Error; err != nil {
+		t.Fatalf("failed to create oauth account: %v", err)
+	}
+
+	rotatedKey := append([]byte(nil), config.Env.OAuthTokenEncryptionKey...)
+	rotatedKey[0] ^= 0xff
+	config.Env.OAuthTokenEncryptionKey = rotatedKey
+
+	found, err := repo.FindOAuthAccount(context.Background(), "google", "provider-uid")
+	if err != nil {
+		t.Fatalf("expected oauth account even when tokens stale: %v", err)
+	}
+	if found == nil {
+		t.Fatalf("expected oauth account, got nil")
+	}
+	if found.UserID != userID {
+		t.Fatalf("expected user id %s, got %s", userID, found.UserID)
+	}
+	if found.AccessToken != nil {
+		t.Fatalf("expected access token to be nil, got %v", *found.AccessToken)
+	}
+	if found.RefreshToken != nil {
+		t.Fatalf("expected refresh token to be nil, got %v", *found.RefreshToken)
+	}
+}
+
+func newInMemoryDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("failed to open memory db: %v", err)
+	}
+	if err := db.AutoMigrate(&entity.User{}, &entity.OAuthAccount{}); err != nil {
+		t.Fatalf("failed to migrate schema: %v", err)
+	}
+	return db
 }

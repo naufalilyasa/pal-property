@@ -24,6 +24,7 @@ require (
 	go.uber.org/zap v1.27.0
 	gorm.io/datatypes v1.2.7
 	gorm.io/driver/postgres v1.6.0
+	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.1
 )
 
@@ -41,6 +42,7 @@ require (
 	github.com/golang-sql/sqlexp v0.1.0 // indirect
 	github.com/gorilla/schema v1.4.1 // indirect
 	github.com/gosimple/unidecode v1.0.1 // indirect
+	github.com/mattn/go-sqlite3 v1.14.22 // indirect
 	github.com/mdelapenya/tlscert v0.2.0 // indirect
 	github.com/microsoft/go-mssqldb v1.9.5 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect

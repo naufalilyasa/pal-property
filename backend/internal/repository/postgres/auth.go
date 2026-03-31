@@ -36,20 +36,8 @@ func (r *authRepository) FindOAuthAccount(ctx context.Context, provider, provide
 		return nil, err
 	}
 
-	if account.AccessToken != nil {
-		decrypted, err := decryptOAuthToken(*account.AccessToken, "access token")
-		if err != nil {
-			return nil, err
-		}
-		account.AccessToken = decrypted
-	}
-	if account.RefreshToken != nil {
-		decrypted, err := decryptOAuthToken(*account.RefreshToken, "refresh token")
-		if err != nil {
-			return nil, err
-		}
-		account.RefreshToken = decrypted
-	}
+	account.AccessToken = decryptStoredOAuthToken(account.AccessToken, "access token")
+	account.RefreshToken = decryptStoredOAuthToken(account.RefreshToken, "refresh token")
 	return &account, nil
 }
 
@@ -116,6 +104,17 @@ func decryptOAuthToken(raw string, fieldName string) (*string, error) {
 		return &plaintext, nil
 	}
 	return nil, fmt.Errorf("repository: failed to decrypt %s: %w", fieldName, err)
+}
+
+func decryptStoredOAuthToken(raw *string, fieldName string) *string {
+	if raw == nil {
+		return nil
+	}
+	decrypted, err := decryptOAuthToken(*raw, fieldName)
+	if err != nil {
+		return nil
+	}
+	return decrypted
 }
 
 func isLegacyPlaintextToken(raw string, decryptErr error) bool {
