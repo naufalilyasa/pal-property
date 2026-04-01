@@ -50,12 +50,17 @@ type Listing struct {
 
 	SpecialOffers datatypes.JSON `gorm:"type:jsonb;default:'[]'" json:"special_offers"`
 
-	LocationProvince *string  `gorm:"type:varchar(100);index" json:"location_province"`
-	LocationCity     *string  `gorm:"type:varchar(100)" json:"location_city"`
-	LocationDistrict *string  `gorm:"type:varchar(100)" json:"location_district"`
-	AddressDetail    *string  `gorm:"type:text" json:"address_detail"`
-	Latitude         *float64 `gorm:"type:decimal(10,8)" json:"latitude"`
-	Longitude        *float64 `gorm:"type:decimal(11,8)" json:"longitude"`
+	LocationProvince     *string  `gorm:"type:varchar(100);index" json:"location_province"`
+	LocationProvinceCode *string  `gorm:"type:varchar(13);index" json:"location_province_code"`
+	LocationCity         *string  `gorm:"type:varchar(100)" json:"location_city"`
+	LocationCityCode     *string  `gorm:"type:varchar(13);index" json:"location_city_code"`
+	LocationDistrict     *string  `gorm:"type:varchar(100)" json:"location_district"`
+	LocationDistrictCode *string  `gorm:"type:varchar(13);index" json:"location_district_code"`
+	LocationVillage      *string  `gorm:"type:varchar(100)" json:"location_village"`
+	LocationVillageCode  *string  `gorm:"type:varchar(13);index" json:"location_village_code"`
+	AddressDetail        *string  `gorm:"type:text" json:"address_detail"`
+	Latitude             *float64 `gorm:"type:decimal(10,8)" json:"latitude"`
+	Longitude            *float64 `gorm:"type:decimal(11,8)" json:"longitude"`
 
 	BedroomCount    *int `gorm:"type:int;index" json:"bedroom_count"`
 	BathroomCount   *int `gorm:"type:int;index" json:"bathroom_count"`

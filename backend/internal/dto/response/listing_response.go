@@ -8,45 +8,50 @@ import (
 )
 
 type ListingResponse struct {
-	ID                uuid.UUID               `json:"id"`
-	UserID            uuid.UUID               `json:"user_id"`
-	CategoryID        *uuid.UUID              `json:"category_id"`
-	Category          *CategoryShortResponse  `json:"category,omitempty"`
-	Title             string                  `json:"title"`
-	Slug              string                  `json:"slug"`
-	Description       *string                 `json:"description"`
-	TransactionType   string                  `json:"transaction_type"`
-	Price             int64                   `json:"price"`
-	Currency          string                  `json:"currency"`
-	IsNegotiable      bool                    `json:"is_negotiable"`
-	SpecialOffers     datatypes.JSON          `json:"special_offers"`
-	LocationProvince  *string                 `json:"location_province"`
-	LocationCity      *string                 `json:"location_city"`
-	LocationDistrict  *string                 `json:"location_district"`
-	AddressDetail     *string                 `json:"address_detail"`
-	Latitude          *float64                `json:"latitude"`
-	Longitude         *float64                `json:"longitude"`
-	BedroomCount      *int                    `json:"bedroom_count"`
-	BathroomCount     *int                    `json:"bathroom_count"`
-	FloorCount        *int                    `json:"floor_count"`
-	CarportCapacity   *int                    `json:"carport_capacity"`
-	LandAreaSqm       *int                    `json:"land_area_sqm"`
-	BuildingAreaSqm   *int                    `json:"building_area_sqm"`
-	CertificateType   *string                 `json:"certificate_type"`
-	Condition         *string                 `json:"condition"`
-	Furnishing        *string                 `json:"furnishing"`
-	ElectricalPowerVA *int                    `json:"electrical_power_va"`
-	FacingDirection   *string                 `json:"facing_direction"`
-	YearBuilt         *int                    `json:"year_built"`
-	Facilities        datatypes.JSON          `json:"facilities"`
-	Status            string                  `json:"status"`
-	IsFeatured        bool                    `json:"is_featured"`
-	Specifications    datatypes.JSON          `json:"specifications"`
-	ViewCount         int                     `json:"view_count"`
-	Images            []*ListingImageResponse `json:"images"`
-	Video             *ListingVideoResponse   `json:"video,omitempty"`
-	CreatedAt         time.Time               `json:"created_at"`
-	UpdatedAt         time.Time               `json:"updated_at"`
+	ID                   uuid.UUID               `json:"id"`
+	UserID               uuid.UUID               `json:"user_id"`
+	CategoryID           *uuid.UUID              `json:"category_id"`
+	Category             *CategoryShortResponse  `json:"category,omitempty"`
+	Title                string                  `json:"title"`
+	Slug                 string                  `json:"slug"`
+	Description          *string                 `json:"description"`
+	TransactionType      string                  `json:"transaction_type"`
+	Price                int64                   `json:"price"`
+	Currency             string                  `json:"currency"`
+	IsNegotiable         bool                    `json:"is_negotiable"`
+	SpecialOffers        datatypes.JSON          `json:"special_offers"`
+	LocationProvince     *string                 `json:"location_province"`
+	LocationProvinceCode *string                 `json:"location_province_code"`
+	LocationCity         *string                 `json:"location_city"`
+	LocationCityCode     *string                 `json:"location_city_code"`
+	LocationDistrict     *string                 `json:"location_district"`
+	LocationDistrictCode *string                 `json:"location_district_code"`
+	LocationVillage      *string                 `json:"location_village"`
+	LocationVillageCode  *string                 `json:"location_village_code"`
+	AddressDetail        *string                 `json:"address_detail"`
+	Latitude             *float64                `json:"latitude"`
+	Longitude            *float64                `json:"longitude"`
+	BedroomCount         *int                    `json:"bedroom_count"`
+	BathroomCount        *int                    `json:"bathroom_count"`
+	FloorCount           *int                    `json:"floor_count"`
+	CarportCapacity      *int                    `json:"carport_capacity"`
+	LandAreaSqm          *int                    `json:"land_area_sqm"`
+	BuildingAreaSqm      *int                    `json:"building_area_sqm"`
+	CertificateType      *string                 `json:"certificate_type"`
+	Condition            *string                 `json:"condition"`
+	Furnishing           *string                 `json:"furnishing"`
+	ElectricalPowerVA    *int                    `json:"electrical_power_va"`
+	FacingDirection      *string                 `json:"facing_direction"`
+	YearBuilt            *int                    `json:"year_built"`
+	Facilities           datatypes.JSON          `json:"facilities"`
+	Status               string                  `json:"status"`
+	IsFeatured           bool                    `json:"is_featured"`
+	Specifications       datatypes.JSON          `json:"specifications"`
+	ViewCount            int                     `json:"view_count"`
+	Images               []*ListingImageResponse `json:"images"`
+	Video                *ListingVideoResponse   `json:"video,omitempty"`
+	CreatedAt            time.Time               `json:"created_at"`
+	UpdatedAt            time.Time               `json:"updated_at"`
 }
 
 type ListingImageResponse struct {
@@ -69,7 +74,6 @@ type PaginatedListings struct {
 	Limit      int                `json:"limit"`
 	TotalPages int                `json:"total_pages"`
 }
-
 
 type ListingVideoResponse struct {
 	ID               uuid.UUID `json:"id"`

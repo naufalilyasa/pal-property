@@ -90,67 +90,77 @@ func (s *Specifications) SetBuildingAreaSqm(value int) {
 }
 
 type CreateListingRequest struct {
-	CategoryID        *uuid.UUID     `json:"category_id"`
-	Title             string         `json:"title" validate:"required,min=5,max=255"`
-	Description       *string        `json:"description" validate:"omitempty,max=5000"`
-	TransactionType   string         `json:"transaction_type" validate:"omitempty,oneof=sale rent"`
-	Price             int64          `json:"price" validate:"required,gt=0"`
-	Currency          *string        `json:"currency" validate:"omitempty,oneof=IDR"`
-	IsNegotiable      *bool          `json:"is_negotiable"`
-	SpecialOffers     []string       `json:"special_offers" validate:"omitempty,dive,oneof=Promo DP_0 Aset_Bank Turun_Harga"`
-	LocationProvince  *string        `json:"location_province" validate:"omitempty,max=100"`
-	LocationCity      *string        `json:"location_city" validate:"omitempty,max=100"`
-	LocationDistrict  *string        `json:"location_district" validate:"omitempty,max=100"`
-	AddressDetail     *string        `json:"address_detail" validate:"omitempty,max=5000"`
-	Latitude          *float64       `json:"latitude" validate:"omitempty,gte=-90,lte=90"`
-	Longitude         *float64       `json:"longitude" validate:"omitempty,gte=-180,lte=180"`
-	BedroomCount      *int           `json:"bedroom_count" validate:"omitempty,gte=0,lte=50"`
-	BathroomCount     *int           `json:"bathroom_count" validate:"omitempty,gte=0,lte=50"`
-	FloorCount        *int           `json:"floor_count" validate:"omitempty,gte=0,lte=200"`
-	CarportCapacity   *int           `json:"carport_capacity" validate:"omitempty,gte=0,lte=100"`
-	LandAreaSqm       *int           `json:"land_area_sqm" validate:"omitempty,gte=0"`
-	BuildingAreaSqm   *int           `json:"building_area_sqm" validate:"omitempty,gte=0"`
-	CertificateType   *string        `json:"certificate_type" validate:"omitempty,oneof=SHM HGB Strata Girik AJB SHMRS"`
-	Condition         *string        `json:"condition" validate:"omitempty,oneof=new second"`
-	Furnishing        *string        `json:"furnishing" validate:"omitempty,oneof=unfurnished semi fully"`
-	ElectricalPowerVA *int           `json:"electrical_power_va" validate:"omitempty,gte=0"`
-	FacingDirection   *string        `json:"facing_direction" validate:"omitempty,oneof=north south east west northeast northwest southeast southwest"`
-	YearBuilt         *int           `json:"year_built" validate:"omitempty,gte=1800,lte=2100"`
-	Facilities        []string       `json:"facilities" validate:"omitempty,dive,oneof=AC CCTV Wifi Water_Heater Carport Garden Pool Gym Playground Security"`
-	Status            string         `json:"status" validate:"required,oneof=active inactive sold draft archived"`
-	Specifications    Specifications `json:"specifications"`
+	CategoryID           *uuid.UUID     `json:"category_id"`
+	Title                string         `json:"title" validate:"required,min=5,max=255"`
+	Description          *string        `json:"description" validate:"omitempty,max=5000"`
+	TransactionType      string         `json:"transaction_type" validate:"omitempty,oneof=sale rent"`
+	Price                int64          `json:"price" validate:"required,gt=0"`
+	Currency             *string        `json:"currency" validate:"omitempty,oneof=IDR"`
+	IsNegotiable         *bool          `json:"is_negotiable"`
+	SpecialOffers        []string       `json:"special_offers" validate:"omitempty,dive,oneof=Promo DP_0 Aset_Bank Turun_Harga"`
+	LocationProvince     *string        `json:"location_province" validate:"omitempty,max=100"`
+	LocationProvinceCode *string        `json:"location_province_code" validate:"omitempty,max=13"`
+	LocationCity         *string        `json:"location_city" validate:"omitempty,max=100"`
+	LocationCityCode     *string        `json:"location_city_code" validate:"omitempty,max=13"`
+	LocationDistrict     *string        `json:"location_district" validate:"omitempty,max=100"`
+	LocationDistrictCode *string        `json:"location_district_code" validate:"omitempty,max=13"`
+	LocationVillage      *string        `json:"location_village" validate:"omitempty,max=100"`
+	LocationVillageCode  *string        `json:"location_village_code" validate:"omitempty,max=13"`
+	AddressDetail        *string        `json:"address_detail" validate:"omitempty,max=5000"`
+	Latitude             *float64       `json:"latitude" validate:"omitempty,gte=-90,lte=90"`
+	Longitude            *float64       `json:"longitude" validate:"omitempty,gte=-180,lte=180"`
+	BedroomCount         *int           `json:"bedroom_count" validate:"omitempty,gte=0,lte=50"`
+	BathroomCount        *int           `json:"bathroom_count" validate:"omitempty,gte=0,lte=50"`
+	FloorCount           *int           `json:"floor_count" validate:"omitempty,gte=0,lte=200"`
+	CarportCapacity      *int           `json:"carport_capacity" validate:"omitempty,gte=0,lte=100"`
+	LandAreaSqm          *int           `json:"land_area_sqm" validate:"omitempty,gte=0"`
+	BuildingAreaSqm      *int           `json:"building_area_sqm" validate:"omitempty,gte=0"`
+	CertificateType      *string        `json:"certificate_type" validate:"omitempty,oneof=SHM HGB Strata Girik AJB SHMRS"`
+	Condition            *string        `json:"condition" validate:"omitempty,oneof=new second"`
+	Furnishing           *string        `json:"furnishing" validate:"omitempty,oneof=unfurnished semi fully"`
+	ElectricalPowerVA    *int           `json:"electrical_power_va" validate:"omitempty,gte=0"`
+	FacingDirection      *string        `json:"facing_direction" validate:"omitempty,oneof=north south east west northeast northwest southeast southwest"`
+	YearBuilt            *int           `json:"year_built" validate:"omitempty,gte=1800,lte=2100"`
+	Facilities           []string       `json:"facilities" validate:"omitempty,dive,oneof=AC CCTV Wifi Water_Heater Carport Garden Pool Gym Playground Security"`
+	Status               string         `json:"status" validate:"required,oneof=active inactive sold draft archived"`
+	Specifications       Specifications `json:"specifications"`
 }
 
 type UpdateListingRequest struct {
-	CategoryID        *uuid.UUID      `json:"category_id"`
-	Title             *string         `json:"title" validate:"omitempty,min=5,max=255"`
-	Description       *string         `json:"description" validate:"omitempty,max=5000"`
-	TransactionType   *string         `json:"transaction_type" validate:"omitempty,oneof=sale rent"`
-	Price             *int64          `json:"price" validate:"omitempty,gt=0"`
-	Currency          *string         `json:"currency" validate:"omitempty,oneof=IDR"`
-	IsNegotiable      *bool           `json:"is_negotiable"`
-	SpecialOffers     *[]string       `json:"special_offers" validate:"omitempty,dive,oneof=Promo DP_0 Aset_Bank Turun_Harga"`
-	LocationProvince  *string         `json:"location_province" validate:"omitempty,max=100"`
-	LocationCity      *string         `json:"location_city" validate:"omitempty,max=100"`
-	LocationDistrict  *string         `json:"location_district" validate:"omitempty,max=100"`
-	AddressDetail     *string         `json:"address_detail" validate:"omitempty,max=5000"`
-	Latitude          *float64        `json:"latitude" validate:"omitempty,gte=-90,lte=90"`
-	Longitude         *float64        `json:"longitude" validate:"omitempty,gte=-180,lte=180"`
-	BedroomCount      *int            `json:"bedroom_count" validate:"omitempty,gte=0,lte=50"`
-	BathroomCount     *int            `json:"bathroom_count" validate:"omitempty,gte=0,lte=50"`
-	FloorCount        *int            `json:"floor_count" validate:"omitempty,gte=0,lte=200"`
-	CarportCapacity   *int            `json:"carport_capacity" validate:"omitempty,gte=0,lte=100"`
-	LandAreaSqm       *int            `json:"land_area_sqm" validate:"omitempty,gte=0"`
-	BuildingAreaSqm   *int            `json:"building_area_sqm" validate:"omitempty,gte=0"`
-	CertificateType   *string         `json:"certificate_type" validate:"omitempty,oneof=SHM HGB Strata Girik AJB SHMRS"`
-	Condition         *string         `json:"condition" validate:"omitempty,oneof=new second"`
-	Furnishing        *string         `json:"furnishing" validate:"omitempty,oneof=unfurnished semi fully"`
-	ElectricalPowerVA *int            `json:"electrical_power_va" validate:"omitempty,gte=0"`
-	FacingDirection   *string         `json:"facing_direction" validate:"omitempty,oneof=north south east west northeast northwest southeast southwest"`
-	YearBuilt         *int            `json:"year_built" validate:"omitempty,gte=1800,lte=2100"`
-	Facilities        *[]string       `json:"facilities" validate:"omitempty,dive,oneof=AC CCTV Wifi Water_Heater Carport Garden Pool Gym Playground Security"`
-	Status            *string         `json:"status" validate:"omitempty,oneof=active inactive sold draft archived"`
-	Specifications    *Specifications `json:"specifications"`
+	CategoryID           *uuid.UUID      `json:"category_id"`
+	Title                *string         `json:"title" validate:"omitempty,min=5,max=255"`
+	Description          *string         `json:"description" validate:"omitempty,max=5000"`
+	TransactionType      *string         `json:"transaction_type" validate:"omitempty,oneof=sale rent"`
+	Price                *int64          `json:"price" validate:"omitempty,gt=0"`
+	Currency             *string         `json:"currency" validate:"omitempty,oneof=IDR"`
+	IsNegotiable         *bool           `json:"is_negotiable"`
+	SpecialOffers        *[]string       `json:"special_offers" validate:"omitempty,dive,oneof=Promo DP_0 Aset_Bank Turun_Harga"`
+	LocationProvince     *string         `json:"location_province" validate:"omitempty,max=100"`
+	LocationProvinceCode *string         `json:"location_province_code" validate:"omitempty,max=13"`
+	LocationCity         *string         `json:"location_city" validate:"omitempty,max=100"`
+	LocationCityCode     *string         `json:"location_city_code" validate:"omitempty,max=13"`
+	LocationDistrict     *string         `json:"location_district" validate:"omitempty,max=100"`
+	LocationDistrictCode *string         `json:"location_district_code" validate:"omitempty,max=13"`
+	LocationVillage      *string         `json:"location_village" validate:"omitempty,max=100"`
+	LocationVillageCode  *string         `json:"location_village_code" validate:"omitempty,max=13"`
+	AddressDetail        *string         `json:"address_detail" validate:"omitempty,max=5000"`
+	Latitude             *float64        `json:"latitude" validate:"omitempty,gte=-90,lte=90"`
+	Longitude            *float64        `json:"longitude" validate:"omitempty,gte=-180,lte=180"`
+	BedroomCount         *int            `json:"bedroom_count" validate:"omitempty,gte=0,lte=50"`
+	BathroomCount        *int            `json:"bathroom_count" validate:"omitempty,gte=0,lte=50"`
+	FloorCount           *int            `json:"floor_count" validate:"omitempty,gte=0,lte=200"`
+	CarportCapacity      *int            `json:"carport_capacity" validate:"omitempty,gte=0,lte=100"`
+	LandAreaSqm          *int            `json:"land_area_sqm" validate:"omitempty,gte=0"`
+	BuildingAreaSqm      *int            `json:"building_area_sqm" validate:"omitempty,gte=0"`
+	CertificateType      *string         `json:"certificate_type" validate:"omitempty,oneof=SHM HGB Strata Girik AJB SHMRS"`
+	Condition            *string         `json:"condition" validate:"omitempty,oneof=new second"`
+	Furnishing           *string         `json:"furnishing" validate:"omitempty,oneof=unfurnished semi fully"`
+	ElectricalPowerVA    *int            `json:"electrical_power_va" validate:"omitempty,gte=0"`
+	FacingDirection      *string         `json:"facing_direction" validate:"omitempty,oneof=north south east west northeast northwest southeast southwest"`
+	YearBuilt            *int            `json:"year_built" validate:"omitempty,gte=1800,lte=2100"`
+	Facilities           *[]string       `json:"facilities" validate:"omitempty,dive,oneof=AC CCTV Wifi Water_Heater Carport Garden Pool Gym Playground Security"`
+	Status               *string         `json:"status" validate:"omitempty,oneof=active inactive sold draft archived"`
+	Specifications       *Specifications `json:"specifications"`
 }
 
 type ReorderListingImagesRequest struct {

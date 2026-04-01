@@ -17,6 +17,7 @@ var (
 	ErrImageOrderInvalid  = errors.New("invalid listing image order")
 	ErrImageStorageUnset  = errors.New("listing image storage is not configured")
 	ErrInvalidVideoFile   = errors.New("invalid video file")
+	ErrInvalidLocation    = errors.New("invalid location")
 	ErrVideoTooLarge      = errors.New("video file is too large")
 	ErrVideoTooLong       = errors.New("video duration exceeds limit")
 	ErrVideoAlreadyExists = errors.New("listing already has a video")
