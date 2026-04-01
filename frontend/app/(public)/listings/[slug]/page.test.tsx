@@ -76,6 +76,8 @@ describe("PublicListingDetailPage", () => {
       currency: "IDR",
       status: "active",
       is_featured: true,
+      latitude: -6.2088,
+      longitude: 106.8456,
       specifications: {},
       view_count: 0,
       images: [],
@@ -178,7 +180,7 @@ describe("PublicListingDetailPage", () => {
       }),
     );
 
-    expect(screen.getByRole("heading", { level: 2, name: /video tour/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: /video properti/i })).toBeInTheDocument();
     expect(screen.getByTestId("listing-video-tour")).toBeInTheDocument();
     expect(screen.getByTestId("listing-detail-video")).toHaveAttribute("src", "https://videos.example/clifftop-tour.mp4");
     expect(screen.getByText(/clifftop-tour\.mp4/i)).toBeInTheDocument();
@@ -195,6 +197,8 @@ describe("PublicListingDetailPage", () => {
       currency: "IDR",
       status: "active",
       is_featured: false,
+      latitude: -6.1754,
+      longitude: 106.8272,
       specifications: { land_area_sqm: 180 },
       view_count: 0,
       images: [],
@@ -208,7 +212,39 @@ describe("PublicListingDetailPage", () => {
       }),
     );
 
-    expect(screen.getByText(/land area/i)).toBeInTheDocument();
-    expect(screen.getByText("180 sqm")).toBeInTheDocument();
+    expect(screen.getByText(/luas tanah/i)).toBeInTheDocument();
+    expect(screen.getByText("180 m²")).toBeInTheDocument();
+  });
+
+  it("renders the map using the listing coordinates", async () => {
+    getOptionalUserMock.mockResolvedValue(null);
+    getListingBySlugMock.mockResolvedValue({
+      id: "listing-5",
+      user_id: "seller-1",
+      title: "Menteng Residence",
+      slug: "menteng-residence",
+      price: 7800000000,
+      currency: "IDR",
+      status: "active",
+      is_featured: true,
+      latitude: -6.1961,
+      longitude: 106.8296,
+      specifications: {},
+      view_count: 0,
+      images: [],
+      created_at: "2026-03-17T00:00:00Z",
+      updated_at: "2026-03-17T00:00:00Z",
+    });
+
+    render(
+      await PublicListingDetailPage({
+        params: Promise.resolve({ slug: "menteng-residence" }),
+      }),
+    );
+
+    expect(screen.getByTestId("listing-detail-map")).toHaveAttribute(
+      "src",
+      expect.stringContaining("marker=-6.196100%2C106.829600"),
+    );
   });
 });
