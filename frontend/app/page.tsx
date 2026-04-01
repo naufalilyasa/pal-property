@@ -27,16 +27,18 @@ export default function Home() {
                   Jual Beli Properti Mewah & Eksklusif di Indonesia.
                 </h1>
                 <p className="max-w-2xl text-lg text-muted-foreground sm:text-xl">
-                  Kami siap membantu Anda menemukan dan memasarkan berbagai macam properti premium dengan layanan agen terbaik dan terpercaya di seluruh penjuru Nusantara.
+                  Kami siap membantu Anda menemukan berbagai macam properti
+                  premium dengan layanan agen terbaik dan terpercaya di seluruh
+                  penjuru Nusantara.
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-4 pt-4">
-                <Link className="inline-flex h-12 items-center justify-center rounded-full bg-primary px-8 text-sm font-semibold text-primary-foreground shadow transition hover:bg-primary/90" href="/listings">
-                  Jelajahi Properti
-                </Link>
-                <Link className="inline-flex h-12 items-center justify-center rounded-full border border-border bg-background px-8 text-sm font-semibold text-foreground shadow-sm transition hover:bg-accent hover:text-accent-foreground" href="/login">
-                  Login Public
+                <Link
+                  className="inline-flex h-12 items-center justify-center rounded-full bg-primary px-8 text-sm font-semibold text-primary-foreground shadow transition hover:bg-primary/90"
+                  href="/listings"
+                >
+                  Cari Properti
                 </Link>
               </div>
             </div>
@@ -64,7 +66,8 @@ export default function Home() {
                 Jual Beli Mudah
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                Proses pemasaran dan pencarian properti yang transparan, cepat, dan aman melalui dukungan agen yang profesional.
+                Proses pemasaran dan pencarian properti yang transparan, cepat,
+                dan aman melalui dukungan agen yang profesional.
               </p>
             </article>
             <article className="rounded-2xl border border-border bg-card p-8 shadow-sm transition-colors hover:bg-accent/40">
@@ -78,7 +81,8 @@ export default function Home() {
                 Properti Pilihan
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                Kurasi ketat terhadap listing properti untuk memberikan jaminan kualitas dan investasi menguntungkan bagi Anda.
+                Kurasi ketat terhadap listing properti untuk memberikan jaminan
+                kualitas dan investasi menguntungkan bagi Anda.
               </p>
             </article>
             <article className="rounded-2xl border border-border bg-card p-8 shadow-sm transition-colors hover:bg-accent/40">
@@ -92,7 +96,8 @@ export default function Home() {
                 Koneksi Luas
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                Didukung oleh jaringan penjual dan pembeli properti yang masif di berbagai kota besar seluruh Indonesia.
+                Didukung oleh jaringan penjual dan pembeli properti yang masif
+                di berbagai kota besar seluruh Indonesia.
               </p>
             </article>
           </section>
