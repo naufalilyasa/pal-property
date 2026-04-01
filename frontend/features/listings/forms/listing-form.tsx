@@ -5,7 +5,7 @@ import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { type ChangeEvent, useMemo, useState } from "react";
+import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,10 @@ import {
   formatListingFormError,
   getDefaultSpecifications,
   getListingCategories,
+  getRegionCities,
+  getRegionDistricts,
+  getRegionProvinces,
+  getRegionVillages,
   parseListingSpecifications,
   parseStringList,
   normalizeNullableNumber,
@@ -36,6 +40,7 @@ import {
   type ListingFormRequest,
   type ListingImageRecord,
   type ListingRecord,
+  type RegionOption,
   type ListingTransactionType,
 } from "@/lib/api/listing-form";
 import { queryKeys } from "@/lib/query/keys";
@@ -112,6 +117,73 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
     resolver: zodResolver(listingFormSchema),
     defaultValues: toFormValues(initialListing),
   });
+
+  const selectedProvinceCode = form.watch("location_province_code");
+  const selectedCityCode = form.watch("location_city_code");
+  const selectedDistrictCode = form.watch("location_district_code");
+
+  const provincesQuery = useQuery({
+    queryKey: ["regions", "provinces"],
+    queryFn: () => getRegionProvinces(),
+  });
+
+  const citiesQuery = useQuery({
+    queryKey: ["regions", "cities", selectedProvinceCode],
+    queryFn: () => getRegionCities(selectedProvinceCode),
+    enabled: Boolean(selectedProvinceCode),
+  });
+
+  const districtsQuery = useQuery({
+    queryKey: ["regions", "districts", selectedCityCode],
+    queryFn: () => getRegionDistricts(selectedCityCode),
+    enabled: Boolean(selectedCityCode),
+  });
+
+  const villagesQuery = useQuery({
+    queryKey: ["regions", "villages", selectedDistrictCode],
+    queryFn: () => getRegionVillages(selectedDistrictCode),
+    enabled: Boolean(selectedDistrictCode),
+  });
+
+  useEffect(() => {
+    const matchedProvince = findRegionOptionByName(provincesQuery.data, listing?.location_province);
+    if (!matchedProvince || form.getValues("location_province_code")) {
+      return;
+    }
+
+    form.setValue("location_province_code", matchedProvince.code, { shouldDirty: false });
+    form.setValue("location_province", matchedProvince.name, { shouldDirty: false });
+  }, [form, listing?.location_province, provincesQuery.data]);
+
+  useEffect(() => {
+    const matchedCity = findRegionOptionByName(citiesQuery.data, listing?.location_city);
+    if (!matchedCity || form.getValues("location_city_code")) {
+      return;
+    }
+
+    form.setValue("location_city_code", matchedCity.code, { shouldDirty: false });
+    form.setValue("location_city", matchedCity.name, { shouldDirty: false });
+  }, [citiesQuery.data, form, listing?.location_city]);
+
+  useEffect(() => {
+    const matchedDistrict = findRegionOptionByName(districtsQuery.data, listing?.location_district);
+    if (!matchedDistrict || form.getValues("location_district_code")) {
+      return;
+    }
+
+    form.setValue("location_district_code", matchedDistrict.code, { shouldDirty: false });
+    form.setValue("location_district", matchedDistrict.name, { shouldDirty: false });
+  }, [districtsQuery.data, form, listing?.location_district]);
+
+  useEffect(() => {
+    const matchedVillage = findRegionOptionByName(villagesQuery.data, listing?.location_village);
+    if (!matchedVillage || form.getValues("location_village_code")) {
+      return;
+    }
+
+    form.setValue("location_village_code", matchedVillage.code, { shouldDirty: false });
+    form.setValue("location_village", matchedVillage.name, { shouldDirty: false });
+  }, [form, listing?.location_village, villagesQuery.data]);
 
   const orderedImages = useMemo(() => sortListingImages(listing?.images ?? []), [listing]);
   const listingVideo = listing?.video ?? null;
@@ -507,11 +579,151 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                   <p className="text-sm leading-7 text-[var(--muted)]">Richer listing fields map directly to the backend request contract while preserving compatibility `specifications`.</p>
                 </div>
 
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="location_province_code"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel htmlFor="field-location-province">Province</FormLabel>
+                        <FormControl>
+                          <Select
+                            aria-label="Province"
+                            id="field-location-province"
+                            value={field.value ?? ""}
+                            onChange={(event) => {
+                              const nextCode = event.target.value;
+                              const option = (provincesQuery.data ?? []).find((item) => item.code === nextCode) ?? null;
+                              field.onChange(nextCode);
+                              form.setValue("location_province", option?.name ?? "", { shouldDirty: true, shouldValidate: true });
+                              form.setValue("location_city_code", "", { shouldDirty: true, shouldValidate: true });
+                              form.setValue("location_city", "", { shouldDirty: true });
+                              form.setValue("location_district_code", "", { shouldDirty: true, shouldValidate: true });
+                              form.setValue("location_district", "", { shouldDirty: true });
+                              form.setValue("location_village_code", "", { shouldDirty: true, shouldValidate: true });
+                              form.setValue("location_village", "", { shouldDirty: true });
+                            }}
+                          >
+                            <option value="">Select province</option>
+                            {(provincesQuery.data ?? []).map((option) => (
+                              <option key={option.code} value={option.code}>
+                                {option.name}
+                              </option>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        <FormDescription>Province is loaded from the wilayah database.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="location_city_code"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel htmlFor="field-location-city">City</FormLabel>
+                        <FormControl>
+                          <Select
+                            aria-label="City"
+                            disabled={!selectedProvinceCode || citiesQuery.isLoading}
+                            id="field-location-city"
+                            value={field.value ?? ""}
+                            onChange={(event) => {
+                              const nextCode = event.target.value;
+                              const option = (citiesQuery.data ?? []).find((item) => item.code === nextCode) ?? null;
+                              field.onChange(nextCode);
+                              form.setValue("location_city", option?.name ?? "", { shouldDirty: true, shouldValidate: true });
+                              form.setValue("location_district_code", "", { shouldDirty: true, shouldValidate: true });
+                              form.setValue("location_district", "", { shouldDirty: true });
+                              form.setValue("location_village_code", "", { shouldDirty: true, shouldValidate: true });
+                              form.setValue("location_village", "", { shouldDirty: true });
+                            }}
+                          >
+                            <option value="">{selectedProvinceCode ? "Select city" : "Choose province first"}</option>
+                            {(citiesQuery.data ?? []).map((option) => (
+                              <option key={option.code} value={option.code}>
+                                {option.name}
+                              </option>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="location_district_code"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel htmlFor="field-location-district">District</FormLabel>
+                        <FormControl>
+                          <Select
+                            aria-label="District"
+                            disabled={!selectedCityCode || districtsQuery.isLoading}
+                            id="field-location-district"
+                            value={field.value ?? ""}
+                            onChange={(event) => {
+                              const nextCode = event.target.value;
+                              const option = (districtsQuery.data ?? []).find((item) => item.code === nextCode) ?? null;
+                              field.onChange(nextCode);
+                              form.setValue("location_district", option?.name ?? "", { shouldDirty: true, shouldValidate: true });
+                              form.setValue("location_village_code", "", { shouldDirty: true, shouldValidate: true });
+                              form.setValue("location_village", "", { shouldDirty: true });
+                            }}
+                          >
+                            <option value="">{selectedCityCode ? "Select district" : "Choose city first"}</option>
+                            {(districtsQuery.data ?? []).map((option) => (
+                              <option key={option.code} value={option.code}>
+                                {option.name}
+                              </option>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="location_village_code"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel htmlFor="field-location-village">Village / Kelurahan</FormLabel>
+                        <FormControl>
+                          <Select
+                            aria-label="Village / Kelurahan"
+                            disabled={!selectedDistrictCode || villagesQuery.isLoading}
+                            id="field-location-village"
+                            value={field.value ?? ""}
+                            onChange={(event) => {
+                              const nextCode = event.target.value;
+                              const option = (villagesQuery.data ?? []).find((item) => item.code === nextCode) ?? null;
+                              field.onChange(nextCode);
+                              form.setValue("location_village", option?.name ?? "", { shouldDirty: true, shouldValidate: true });
+                            }}
+                          >
+                            <option value="">{selectedDistrictCode ? "Select village" : "Choose district first"}</option>
+                            {(villagesQuery.data ?? []).map((option) => (
+                              <option key={option.code} value={option.code}>
+                                {option.name}
+                              </option>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        <FormDescription>New listing locations are normalized from DB-backed wilayah selections.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
                 {(
                   [
-                    ["location_province", "Province"],
-                    ["location_city", "City"],
-                    ["location_district", "District"],
                     ["address_detail", "Address detail"],
                     ["latitude", "Latitude"],
                     ["longitude", "Longitude"],
@@ -779,8 +991,13 @@ function toFormValues(listing: ListingRecord | null): ListingFormSchema {
       is_negotiable: false,
       special_offers: "",
       location_province: "",
+      location_province_code: "",
       location_city: "",
+      location_city_code: "",
       location_district: "",
+      location_district_code: "",
+      location_village: "",
+      location_village_code: "",
       address_detail: "",
       latitude: "",
       longitude: "",
@@ -813,8 +1030,13 @@ function toFormValues(listing: ListingRecord | null): ListingFormSchema {
     is_negotiable: listing.is_negotiable ?? false,
     special_offers: parseStringList(listing.special_offers).join(", "),
     location_province: listing.location_province ?? "",
+    location_province_code: listing.location_province_code ?? "",
     location_city: listing.location_city ?? "",
+    location_city_code: listing.location_city_code ?? "",
     location_district: listing.location_district ?? "",
+    location_district_code: listing.location_district_code ?? "",
+    location_village: listing.location_village ?? "",
+    location_village_code: listing.location_village_code ?? "",
     address_detail: listing.address_detail ?? "",
     latitude: listing.latitude != null ? String(listing.latitude) : "",
     longitude: listing.longitude != null ? String(listing.longitude) : "",
@@ -853,8 +1075,13 @@ function toRequestPayload(values: ListingFormSchema): ListingFormRequest {
     is_negotiable: values.is_negotiable ?? false,
     special_offers: normalizeStringList(values.special_offers),
     location_province: normalizeNullableString(values.location_province),
+    location_province_code: normalizeNullableString(values.location_province_code),
     location_city: normalizeNullableString(values.location_city),
+    location_city_code: normalizeNullableString(values.location_city_code),
     location_district: normalizeNullableString(values.location_district),
+    location_district_code: normalizeNullableString(values.location_district_code),
+    location_village: normalizeNullableString(values.location_village),
+    location_village_code: normalizeNullableString(values.location_village_code),
     address_detail: normalizeNullableString(values.address_detail),
     latitude: normalizeNullableNumber(values.latitude),
     longitude: normalizeNullableNumber(values.longitude),
@@ -950,8 +1177,13 @@ function createEmptyListing(): ListingRecord {
     is_negotiable: false,
     special_offers: [],
     location_province: null,
+    location_province_code: null,
     location_city: null,
+    location_city_code: null,
     location_district: null,
+    location_district_code: null,
+    location_village: null,
+    location_village_code: null,
     address_detail: null,
     latitude: null,
     longitude: null,
@@ -977,4 +1209,13 @@ function createEmptyListing(): ListingRecord {
     created_at: new Date(0).toISOString(),
     updated_at: new Date(0).toISOString(),
   };
+}
+
+function findRegionOptionByName(options: RegionOption[] | undefined, value: string | null | undefined) {
+  const normalizedValue = value?.trim().toLowerCase();
+  if (!normalizedValue) {
+    return null;
+  }
+
+  return (options ?? []).find((option) => option.name.trim().toLowerCase() === normalizedValue) ?? null;
 }

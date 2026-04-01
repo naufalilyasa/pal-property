@@ -25,6 +25,10 @@ const {
   deleteListingVideoMock,
   getListingByIdMock,
   getListingCategoriesMock,
+  getRegionCitiesMock,
+  getRegionDistrictsMock,
+  getRegionProvincesMock,
+  getRegionVillagesMock,
   reorderListingImagesMock,
   setPrimaryListingImageMock,
   uploadListingImagesMock,
@@ -36,6 +40,10 @@ const {
   deleteListingVideoMock: vi.fn(),
   getListingByIdMock: vi.fn(),
   getListingCategoriesMock: vi.fn(),
+  getRegionCitiesMock: vi.fn(),
+  getRegionDistrictsMock: vi.fn(),
+  getRegionProvincesMock: vi.fn(),
+  getRegionVillagesMock: vi.fn(),
   reorderListingImagesMock: vi.fn(),
   setPrimaryListingImageMock: vi.fn(),
   uploadListingImagesMock: vi.fn(),
@@ -62,6 +70,10 @@ vi.mock("@/lib/api/listing-form", async () => {
     deleteListingVideo: deleteListingVideoMock,
     getListingById: getListingByIdMock,
     getListingCategories: getListingCategoriesMock,
+    getRegionCities: getRegionCitiesMock,
+    getRegionDistricts: getRegionDistrictsMock,
+    getRegionProvinces: getRegionProvincesMock,
+    getRegionVillages: getRegionVillagesMock,
     reorderListingImages: reorderListingImagesMock,
     setPrimaryListingImage: setPrimaryListingImageMock,
     uploadListingImages: uploadListingImagesMock,
@@ -97,8 +109,13 @@ function buildListing(overrides: Partial<import("@/lib/api/listing-form").Listin
     is_negotiable: false,
     special_offers: [],
     location_province: "Jawa Barat",
+    location_province_code: "32",
     location_city: "Bandung",
+    location_city_code: "32.73",
     location_district: "Cidadap",
+    location_district_code: "32.73.08",
+    location_village: "Hegarmanah",
+    location_village_code: "32.73.08.1003",
     address_detail: "Jl. Setiabudi 10",
     latitude: null,
     longitude: null,
@@ -156,6 +173,44 @@ describe("ListingForm", () => {
       { id: "cat-root", name: "House", slug: "house", label: "House" },
       { id: "cat-child", name: "Villa", slug: "villa", label: "House / Villa" },
     ]);
+    getRegionProvincesMock.mockResolvedValue([
+      { code: "31", name: "DKI Jakarta" },
+      { code: "32", name: "Jawa Barat" },
+      { code: "35", name: "Jawa Timur" },
+    ]);
+    getRegionCitiesMock.mockImplementation(async (provinceCode: string) => {
+      if (provinceCode === "31") {
+        return [{ code: "31.74", name: "Jakarta Selatan" }];
+      }
+
+      if (provinceCode === "35") {
+        return [{ code: "35.78", name: "Surabaya" }];
+      }
+
+      return [{ code: "32.73", name: "Bandung" }];
+    });
+    getRegionDistrictsMock.mockImplementation(async (cityCode: string) => {
+      if (cityCode === "31.74") {
+        return [{ code: "31.74.05", name: "Kebayoran Baru" }];
+      }
+
+      if (cityCode === "35.78") {
+        return [{ code: "35.78.10", name: "Wonokromo" }];
+      }
+
+      return [{ code: "32.73.08", name: "Cidadap" }];
+    });
+    getRegionVillagesMock.mockImplementation(async (districtCode: string) => {
+      if (districtCode === "31.74.05") {
+        return [{ code: "31.74.05.1001", name: "Gandaria Utara" }];
+      }
+
+      if (districtCode === "35.78.10") {
+        return [{ code: "35.78.10.1001", name: "Darmo" }];
+      }
+
+      return [{ code: "32.73.08.1003", name: "Hegarmanah" }];
+    });
     inspectListingImageSelectionMock.mockResolvedValue({
       message: "Ready: 2 images selected (garden.png, patio.png). Recommended ratio: 4:3.",
       offRatioCount: 0,
@@ -179,8 +234,10 @@ describe("ListingForm", () => {
     fireEvent.change(screen.getByLabelText(/^price/i), { target: { value: "2750000000" } });
     fireEvent.change(screen.getByLabelText(/^category/i), { target: { value: "cat-child" } });
     fireEvent.change(screen.getByLabelText(/^transaction type/i), { target: { value: "rent" } });
-    fireEvent.change(screen.getByLabelText(/^city/i), { target: { value: "Jakarta" } });
-    fireEvent.change(screen.getByLabelText(/^province/i), { target: { value: "DKI Jakarta" } });
+    fireEvent.change(await screen.findByLabelText(/^province/i), { target: { value: "31" } });
+    fireEvent.change(await screen.findByLabelText(/^city/i), { target: { value: "31.74" } });
+    fireEvent.change(await screen.findByLabelText(/^district/i), { target: { value: "31.74.05" } });
+    fireEvent.change(await screen.findByLabelText(/village/i), { target: { value: "31.74.05.1001" } });
     fireEvent.change(screen.getByLabelText(/^bedrooms/i), { target: { value: "4" } });
 
     fireEvent.click(screen.getByRole("button", { name: /create listing/i }));
@@ -197,8 +254,13 @@ describe("ListingForm", () => {
           is_negotiable: false,
           special_offers: [],
           location_province: "DKI Jakarta",
-          location_city: "Jakarta",
-          location_district: null,
+          location_province_code: "31",
+          location_city: "Jakarta Selatan",
+          location_city_code: "31.74",
+          location_district: "Kebayoran Baru",
+          location_district_code: "31.74.05",
+          location_village: "Gandaria Utara",
+          location_village_code: "31.74.05.1001",
           address_detail: null,
           latitude: null,
           longitude: null,
@@ -241,8 +303,10 @@ describe("ListingForm", () => {
     });
     fireEvent.change(screen.getByLabelText(/^price/i), { target: { value: "0" } });
     fireEvent.change(screen.getByLabelText(/^transaction type/i), { target: { value: "sale" } });
-    fireEvent.change(screen.getByLabelText(/^city/i), { target: { value: "  Surabaya " } });
-    fireEvent.change(screen.getByLabelText(/^district/i), { target: { value: "   " } });
+    fireEvent.change(await screen.findByLabelText(/^province/i), { target: { value: "35" } });
+    fireEvent.change(await screen.findByLabelText(/^city/i), { target: { value: "35.78" } });
+    fireEvent.change(await screen.findByLabelText(/^district/i), { target: { value: "35.78.10" } });
+    fireEvent.change(await screen.findByLabelText(/village/i), { target: { value: "35.78.10.1001" } });
     fireEvent.change(screen.getByLabelText(/^address detail/i), { target: { value: "  Tower A  " } });
     fireEvent.change(screen.getByLabelText(/^status/i), { target: { value: "sold" } });
     fireEvent.change(screen.getByLabelText(/^bedrooms/i), { target: { value: "" } });
@@ -262,9 +326,14 @@ describe("ListingForm", () => {
           currency: "IDR",
           is_negotiable: false,
           special_offers: [],
-          location_province: null,
+          location_province: "Jawa Timur",
+          location_province_code: "35",
           location_city: "Surabaya",
-          location_district: null,
+          location_city_code: "35.78",
+          location_district: "Wonokromo",
+          location_district_code: "35.78.10",
+          location_village: "Darmo",
+          location_village_code: "35.78.10.1001",
           address_detail: "Tower A",
           latitude: null,
           longitude: null,
@@ -387,6 +456,10 @@ describe("ListingForm", () => {
 
     fireEvent.change(screen.getByLabelText(/^title/i), { target: { value: "Tiny home" } });
     fireEvent.change(screen.getByLabelText(/^price/i), { target: { value: "950000000" } });
+    fireEvent.change(await screen.findByLabelText(/^province/i), { target: { value: "31" } });
+    fireEvent.change(await screen.findByLabelText(/^city/i), { target: { value: "31.74" } });
+    fireEvent.change(await screen.findByLabelText(/^district/i), { target: { value: "31.74.05" } });
+    fireEvent.change(await screen.findByLabelText(/village/i), { target: { value: "31.74.05.1001" } });
 
     fireEvent.click(screen.getByRole("button", { name: /create listing/i }));
 
