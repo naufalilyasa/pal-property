@@ -49,9 +49,21 @@ type listingService struct {
 	storage      domain.ListingImageStorage
 	videoStorage domain.ListingVideoStorage
 	authz        AuthzService
+	regions      RegionLookupService
 	publish      domain.EventPublisher
 	jobs         domain.SearchIndexJobRepository
 	txm          domain.SearchIndexTransactionManager
+}
+
+type normalizedListingLocation struct {
+	ProvinceName *string
+	ProvinceCode *string
+	CityName     *string
+	CityCode     *string
+	DistrictName *string
+	DistrictCode *string
+	VillageName  *string
+	VillageCode  *string
 }
 
 func (s *listingService) applyStorage(storage []domain.ListingImageStorage) {
@@ -106,6 +118,15 @@ func NewListingServiceWithAuthzPublisherAndJobs(repo domain.ListingRepository, a
 	return service
 }
 
+func WithRegionLookupService(svc ListingService, regions RegionLookupService) ListingService {
+	impl, ok := svc.(*listingService)
+	if !ok {
+		return svc
+	}
+	impl.regions = regions
+	return impl
+}
+
 func (s *listingService) Create(ctx context.Context, principal pkgauthz.Principal, req *request.CreateListingRequest) (*response.ListingResponse, error) {
 	if req.Title == "" || req.Price <= 0 || req.Status == "" {
 		return nil, domain.ErrInvalidCredential
@@ -131,39 +152,48 @@ func (s *listingService) Create(ctx context.Context, principal pkgauthz.Principa
 	if err != nil {
 		return nil, err
 	}
+	location, err := s.normalizeLocation(ctx, req.LocationProvince, req.LocationProvinceCode, req.LocationCity, req.LocationCityCode, req.LocationDistrict, req.LocationDistrictCode, req.LocationVillage, req.LocationVillageCode)
+	if err != nil {
+		return nil, err
+	}
 
 	listing := &entity.Listing{
-		UserID:            principal.UserID,
-		CategoryID:        req.CategoryID,
-		Title:             req.Title,
-		Slug:              listingSlug,
-		Description:       req.Description,
-		TransactionType:   defaultString(req.TransactionType, "sale"),
-		Price:             req.Price,
-		Currency:          defaultStringPointer(req.Currency, "IDR"),
-		IsNegotiable:      defaultBool(req.IsNegotiable),
-		SpecialOffers:     datatypes.JSON(specialOffersJSON),
-		LocationProvince:  req.LocationProvince,
-		LocationCity:      req.LocationCity,
-		LocationDistrict:  req.LocationDistrict,
-		AddressDetail:     req.AddressDetail,
-		Latitude:          req.Latitude,
-		Longitude:         req.Longitude,
-		BedroomCount:      resolveIntFieldWithLegacy(req.BedroomCount, req.Specifications.Bedrooms, req.Specifications.HasBedrooms()),
-		BathroomCount:     resolveIntFieldWithLegacy(req.BathroomCount, req.Specifications.Bathrooms, req.Specifications.HasBathrooms()),
-		FloorCount:        req.FloorCount,
-		CarportCapacity:   req.CarportCapacity,
-		LandAreaSqm:       resolveIntFieldWithLegacy(req.LandAreaSqm, req.Specifications.LandAreaSqm, req.Specifications.HasLandAreaSqm()),
-		BuildingAreaSqm:   resolveIntFieldWithLegacy(req.BuildingAreaSqm, req.Specifications.BuildingAreaSqm, req.Specifications.HasBuildingAreaSqm()),
-		CertificateType:   req.CertificateType,
-		Condition:         req.Condition,
-		Furnishing:        req.Furnishing,
-		ElectricalPowerVA: req.ElectricalPowerVA,
-		FacingDirection:   req.FacingDirection,
-		YearBuilt:         req.YearBuilt,
-		Facilities:        datatypes.JSON(facilitiesJSON),
-		Status:            req.Status,
-		Specifications:    datatypes.JSON(specsJSON),
+		UserID:               principal.UserID,
+		CategoryID:           req.CategoryID,
+		Title:                req.Title,
+		Slug:                 listingSlug,
+		Description:          req.Description,
+		TransactionType:      defaultString(req.TransactionType, "sale"),
+		Price:                req.Price,
+		Currency:             defaultStringPointer(req.Currency, "IDR"),
+		IsNegotiable:         defaultBool(req.IsNegotiable),
+		SpecialOffers:        datatypes.JSON(specialOffersJSON),
+		LocationProvince:     location.ProvinceName,
+		LocationProvinceCode: location.ProvinceCode,
+		LocationCity:         location.CityName,
+		LocationCityCode:     location.CityCode,
+		LocationDistrict:     location.DistrictName,
+		LocationDistrictCode: location.DistrictCode,
+		LocationVillage:      location.VillageName,
+		LocationVillageCode:  location.VillageCode,
+		AddressDetail:        req.AddressDetail,
+		Latitude:             req.Latitude,
+		Longitude:            req.Longitude,
+		BedroomCount:         resolveIntFieldWithLegacy(req.BedroomCount, req.Specifications.Bedrooms, req.Specifications.HasBedrooms()),
+		BathroomCount:        resolveIntFieldWithLegacy(req.BathroomCount, req.Specifications.Bathrooms, req.Specifications.HasBathrooms()),
+		FloorCount:           req.FloorCount,
+		CarportCapacity:      req.CarportCapacity,
+		LandAreaSqm:          resolveIntFieldWithLegacy(req.LandAreaSqm, req.Specifications.LandAreaSqm, req.Specifications.HasLandAreaSqm()),
+		BuildingAreaSqm:      resolveIntFieldWithLegacy(req.BuildingAreaSqm, req.Specifications.BuildingAreaSqm, req.Specifications.HasBuildingAreaSqm()),
+		CertificateType:      req.CertificateType,
+		Condition:            req.Condition,
+		Furnishing:           req.Furnishing,
+		ElectricalPowerVA:    req.ElectricalPowerVA,
+		FacingDirection:      req.FacingDirection,
+		YearBuilt:            req.YearBuilt,
+		Facilities:           datatypes.JSON(facilitiesJSON),
+		Status:               req.Status,
+		Specifications:       datatypes.JSON(specsJSON),
 	}
 
 	var created *entity.Listing
@@ -298,19 +328,20 @@ func (s *listingService) Update(ctx context.Context, id uuid.UUID, principal pkg
 		fields = append(fields, "special_offers")
 	}
 
-	if req.LocationProvince != nil {
-		listing.LocationProvince = req.LocationProvince
-		fields = append(fields, "location_province")
-	}
-
-	if req.LocationCity != nil {
-		listing.LocationCity = req.LocationCity
-		fields = append(fields, "location_city")
-	}
-
-	if req.LocationDistrict != nil {
-		listing.LocationDistrict = req.LocationDistrict
-		fields = append(fields, "location_district")
+	if hasLocationUpdates(req) {
+		location, err := s.normalizeLocation(ctx, req.LocationProvince, req.LocationProvinceCode, req.LocationCity, req.LocationCityCode, req.LocationDistrict, req.LocationDistrictCode, req.LocationVillage, req.LocationVillageCode)
+		if err != nil {
+			return nil, err
+		}
+		listing.LocationProvince = location.ProvinceName
+		listing.LocationProvinceCode = location.ProvinceCode
+		listing.LocationCity = location.CityName
+		listing.LocationCityCode = location.CityCode
+		listing.LocationDistrict = location.DistrictName
+		listing.LocationDistrictCode = location.DistrictCode
+		listing.LocationVillage = location.VillageName
+		listing.LocationVillageCode = location.VillageCode
+		fields = append(fields, "location_province", "location_province_code", "location_city", "location_city_code", "location_district", "location_district_code", "location_village", "location_village_code")
 	}
 
 	if req.AddressDetail != nil {
@@ -890,42 +921,47 @@ func (s *listingService) mapToResponse(l *entity.Listing) *response.ListingRespo
 	}
 	compatSpecs := readCompatibilitySpecifications(l.Specifications)
 	return &response.ListingResponse{
-		ID:                l.ID,
-		UserID:            l.UserID,
-		CategoryID:        l.CategoryID,
-		Title:             l.Title,
-		Slug:              l.Slug,
-		Description:       l.Description,
-		TransactionType:   l.TransactionType,
-		Price:             l.Price,
-		Currency:          l.Currency,
-		IsNegotiable:      l.IsNegotiable,
-		SpecialOffers:     l.SpecialOffers,
-		LocationProvince:  l.LocationProvince,
-		LocationCity:      l.LocationCity,
-		LocationDistrict:  l.LocationDistrict,
-		AddressDetail:     l.AddressDetail,
-		Latitude:          l.Latitude,
-		Longitude:         l.Longitude,
-		BedroomCount:      resolveIntFieldWithLegacy(l.BedroomCount, compatSpecs.Bedrooms, compatSpecs.HasBedrooms()),
-		BathroomCount:     resolveIntFieldWithLegacy(l.BathroomCount, compatSpecs.Bathrooms, compatSpecs.HasBathrooms()),
-		FloorCount:        l.FloorCount,
-		CarportCapacity:   l.CarportCapacity,
-		LandAreaSqm:       resolveIntFieldWithLegacy(l.LandAreaSqm, compatSpecs.LandAreaSqm, compatSpecs.HasLandAreaSqm()),
-		BuildingAreaSqm:   resolveIntFieldWithLegacy(l.BuildingAreaSqm, compatSpecs.BuildingAreaSqm, compatSpecs.HasBuildingAreaSqm()),
-		CertificateType:   l.CertificateType,
-		Condition:         l.Condition,
-		Furnishing:        l.Furnishing,
-		ElectricalPowerVA: l.ElectricalPowerVA,
-		FacingDirection:   l.FacingDirection,
-		YearBuilt:         l.YearBuilt,
-		Facilities:        l.Facilities,
-		Status:            l.Status,
-		IsFeatured:        l.IsFeatured,
-		Specifications:    l.Specifications,
-		ViewCount:         l.ViewCount,
-		Images:            mapListingImagesToResponse(l.Images),
-		Video:             mapListingVideoToResponse(l.Video),
+		ID:                   l.ID,
+		UserID:               l.UserID,
+		CategoryID:           l.CategoryID,
+		Title:                l.Title,
+		Slug:                 l.Slug,
+		Description:          l.Description,
+		TransactionType:      l.TransactionType,
+		Price:                l.Price,
+		Currency:             l.Currency,
+		IsNegotiable:         l.IsNegotiable,
+		SpecialOffers:        l.SpecialOffers,
+		LocationProvince:     l.LocationProvince,
+		LocationProvinceCode: l.LocationProvinceCode,
+		LocationCity:         l.LocationCity,
+		LocationCityCode:     l.LocationCityCode,
+		LocationDistrict:     l.LocationDistrict,
+		LocationDistrictCode: l.LocationDistrictCode,
+		LocationVillage:      l.LocationVillage,
+		LocationVillageCode:  l.LocationVillageCode,
+		AddressDetail:        l.AddressDetail,
+		Latitude:             l.Latitude,
+		Longitude:            l.Longitude,
+		BedroomCount:         resolveIntFieldWithLegacy(l.BedroomCount, compatSpecs.Bedrooms, compatSpecs.HasBedrooms()),
+		BathroomCount:        resolveIntFieldWithLegacy(l.BathroomCount, compatSpecs.Bathrooms, compatSpecs.HasBathrooms()),
+		FloorCount:           l.FloorCount,
+		CarportCapacity:      l.CarportCapacity,
+		LandAreaSqm:          resolveIntFieldWithLegacy(l.LandAreaSqm, compatSpecs.LandAreaSqm, compatSpecs.HasLandAreaSqm()),
+		BuildingAreaSqm:      resolveIntFieldWithLegacy(l.BuildingAreaSqm, compatSpecs.BuildingAreaSqm, compatSpecs.HasBuildingAreaSqm()),
+		CertificateType:      l.CertificateType,
+		Condition:            l.Condition,
+		Furnishing:           l.Furnishing,
+		ElectricalPowerVA:    l.ElectricalPowerVA,
+		FacingDirection:      l.FacingDirection,
+		YearBuilt:            l.YearBuilt,
+		Facilities:           l.Facilities,
+		Status:               l.Status,
+		IsFeatured:           l.IsFeatured,
+		Specifications:       l.Specifications,
+		ViewCount:            l.ViewCount,
+		Images:               mapListingImagesToResponse(l.Images),
+		Video:                mapListingVideoToResponse(l.Video),
 		Category: func() *response.CategoryShortResponse {
 			if l.Category == nil {
 				return nil
@@ -1052,6 +1088,75 @@ func defaultStringPointer(value *string, fallback string) string {
 		return fallback
 	}
 	return *value
+}
+
+func hasLocationUpdates(req *request.UpdateListingRequest) bool {
+	return req.LocationProvince != nil || req.LocationProvinceCode != nil || req.LocationCity != nil || req.LocationCityCode != nil || req.LocationDistrict != nil || req.LocationDistrictCode != nil || req.LocationVillage != nil || req.LocationVillageCode != nil
+}
+
+func (s *listingService) normalizeLocation(ctx context.Context, provinceName, provinceCode, cityName, cityCode, districtName, districtCode, villageName, villageCode *string) (*normalizedListingLocation, error) {
+	if hasAnyLocationCode(provinceCode, cityCode, districtCode, villageCode) {
+		if s.regions == nil {
+			return nil, domain.ErrInvalidLocation
+		}
+		selection, err := s.regions.ResolveHierarchy(ctx, normalizePointerValue(provinceCode), normalizePointerValue(cityCode), normalizePointerValue(districtCode), normalizePointerValue(villageCode))
+		if err != nil {
+			return nil, err
+		}
+		return &normalizedListingLocation{
+			ProvinceName: stringPointer(selection.Province.Name),
+			ProvinceCode: stringPointer(selection.Province.Code),
+			CityName:     stringPointer(selection.City.Name),
+			CityCode:     stringPointer(selection.City.Code),
+			DistrictName: stringPointer(selection.District.Name),
+			DistrictCode: stringPointer(selection.District.Code),
+			VillageName:  stringPointer(selection.Village.Name),
+			VillageCode:  stringPointer(selection.Village.Code),
+		}, nil
+	}
+
+	return &normalizedListingLocation{
+		ProvinceName: normalizeOptionalPointer(provinceName),
+		ProvinceCode: nil,
+		CityName:     normalizeOptionalPointer(cityName),
+		CityCode:     nil,
+		DistrictName: normalizeOptionalPointer(districtName),
+		DistrictCode: nil,
+		VillageName:  normalizeOptionalPointer(villageName),
+		VillageCode:  nil,
+	}, nil
+}
+
+func hasAnyLocationCode(values ...*string) bool {
+	for _, value := range values {
+		if strings.TrimSpace(normalizePointerValue(value)) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeOptionalPointer(value *string) *string {
+	trimmed := normalizePointerValue(value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
+
+func normalizePointerValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(*value)
+}
+
+func stringPointer(value string) *string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
 }
 
 func publicListingStatuses() []string {
@@ -1433,14 +1538,6 @@ func validateListingImageOrder(images []*entity.ListingImage, orderedImageIDs []
 	}
 
 	return nil
-}
-
-func stringPointer(value string) *string {
-	if strings.TrimSpace(value) == "" {
-		return nil
-	}
-
-	return &value
 }
 
 func int64Pointer(value int64) *int64 {

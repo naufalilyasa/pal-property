@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -41,6 +42,9 @@ func main() {
 	db, err := gormPkg.Open(pgDriver.Open(dsn), &gormPkg.Config{})
 	if err != nil {
 		logger.Log.Fatal("Failed to connect to database", zap.Error(err))
+	}
+	if err := postgres.EnsureIndonesiaRegionsSeeded(context.Background(), db, config.Env.WilayahDataPath); err != nil {
+		logger.Log.Fatal("Failed to seed wilayah data", zap.Error(err))
 	}
 
 	goth.UseProviders(
@@ -110,6 +114,10 @@ func main() {
 		logger.Log.Fatal("Failed to initialize search service", zap.Error(err))
 	}
 	searchHandler := handler.NewSearchHandler(searchService)
+	regionRepo := postgres.NewRegionRepository(db)
+	regionService := service.NewRegionService(regionRepo)
+	listingService = service.WithRegionLookupService(listingService, regionService)
+	regionHandler := handler.NewRegionHandler(regionService)
 
 	categoryRepo := postgres.NewCategoryRepository(db)
 	categoryService := service.NewCategoryServiceWithJobsAndTransactions(categoryRepo, indexJobRepo, indexTxManager)
@@ -161,7 +169,7 @@ func main() {
 		},
 	})
 
-	router.Register(app, db, authzService, authHandler, listingHandler, savedListingHandler, searchHandler, categoryHandler)
+	router.Register(app, db, authzService, authHandler, listingHandler, savedListingHandler, searchHandler, regionHandler, categoryHandler)
 
 	logger.Log.Info("Server starting", zap.String("port", config.Env.Port))
 	if err := app.Listen(fmt.Sprintf(":%s", config.Env.Port)); err != nil {
