@@ -15,6 +15,18 @@ function formatPrice(price: number, currency: string) {
   }).format(price);
 }
 
+function formatMetric(label: string, value?: number) {
+  return typeof value === "number" ? `${label} ${value}` : null;
+}
+
+function formatArea(label: string, value?: number) {
+  return typeof value === "number" ? `${label} ${value} m²` : null;
+}
+
+function formatTransactionType(value: string) {
+  return value === "rent" ? "Sewa" : value === "sale" ? "Jual" : value;
+}
+
 export function SearchListingCardItem({
   href,
   listing,
@@ -38,8 +50,20 @@ export function SearchListingCardItem({
   const image = visibleImages[activeIndex] ?? null;
   const additionalImages = Math.max(images.length - visibleImages.length, 0);
   const price = formatPrice(listing.price, listing.currency);
-  const address = [listing.location_district, listing.location_city, listing.location_province].filter(Boolean).join(", ");
-  const meta = [listing.category?.name, listing.transaction_type, listing.status].filter(Boolean).join(" • ");
+  const primaryLocation = [listing.location_village, listing.location_district, listing.location_city].filter(Boolean).join(", ");
+  const secondaryLocation = [listing.location_province].filter(Boolean).join(", ");
+  const badges = [
+    listing.category?.name,
+    formatTransactionType(listing.transaction_type),
+    listing.status,
+    listing.is_featured ? "Featured" : null,
+  ].filter(Boolean);
+  const metrics = [
+    formatMetric("KT", listing.bedroom_count),
+    formatMetric("KM", listing.bathroom_count),
+    formatArea("LT", listing.land_area_sqm),
+    formatArea("LB", listing.building_area_sqm),
+  ].filter(Boolean);
 
   const canSlide = visibleImages.length > 1;
   const showMoreOverlay = additionalImages > 0 && activeIndex === visibleImages.length - 1;
@@ -115,14 +139,38 @@ export function SearchListingCardItem({
         </div>
       </div>
 
-      <div className="flex flex-col space-y-1">
+      <div className="flex flex-col space-y-2">
         <Link href={href} className="text-lg font-bold tracking-tight text-[#111] hover:underline">
           {price}
         </Link>
-        <p className="text-[12px] font-medium text-[#111]">{meta}</p>
+        {badges.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {badges.map((badge) => (
+              <span
+                key={`${listing.id}-${badge}`}
+                className="rounded-full bg-[#eef1fb] px-2.5 py-1 text-[11px] font-semibold text-[#3a4aa1]"
+              >
+                {badge}
+              </span>
+            ))}
+          </div>
+        ) : null}
         <p className="text-sm font-semibold text-[#111]">{listing.title}</p>
+        {primaryLocation ? <p className="line-clamp-1 text-[12px] font-medium text-[#4b5563]">{primaryLocation}</p> : null}
+        {secondaryLocation ? <p className="line-clamp-1 text-[12px] text-[#6d6a64]">{secondaryLocation}</p> : null}
         {listing.description_excerpt ? <p className="line-clamp-2 text-[12px] text-[#6d6a64]">{listing.description_excerpt}</p> : null}
-        {address ? <p className="line-clamp-1 text-[12px] text-[#6d6a64]">{address}</p> : null}
+        {metrics.length > 0 ? (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {metrics.map((metric) => (
+              <span
+                key={`${listing.id}-${metric}`}
+                className="rounded-full border border-[#e6e7eb] bg-[#f8f8fa] px-2.5 py-1 text-[11px] font-medium text-[#374151]"
+              >
+                {metric}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
     </article>
   );

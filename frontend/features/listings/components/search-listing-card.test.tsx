@@ -22,6 +22,14 @@ function buildListing(overrides: Partial<import("@/features/listings/server/get-
     transaction_type: "sale",
     price: 3250000000,
     currency: "IDR",
+    location_province: "DKI Jakarta",
+    location_city: "Jakarta Timur",
+    location_district: "Cibubur",
+    location_village: "Ciracas",
+    bedroom_count: 4,
+    bathroom_count: 3,
+    land_area_sqm: 152,
+    building_area_sqm: 166,
     status: "active",
     is_featured: false,
     created_at: "2026-03-17T00:00:00Z",
@@ -63,5 +71,16 @@ describe("SearchListingCardItem", () => {
     expect(screen.getByText("+1")).toBeInTheDocument();
     expect(screen.getByText(/more photos/i)).toBeInTheDocument();
     expect(nextButton).toBeDisabled();
+  });
+
+  it("renders denser location and property metrics without changing the image shell", () => {
+    render(<SearchListingCardItem href="/listings/jakarta-river-house" listing={buildListing()} />);
+
+    expect(screen.getByText(/ciracas, cibubur, jakarta timur/i)).toBeInTheDocument();
+    expect(screen.getByText(/dki jakarta/i)).toBeInTheDocument();
+    expect(screen.getByText("KT 4")).toBeInTheDocument();
+    expect(screen.getByText("KM 3")).toBeInTheDocument();
+    expect(screen.getByText("LT 152 m²")).toBeInTheDocument();
+    expect(screen.getByText("LB 166 m²")).toBeInTheDocument();
   });
 });
