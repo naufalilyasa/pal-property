@@ -25,7 +25,7 @@ export default async function DashboardListingsPage() {
       </section>
 
       {listingsPage.data.length === 0 ? (
-        <section className="rounded-[1.75rem] border border-[var(--line)] bg-white/80 p-8 text-sm leading-7 text-[var(--muted)]">
+        <section className="rounded-[1.75rem] border border-[var(--line)] bg-white/80 p-8 text-sm leading-7 text-slate-900">
           No listings yet. Create your first property record to start the seller workflow.
         </section>
       ) : (

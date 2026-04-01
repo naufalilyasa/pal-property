@@ -24,12 +24,12 @@ export function DashboardListingsTable({ listings }: { listings: SellerListing[]
                 {image ? (
                   <Image alt={listing.title} fill sizes="120px" src={image.url} className="object-cover" unoptimized />
                 ) : (
-                  <div className="flex h-full items-center justify-center px-3 text-center text-xs text-[var(--muted)]">No image</div>
+                  <div className="flex h-full items-center justify-center px-3 text-center text-xs text-slate-900">No image</div>
                 )}
               </div>
               <div className="space-y-2">
                 <h2 className="text-lg font-semibold text-[var(--ink)]">{listing.title}</h2>
-                <p className="text-sm text-[var(--muted)]">{listing.category?.name ?? "Uncategorized"} · {listing.status} · {listing.location_city ?? "Unknown city"}</p>
+                <p className="text-sm text-slate-900">{listing.category?.name ?? "Uncategorized"} · {listing.status} · {listing.location_city ?? "Unknown city"}</p>
               </div>
               <div className="flex flex-col items-start gap-3 lg:items-end">
                 <p className="text-sm font-semibold text-[var(--ink)]">{formatPrice(listing.price, listing.currency)}</p>
