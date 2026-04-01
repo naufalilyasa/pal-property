@@ -41,6 +41,8 @@ type listingSearchDocument struct {
 	LocationCity       *string                 `json:"location_city,omitempty"`
 	LocationDistrict   *string                 `json:"location_district,omitempty"`
 	LocationVillage    *string                 `json:"location_village,omitempty"`
+	Latitude           *float64                `json:"latitude,omitempty"`
+	Longitude          *float64                `json:"longitude,omitempty"`
 	BedroomCount       *int                    `json:"bedroom_count,omitempty"`
 	BathroomCount      *int                    `json:"bathroom_count,omitempty"`
 	LandAreaSqm        *int                    `json:"land_area_sqm,omitempty"`
@@ -118,6 +120,8 @@ func listingEventDocument(event domain.ListingEvent) listingSearchDocument {
 		LocationCity:       event.Payload.LocationCity,
 		LocationDistrict:   event.Payload.LocationDistrict,
 		LocationVillage:    event.Payload.LocationVillage,
+		Latitude:           event.Payload.Latitude,
+		Longitude:          event.Payload.Longitude,
 		BedroomCount:       event.Payload.BedroomCount,
 		BathroomCount:      event.Payload.BathroomCount,
 		LandAreaSqm:        event.Payload.LandAreaSqm,
@@ -151,6 +155,8 @@ func listingDocumentFromEntity(listing *entity.Listing) listingSearchDocument {
 		LocationCity:       listing.LocationCity,
 		LocationDistrict:   listing.LocationDistrict,
 		LocationVillage:    listing.LocationVillage,
+		Latitude:           listing.Latitude,
+		Longitude:          listing.Longitude,
 		BedroomCount:       listing.BedroomCount,
 		BathroomCount:      listing.BathroomCount,
 		LandAreaSqm:        listing.LandAreaSqm,
@@ -215,6 +221,8 @@ func ListingIndexMapping() map[string]any {
 				"location_city":       map[string]any{"type": "keyword"},
 				"location_district":   map[string]any{"type": "keyword"},
 				"location_village":    map[string]any{"type": "keyword"},
+				"latitude":            map[string]any{"type": "double"},
+				"longitude":           map[string]any{"type": "double"},
 				"bedroom_count":       map[string]any{"type": "integer"},
 				"bathroom_count":      map[string]any{"type": "integer"},
 				"land_area_sqm":       map[string]any{"type": "integer"},

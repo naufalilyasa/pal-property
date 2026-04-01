@@ -26,6 +26,8 @@ type SearchListingCardResponse struct {
 	LocationCity       *string                 `json:"location_city,omitempty"`
 	LocationDistrict   *string                 `json:"location_district,omitempty"`
 	LocationVillage    *string                 `json:"location_village,omitempty"`
+	Latitude           *float64                `json:"latitude,omitempty"`
+	Longitude          *float64                `json:"longitude,omitempty"`
 	BedroomCount       *int                    `json:"bedroom_count,omitempty"`
 	BathroomCount      *int                    `json:"bathroom_count,omitempty"`
 	LandAreaSqm        *int                    `json:"land_area_sqm,omitempty"`
