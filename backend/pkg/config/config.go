@@ -32,6 +32,7 @@ type AppConfig struct {
 	ElasticUsername      string `env:"ELASTIC_USERNAME"`
 	ElasticPassword      string `env:"ELASTIC_PASSWORD"`
 	ElasticListingsIndex string `env:"ELASTIC_INDEX_LISTINGS" envDefault:"listings"`
+	WilayahDataPath      string `env:"WILAYAH_DATA_PATH" envDefault:"../wilayah/db/wilayah.sql"`
 
 	// CORS
 	CorsAllowedOrigins string `env:"CORS_ALLOWED_ORIGINS" envDefault:"http://localhost:3000"`
