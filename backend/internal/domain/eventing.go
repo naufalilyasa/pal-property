@@ -71,6 +71,7 @@ type ListingEventPayload struct {
 	LocationProvince  *string                  `json:"location_province,omitempty"`
 	LocationCity      *string                  `json:"location_city,omitempty"`
 	LocationDistrict  *string                  `json:"location_district,omitempty"`
+	LocationVillage   *string                  `json:"location_village,omitempty"`
 	AddressDetail     *string                  `json:"address_detail,omitempty"`
 	Latitude          *float64                 `json:"latitude,omitempty"`
 	Longitude         *float64                 `json:"longitude,omitempty"`

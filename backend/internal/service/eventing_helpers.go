@@ -54,6 +54,7 @@ func buildListingEvent(eventType string, listing *entity.Listing) domain.Listing
 			LocationProvince:  listing.LocationProvince,
 			LocationCity:      listing.LocationCity,
 			LocationDistrict:  listing.LocationDistrict,
+			LocationVillage:   listing.LocationVillage,
 			AddressDetail:     listing.AddressDetail,
 			Latitude:          listing.Latitude,
 			Longitude:         listing.Longitude,

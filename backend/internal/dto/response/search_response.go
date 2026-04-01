@@ -25,6 +25,11 @@ type SearchListingCardResponse struct {
 	LocationProvince   *string                 `json:"location_province,omitempty"`
 	LocationCity       *string                 `json:"location_city,omitempty"`
 	LocationDistrict   *string                 `json:"location_district,omitempty"`
+	LocationVillage    *string                 `json:"location_village,omitempty"`
+	BedroomCount       *int                    `json:"bedroom_count,omitempty"`
+	BathroomCount      *int                    `json:"bathroom_count,omitempty"`
+	LandAreaSqm        *int                    `json:"land_area_sqm,omitempty"`
+	BuildingAreaSqm    *int                    `json:"building_area_sqm,omitempty"`
 	Status             string                  `json:"status"`
 	IsFeatured         bool                    `json:"is_featured"`
 	PrimaryImageURL    *string                 `json:"primary_image_url,omitempty"`

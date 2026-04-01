@@ -40,6 +40,11 @@ type listingSearchDocument struct {
 	LocationProvince   *string                 `json:"location_province,omitempty"`
 	LocationCity       *string                 `json:"location_city,omitempty"`
 	LocationDistrict   *string                 `json:"location_district,omitempty"`
+	LocationVillage    *string                 `json:"location_village,omitempty"`
+	BedroomCount       *int                    `json:"bedroom_count,omitempty"`
+	BathroomCount      *int                    `json:"bathroom_count,omitempty"`
+	LandAreaSqm        *int                    `json:"land_area_sqm,omitempty"`
+	BuildingAreaSqm    *int                    `json:"building_area_sqm,omitempty"`
 	Status             string                  `json:"status"`
 	IsFeatured         bool                    `json:"is_featured"`
 	PrimaryImageURL    *string                 `json:"primary_image_url,omitempty"`
@@ -112,6 +117,11 @@ func listingEventDocument(event domain.ListingEvent) listingSearchDocument {
 		LocationProvince:   event.Payload.LocationProvince,
 		LocationCity:       event.Payload.LocationCity,
 		LocationDistrict:   event.Payload.LocationDistrict,
+		LocationVillage:    event.Payload.LocationVillage,
+		BedroomCount:       event.Payload.BedroomCount,
+		BathroomCount:      event.Payload.BathroomCount,
+		LandAreaSqm:        event.Payload.LandAreaSqm,
+		BuildingAreaSqm:    event.Payload.BuildingAreaSqm,
 		Status:             event.Payload.Status,
 		IsFeatured:         event.Payload.IsFeatured,
 		PrimaryImageURL:    primaryImageURLFromEvent(event.Payload.Images),
@@ -140,6 +150,11 @@ func listingDocumentFromEntity(listing *entity.Listing) listingSearchDocument {
 		LocationProvince:   listing.LocationProvince,
 		LocationCity:       listing.LocationCity,
 		LocationDistrict:   listing.LocationDistrict,
+		LocationVillage:    listing.LocationVillage,
+		BedroomCount:       listing.BedroomCount,
+		BathroomCount:      listing.BathroomCount,
+		LandAreaSqm:        listing.LandAreaSqm,
+		BuildingAreaSqm:    listing.BuildingAreaSqm,
 		Status:             listing.Status,
 		IsFeatured:         listing.IsFeatured,
 		PrimaryImageURL:    primaryImageURLFromEntities(listing.Images),
@@ -199,6 +214,11 @@ func ListingIndexMapping() map[string]any {
 				"location_province":   map[string]any{"type": "keyword"},
 				"location_city":       map[string]any{"type": "keyword"},
 				"location_district":   map[string]any{"type": "keyword"},
+				"location_village":    map[string]any{"type": "keyword"},
+				"bedroom_count":       map[string]any{"type": "integer"},
+				"bathroom_count":      map[string]any{"type": "integer"},
+				"land_area_sqm":       map[string]any{"type": "integer"},
+				"building_area_sqm":   map[string]any{"type": "integer"},
 				"status":              map[string]any{"type": "keyword"},
 				"is_featured":         map[string]any{"type": "boolean"},
 				"primary_image_url":   map[string]any{"type": "keyword", "index": false},
