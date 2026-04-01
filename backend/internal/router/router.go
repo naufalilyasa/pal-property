@@ -47,6 +47,7 @@ func Register(
 	listingHandler *handler.ListingHandler,
 	savedListingHandler *handler.SavedListingHandler,
 	searchHandler *handler.SearchHandler,
+	regionHandler *handler.RegionHandler,
 	categoryHandler *handler.CategoryHandler,
 ) {
 	allowedOrigins := strings.Split(config.Env.CorsAllowedOrigins, ",")
@@ -111,6 +112,10 @@ func Register(
 	// ==========================================
 	api := app.Group("/api")
 	api.Get("/search/listings", searchHandler.SearchListings)
+	api.Get("/regions/provinces", regionHandler.ListProvinces)
+	api.Get("/regions/cities", regionHandler.ListCities)
+	api.Get("/regions/districts", regionHandler.ListDistricts)
+	api.Get("/regions/villages", regionHandler.ListVillages)
 	api.Get("/listings", listingHandler.List)
 	api.Get("/listings/slug/:slug", listingHandler.GetBySlug)
 	api.Get("/listings/:id", listingHandler.GetByID)
