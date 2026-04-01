@@ -47,6 +47,7 @@ func Register(
 	listingHandler *handler.ListingHandler,
 	savedListingHandler *handler.SavedListingHandler,
 	searchHandler *handler.SearchHandler,
+	chatHandler *handler.ChatHandler,
 	regionHandler *handler.RegionHandler,
 	categoryHandler *handler.CategoryHandler,
 ) {
@@ -112,6 +113,7 @@ func Register(
 	// ==========================================
 	api := app.Group("/api")
 	api.Get("/search/listings", searchHandler.SearchListings)
+	api.Post("/chat/messages", chatHandler.CreateMessage)
 	api.Get("/regions/provinces", regionHandler.ListProvinces)
 	api.Get("/regions/cities", regionHandler.ListCities)
 	api.Get("/regions/districts", regionHandler.ListDistricts)

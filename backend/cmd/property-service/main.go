@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/bytedance/sonic"
 	"github.com/gofiber/fiber/v3"
@@ -15,11 +16,13 @@ import (
 	handler "github.com/naufalilyasa/pal-property-backend/internal/handler/http"
 	"github.com/naufalilyasa/pal-property-backend/internal/repository/postgres"
 	"github.com/naufalilyasa/pal-property-backend/internal/repository/redis"
+	searchrepo "github.com/naufalilyasa/pal-property-backend/internal/repository/search"
 	"github.com/naufalilyasa/pal-property-backend/internal/router"
 	"github.com/naufalilyasa/pal-property-backend/internal/service"
 	"github.com/naufalilyasa/pal-property-backend/pkg/authz"
 	"github.com/naufalilyasa/pal-property-backend/pkg/cloudinary"
 	"github.com/naufalilyasa/pal-property-backend/pkg/config"
+	"github.com/naufalilyasa/pal-property-backend/pkg/gemini"
 	"github.com/naufalilyasa/pal-property-backend/pkg/logger"
 	"github.com/naufalilyasa/pal-property-backend/pkg/searchindex"
 	goRedis "github.com/redis/go-redis/v9"
@@ -114,6 +117,24 @@ func main() {
 		logger.Log.Fatal("Failed to initialize search service", zap.Error(err))
 	}
 	searchHandler := handler.NewSearchHandler(searchService)
+	chatRetrievalRepo, err := searchrepo.NewChatRetrievalRepository(config.Env.ElasticChatRetrievalIndex, searchClient)
+	if err != nil {
+		logger.Log.Fatal("Failed to initialize chat retrieval repository", zap.Error(err))
+	}
+	geminiClient, err := gemini.NewClientFromConfig(context.Background())
+	if err != nil {
+		logger.Log.Fatal("Failed to initialize Gemini client", zap.Error(err))
+	}
+	chatRetrievalService, err := service.NewChatRetrievalService(chatRetrievalRepo, geminiClient, config.Env.ChatMaxRetrievalDocs)
+	if err != nil {
+		logger.Log.Fatal("Failed to initialize chat retrieval service", zap.Error(err))
+	}
+	chatMemoryRepo := redis.NewChatMemoryRepository(rdb, time.Duration(config.Env.ChatSessionTTLSeconds)*time.Second, config.Env.ChatMaxHistoryTurns)
+	chatService, err := service.NewChatService(chatRetrievalService, chatMemoryRepo, geminiClient, config.Env.ChatMaxHistoryTurns)
+	if err != nil {
+		logger.Log.Fatal("Failed to initialize chat service", zap.Error(err))
+	}
+	chatHandler := handler.NewChatHandler(chatService)
 	regionRepo := postgres.NewRegionRepository(db)
 	regionService := service.NewRegionService(regionRepo)
 	listingService = service.WithRegionLookupService(listingService, regionService)
@@ -169,7 +190,7 @@ func main() {
 		},
 	})
 
-	router.Register(app, db, authzService, authHandler, listingHandler, savedListingHandler, searchHandler, regionHandler, categoryHandler)
+	router.Register(app, db, authzService, authHandler, listingHandler, savedListingHandler, searchHandler, chatHandler, regionHandler, categoryHandler)
 
 	logger.Log.Info("Server starting", zap.String("port", config.Env.Port))
 	if err := app.Listen(fmt.Sprintf(":%s", config.Env.Port)); err != nil {
