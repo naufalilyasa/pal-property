@@ -34,6 +34,11 @@ export type SearchListingCard = {
   location_province?: string;
   location_city?: string;
   location_district?: string;
+  location_village?: string;
+  bedroom_count?: number;
+  bathroom_count?: number;
+  land_area_sqm?: number;
+  building_area_sqm?: number;
   status: string;
   is_featured: boolean;
   primary_image_url?: string;

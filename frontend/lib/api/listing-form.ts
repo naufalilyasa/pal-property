@@ -32,6 +32,11 @@ export type ListingCategoryOption = {
   label: string;
 };
 
+export type RegionOption = {
+  code: string;
+  name: string;
+};
+
 export type ListingFormRequest = {
   category_id: string | null;
   title: string;
@@ -42,8 +47,13 @@ export type ListingFormRequest = {
   is_negotiable: boolean;
   special_offers: string[];
   location_province: string | null;
+  location_province_code: string | null;
   location_city: string | null;
+  location_city_code: string | null;
   location_district: string | null;
+  location_district_code: string | null;
+  location_village: string | null;
+  location_village_code: string | null;
   address_detail: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -83,8 +93,13 @@ export type ListingRecord = {
   is_negotiable?: boolean;
   special_offers?: string[] | null;
   location_province?: string | null;
+  location_province_code?: string | null;
   location_city?: string | null;
+  location_city_code?: string | null;
   location_district?: string | null;
+  location_district_code?: string | null;
+  location_village?: string | null;
+  location_village_code?: string | null;
   address_detail?: string | null;
   latitude?: number | null;
   longitude?: number | null;
@@ -183,6 +198,62 @@ export async function getListingCategories(
   });
 
   return flattenCategoryOptions(response.data);
+}
+
+export async function getRegionProvinces(options: ListingFormApiOptions = {}): Promise<RegionOption[]> {
+  const response = await browserFetch<RegionOption[]>('/api/regions/provinces', {
+    method: 'GET',
+    cache: 'no-store',
+    baseUrl: options.baseUrl,
+    fetch: options.fetch,
+  });
+
+  return response.data;
+}
+
+export async function getRegionCities(
+  provinceCode: string,
+  options: ListingFormApiOptions = {},
+): Promise<RegionOption[]> {
+  const searchParams = new URLSearchParams({ province_code: provinceCode });
+  const response = await browserFetch<RegionOption[]>(`/api/regions/cities?${searchParams.toString()}`, {
+    method: 'GET',
+    cache: 'no-store',
+    baseUrl: options.baseUrl,
+    fetch: options.fetch,
+  });
+
+  return response.data;
+}
+
+export async function getRegionDistricts(
+  cityCode: string,
+  options: ListingFormApiOptions = {},
+): Promise<RegionOption[]> {
+  const searchParams = new URLSearchParams({ city_code: cityCode });
+  const response = await browserFetch<RegionOption[]>(`/api/regions/districts?${searchParams.toString()}`, {
+    method: 'GET',
+    cache: 'no-store',
+    baseUrl: options.baseUrl,
+    fetch: options.fetch,
+  });
+
+  return response.data;
+}
+
+export async function getRegionVillages(
+  districtCode: string,
+  options: ListingFormApiOptions = {},
+): Promise<RegionOption[]> {
+  const searchParams = new URLSearchParams({ district_code: districtCode });
+  const response = await browserFetch<RegionOption[]>(`/api/regions/villages?${searchParams.toString()}`, {
+    method: 'GET',
+    cache: 'no-store',
+    baseUrl: options.baseUrl,
+    fetch: options.fetch,
+  });
+
+  return response.data;
 }
 
 export async function getListingById(
