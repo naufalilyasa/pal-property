@@ -12,6 +12,7 @@ var (
 	ErrInvalidCredential  = errors.New("invalid credentials")
 	ErrUnauthorized       = errors.New("unauthorized")
 	ErrForbidden          = errors.New("forbidden")
+	ErrChatMemoryNotFound = errors.New("chat memory not found")
 	ErrInvalidImageFile   = errors.New("invalid image file")
 	ErrImageLimitReached  = errors.New("listing image limit reached")
 	ErrImageOrderInvalid  = errors.New("invalid listing image order")
