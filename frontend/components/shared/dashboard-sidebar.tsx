@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: (
@@ -13,15 +16,20 @@ const navItems = [
 ];
 
 export function DashboardSidebar() {
+  const pathname = usePathname();
+
   return (
     <aside className="sticky top-16 h-[calc(100vh-4rem)] bg-white py-6 shadow-sm" data-testid="dashboard-sidebar">
       <nav className="flex flex-col gap-1 px-4">
-        {navItems.map((item) => (
-          <Link key={item.href} href={item.href} className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900">
-            {item.icon}
-            {item.label}
-          </Link>
-        ))}
+        {navItems.map((item) => {
+          const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
+          return (
+            <Link key={item.href} href={item.href} className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-slate-100 hover:text-slate-900 ${isActive ? "bg-slate-100 text-slate-900 font-semibold" : "text-slate-600"}`}>
+              {item.icon}
+              {item.label}
+            </Link>
+          );
+        })}
 
         <div className="mt-8 mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
           Public Workspace

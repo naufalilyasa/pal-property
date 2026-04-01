@@ -433,9 +433,9 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
 
   if (categoriesQuery.isError) {
     return (
-      <section className="rounded-[1.75rem] border border-[var(--line)] bg-white/72 p-8">
+      <section className="rounded-[1.75rem] border border-slate-200 bg-white/72 p-8">
         <p className="text-xs uppercase tracking-[0.3em] text-slate-900">Listing form</p>
-        <h2 className="mt-4 text-2xl font-semibold tracking-[-0.03em] text-[var(--ink)]">We could not prepare this listing form</h2>
+        <h2 className="mt-4 text-2xl font-semibold tracking-[-0.03em] text-slate-900">We could not prepare this listing form</h2>
         <p className="mt-3 text-sm leading-7 text-slate-900">{formatListingFormError(categoriesQuery.error)}</p>
         <Button className="mt-6" onClick={() => void categoriesQuery.refetch()} type="button" variant="secondary">
           Retry
@@ -446,22 +446,22 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col gap-4 rounded-[1.75rem] border border-[var(--line)] bg-white/72 p-6 sm:p-8 lg:flex-row lg:items-end lg:justify-between">
+      <section className="flex flex-col gap-4 rounded-[1.75rem] border border-slate-200 bg-white/72 p-6 sm:p-8 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-3">
           <p className="text-xs uppercase tracking-[0.3em] text-slate-900" style={{ fontFamily: "var(--font-mono), monospace" }}>
-            {effectiveMode === "create" ? "Create listing" : "Edit listing"}
+            {effectiveMode === "create" ? "Buat Listing Baru" : "Edit Listing"}
           </p>
           <div className="space-y-2">
-            <h2 className="text-3xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
-              {effectiveMode === "create" ? "Publish a new property draft" : "Refine an existing property record"}
+            <h2 className="text-3xl font-semibold tracking-[-0.04em] text-slate-900">
+              {effectiveMode === "create" ? "Tambah Properti Baru" : "Edit Data Properti"}
             </h2>
             <p className="max-w-3xl text-sm leading-7 text-slate-900 sm:text-base">
-              Use RHF, Zod, and the canonical backend listing contract so every saved field stays aligned with the PAL Property API.
+              Lengkapi formulir di bawah ini dengan detail properti yang valid untuk menarik minat pembeli atau penyewa.
             </p>
           </div>
         </div>
 
-        <Link className="inline-flex items-center rounded-full border border-[var(--line)] bg-[var(--panel)] px-5 py-3 text-sm font-semibold text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]" href="/dashboard/listings">
+        <Link className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-semibold text-slate-900 transition hover:border-slate-900 hover:text-slate-900" href="/dashboard/listings">
           Back to listings
         </Link>
       </section>
@@ -469,11 +469,11 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
       <Form {...form}>
         <form className="space-y-6" onSubmit={form.handleSubmit((values) => submitMutation.mutate(values))}>
           <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-            <div className="space-y-6 rounded-[1.75rem] border border-[var(--line)] bg-white/80 p-6 sm:p-8">
+            <div className="space-y-6 rounded-[1.75rem] border border-slate-200 bg-white/80 p-6 sm:p-8">
               <div className="space-y-5">
                 <div className="space-y-2">
-                  <h3 className="text-xl font-semibold tracking-[-0.03em] text-[var(--ink)]">Listing basics</h3>
-                  <p className="text-sm leading-7 text-slate-900">The backend remains the source of truth for create and update payloads.</p>
+                  <h3 className="text-xl font-semibold tracking-[-0.03em] text-slate-900">Informasi Dasar</h3>
+                  <p className="text-sm leading-7 text-slate-900">Informasi utama mengenai properti yang akan ditampilkan ke publik.</p>
                 </div>
 
                 <FormField
@@ -481,7 +481,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                   name="title"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel htmlFor="listing-title">Title</FormLabel>
+                      <FormLabel htmlFor="listing-title">Judul Listing</FormLabel>
                       <FormControl>
                         <Input id="listing-title" {...field} />
                       </FormControl>
@@ -495,7 +495,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                   name="description"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel htmlFor="listing-description">Description</FormLabel>
+                      <FormLabel htmlFor="listing-description">Deskripsi Properti</FormLabel>
                       <FormControl>
                         <Textarea className="min-h-36 resize-y" id="listing-description" {...field} value={field.value ?? ""} />
                       </FormControl>
@@ -510,10 +510,10 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                     name="category_id"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel htmlFor="listing-category">Category</FormLabel>
+                        <FormLabel htmlFor="listing-category">Kategori Properti</FormLabel>
                         <FormControl>
                           <Select aria-label="Category" id="listing-category" {...field} value={field.value ?? ""}>
-                            <option value="">No category selected</option>
+                            <option value="">Pilih kategori</option>
                             {(categoriesQuery.data ?? []).map((category: ListingCategoryOption) => (
                               <option key={category.id} value={category.id}>
                                 {category.label}
@@ -531,7 +531,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                     name="transaction_type"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel htmlFor="listing-transaction-type">Transaction type</FormLabel>
+                        <FormLabel htmlFor="listing-transaction-type">Tipe Transaksi</FormLabel>
                         <FormControl>
                           <Select aria-label="Transaction type" id="listing-transaction-type" {...field}>
                             {TRANSACTION_TYPE_OPTIONS.map((option) => (
@@ -551,7 +551,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                     name="status"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel htmlFor="listing-status">Status</FormLabel>
+                        <FormLabel htmlFor="listing-status">Status Publikasi</FormLabel>
                         <FormControl>
                           <Select aria-label="Status" id="listing-status" {...field}>
                             {STATUS_OPTIONS.map((status) => (
@@ -573,7 +573,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                     name="currency"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel htmlFor="listing-currency">Currency</FormLabel>
+                        <FormLabel htmlFor="listing-currency">Mata Uang</FormLabel>
                         <FormControl>
                           <Input id="listing-currency" {...field} />
                         </FormControl>
@@ -587,16 +587,16 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                     name="is_negotiable"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel htmlFor="listing-is-negotiable">Negotiable price</FormLabel>
+                        <FormLabel htmlFor="listing-is-negotiable">Harga Dapat Dinegosiasikan</FormLabel>
                         <FormControl>
-                          <label className="flex h-10 items-center gap-3 rounded-full border border-[var(--line)] bg-white px-4 text-sm text-[var(--ink)]">
+                          <label className="flex h-10 items-center gap-3 rounded-full border border-slate-200 bg-white px-4 text-sm text-slate-900">
                             <input
                               checked={field.value}
                               id="listing-is-negotiable"
                               onChange={(event) => field.onChange(event.target.checked)}
                               type="checkbox"
                             />
-                            <span>Allow negotiation</span>
+                            <span>Bisa ditiadakan / Nego</span>
                           </label>
                         </FormControl>
                         <FormMessage />
@@ -610,11 +610,11 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                   name="special_offers"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel htmlFor="listing-special-offers">Special offers</FormLabel>
+                      <FormLabel htmlFor="listing-special-offers">Promo / Penawaran Khusus</FormLabel>
                       <FormControl>
                         <Input id="listing-special-offers" placeholder="Promo, DP_0, Turun_Harga" {...field} value={field.value ?? ""} />
                       </FormControl>
-                      <FormDescription>Comma-separated tokens matching backend vocabulary.</FormDescription>
+                      <FormDescription>Pisahkan dengan koma (contoh: Promo, DP_0, Turun_Harga).</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -625,11 +625,11 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                   name="price"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel htmlFor="listing-price">Price (IDR)</FormLabel>
+                      <FormLabel htmlFor="listing-price">Harga (IDR)</FormLabel>
                       <FormControl>
                         <Input id="listing-price" inputMode="numeric" min="1" pattern="[0-9]*" {...field} />
                       </FormControl>
-                      <FormDescription>Money stays in integer IDR values.</FormDescription>
+                      <FormDescription>Pastikan memasukkan angka saja tanpa titik atau koma.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -637,11 +637,11 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
               </div>
             </div>
 
-            <div className="space-y-6 rounded-[1.75rem] border border-[var(--line)] bg-white/80 p-6 sm:p-8">
+            <div className="space-y-6 rounded-[1.75rem] border border-slate-200 bg-white/80 p-6 sm:p-8">
               <div className="space-y-5">
                 <div className="space-y-2">
-                  <h3 className="text-xl font-semibold tracking-[-0.03em] text-[var(--ink)]">Location and property details</h3>
-                  <p className="text-sm leading-7 text-slate-900">Richer listing fields map directly to the backend request contract while preserving compatibility `specifications`.</p>
+                  <h3 className="text-xl font-semibold tracking-[-0.03em] text-slate-900">Lokasi & Detail Properti</h3>
+                  <p className="text-sm leading-7 text-slate-900">Lokasi properti serta spesifikasi ruangan dan bentuk bangunan.</p>
                 </div>
 
                 <div className="grid gap-5 sm:grid-cols-2">
@@ -650,7 +650,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                     name="location_province_code"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel htmlFor="field-location-province">Province</FormLabel>
+                        <FormLabel htmlFor="field-location-province">Provinsi</FormLabel>
                         <FormControl>
                           <Select
                             aria-label="Province"
@@ -669,7 +669,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                               form.setValue("location_village", "", { shouldDirty: true });
                             }}
                           >
-                            <option value="">Select province</option>
+                            <option value="">Pilih provinsi</option>
                             {(provincesQuery.data ?? []).map((option) => (
                               <option key={option.code} value={option.code}>
                                 {option.name}
@@ -677,7 +677,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                             ))}
                           </Select>
                         </FormControl>
-                        <FormDescription>Province is loaded from the wilayah database.</FormDescription>
+                        
                         <FormMessage />
                       </FormItem>
                     )}
@@ -688,7 +688,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                     name="location_city_code"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel htmlFor="field-location-city">City</FormLabel>
+                        <FormLabel htmlFor="field-location-city">Kota / Kabupaten</FormLabel>
                         <FormControl>
                           <Select
                             aria-label="City"
@@ -724,7 +724,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                     name="location_district_code"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel htmlFor="field-location-district">District</FormLabel>
+                        <FormLabel htmlFor="field-location-district">Kecamatan</FormLabel>
                         <FormControl>
                           <Select
                             aria-label="District"
@@ -758,7 +758,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                     name="location_village_code"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel htmlFor="field-location-village">Village / Kelurahan</FormLabel>
+                        <FormLabel htmlFor="field-location-village">Desa / Kelurahan</FormLabel>
                         <FormControl>
                           <Select
                             aria-label="Village / Kelurahan"
@@ -780,7 +780,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                             ))}
                           </Select>
                         </FormControl>
-                        <FormDescription>New listing locations are normalized from DB-backed wilayah selections.</FormDescription>
+                        
                         <FormMessage />
                       </FormItem>
                     )}
@@ -886,7 +886,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                               return (
                                 <button
                                   key={option}
-                                  className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-medium transition ${selected ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]" : "border-[var(--line)] bg-white text-[var(--ink)] hover:border-[var(--accent)]/50"}`}
+                                  className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-medium transition ${selected ? "border-slate-900 bg-slate-900/10 text-slate-900" : "border-slate-200 bg-white text-slate-900 hover:border-slate-900/50"}`}
                                   onClick={() => {
                                     const next = new Set(parseStringList(form.getValues("facilities")));
                                     if (selected) {
@@ -904,7 +904,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                                   <span>{option}</span>
                                   <span
                                     aria-hidden="true"
-                                    className={`h-5 w-5 rounded-md border ${selected ? "border-[var(--accent)] bg-[var(--accent)]" : "border-[var(--line)] bg-transparent"}`}
+                                    className={`h-5 w-5 rounded-md border ${selected ? "border-slate-900 bg-slate-900" : "border-slate-200 bg-transparent"}`}
                                   />
                                 </button>
                               );
@@ -920,18 +920,18 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
 
                 {(
                   [
-                    ["address_detail", "Address detail"],
-                    ["latitude", "Latitude"],
-                    ["longitude", "Longitude"],
-                    ["bedrooms", "Bedrooms"],
-                    ["bathrooms", "Bathrooms"],
-                    ["floor_count", "Floor count"],
-                    ["carport_capacity", "Carport capacity"],
-                    ["land_area_sqm", "Land area (sqm)"],
-                    ["building_area_sqm", "Building area (sqm)"],
-                    ["electrical_power_va", "Electrical power (VA)"],
-                    ["facing_direction", "Facing direction"],
-                    ["year_built", "Year built"],
+                    ["address_detail", "Alamat Lengkap (Detail Jalan/Blok)"],
+                    ["latitude", "Latitude (Garis Lintang)"],
+                    ["longitude", "Longitude (Garis Bujur)"],
+                    ["bedrooms", "Kamar Tidur"],
+                    ["bathrooms", "Kamar Mandi"],
+                    ["floor_count", "Jumlah Lantai"],
+                    ["carport_capacity", "Kapasitas Carport / Kendaraan"],
+                    ["land_area_sqm", "Luas Tanah (m²)"],
+                    ["building_area_sqm", "Luas Bangunan (m²)"],
+                    ["electrical_power_va", "Daya Listrik (VA)"],
+                    ["facing_direction", "Arah Bangunan"],
+                    ["year_built", "Tahun Pembangunan"],
                   ] as const
                 ).map(([name, label]) => (
                   <FormField
@@ -957,35 +957,34 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
             </div>
           </section>
 
-          <section className="rounded-[1.75rem] border border-[var(--line)] bg-white/80 p-6 sm:p-8">
+          <section className="rounded-[1.75rem] border border-slate-200 bg-white/80 p-6 sm:p-8">
             <div className="space-y-3">
-              <h3 className="text-xl font-semibold tracking-[-0.03em] text-[var(--ink)]">Listing media</h3>
-              <p className="text-sm leading-7 text-slate-900">Images stay reorderable and primary-aware, while the optional seller video remains a single backend-confirmed slot.</p>
+              <h3 className="text-xl font-semibold tracking-[-0.03em] text-slate-900">Media Properti</h3>
+              <p className="text-sm leading-7 text-slate-900">Unggah foto dan video terbaik agar properti lebih menarik. Anda dapat mengatur ulang urutan foto setelah diunggah.</p>
             </div>
 
             <div className="mt-6 space-y-6">
               {!activeListingId ? (
-                <div className="rounded-[1.25rem] border border-dashed border-[var(--line)] bg-white/70 p-4 text-sm leading-7 text-slate-900">
-                  Media upload akan otomatis membuat draft listing terlebih dulu agar backend punya <code>listingId</code> untuk menyimpan gambar dan video.
+                <div className="rounded-[1.25rem] border border-dashed border-slate-200 bg-white/70 p-4 text-sm leading-7 text-slate-900">
+                  Catatan: Mengubah media otomatis memberlakukan sistem autosave.
                 </div>
               ) : null}
 
               <div className="mt-6 space-y-6">
                 <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-                  <div className="rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel)] p-5">
+                  <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
                     <div className="flex h-full flex-col gap-4 lg:justify-between">
                       <div className="space-y-2">
-                        <p className="text-sm font-medium text-[var(--ink)]">Batch image upload</p>
-                        <p className="text-sm leading-7 text-slate-900">Select one or many images in one action. If this listing is still new, the first upload will autosave a draft before the backend stores the media.</p>
-                        <p className="text-sm leading-7 text-slate-900">Recommended image ratio: {RECOMMENDED_LISTING_IMAGE_RATIO_LABEL}. Listings cards now keep the full image visible, so non-matching ratios will show with padding instead of cropping.</p>
+                        <p className="text-sm font-medium text-slate-900">Unggah Foto (Bisa Lebih Dari Satu)</p>
+                        <p className="text-sm leading-7 text-slate-900">Pilih satu atau beberapa foto sekaligus. Rasio gambar yang disarankan: {RECOMMENDED_LISTING_IMAGE_RATIO_LABEL}.</p>
                       </div>
                       <div className="space-y-3">
-                        <label className="block text-sm font-medium text-[var(--ink)]" htmlFor="listing-image-upload">
+                        <label className="block text-sm font-medium text-slate-900" htmlFor="listing-image-upload">
                           <span className="sr-only">Choose listing images</span>
                           <input
                             key={uploadInputKey}
                             accept="image/*"
-                            className="block w-full text-sm text-slate-900 file:mr-4 file:rounded-full file:border-0 file:bg-[var(--accent)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+                            className="block w-full text-sm text-slate-900 file:mr-4 file:rounded-full file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
                             data-testid="listing-image-upload"
                             id="listing-image-upload"
                             multiple
@@ -996,54 +995,54 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                             type="file"
                           />
                         </label>
-                        <p className="text-xs uppercase tracking-[0.24em] text-slate-900" style={{ fontFamily: "var(--font-mono), monospace" }}>
+                        <p className="text-xs uppercase tracking-[0.24em] text-slate-500" style={{ fontFamily: "var(--font-mono), monospace" }}>
                           {describeSelectedImageFiles(selectedImageFiles)}
                         </p>
                         <Button disabled={imageMutation.isPending || isImagePrecheckPending || selectedImageFiles.length === 0} onClick={() => imageMutation.mutate({ type: "upload" })} type="button">
-                          {isImagePrecheckPending ? "Checking images..." : imageMutation.isPending ? "Uploading images..." : "Upload images"}
+                          {isImagePrecheckPending ? "Memeriksa file..." : imageMutation.isPending ? "Mengunggah gambar..." : "Unggah Gambar"}
                         </Button>
                       </div>
                     </div>
                   </div>
 
-                  <div className="rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel)] p-5">
+                  <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <p className="text-sm font-medium text-[var(--ink)]">Optional listing video</p>
-                        <p className="text-sm leading-7 text-slate-900">One video slot only. Delete the current clip before uploading another. Client hints stay aligned to {formatVideoBytes(MAX_LISTING_VIDEO_BYTES)} and {formatDuration(MAX_LISTING_VIDEO_DURATION_SECONDS)}.</p>
+                        <p className="text-sm font-medium text-slate-900">Optional listing video</p>
+                        <p className="text-sm leading-7 text-slate-900">Hanya dapat mengunggah maksimal satu video tayangan properti dengan batas upload {formatVideoBytes(MAX_LISTING_VIDEO_BYTES)}.</p>
                       </div>
 
                       {listingVideo ? (
-                        <div className="space-y-4 rounded-[1.25rem] border border-[var(--line)] bg-white/80 p-4">
-                          <div className="overflow-hidden rounded-[1rem] border border-[var(--line)] bg-black/90">
+                        <div className="space-y-4 rounded-[1.25rem] border border-slate-200 bg-white/80 p-4">
+                          <div className="overflow-hidden rounded-[1rem] border border-slate-200 bg-black/90">
                             <video className="aspect-video h-full w-full object-cover" controls preload="metadata" src={listingVideo.url}>
                               <track kind="captions" label="Listing video captions unavailable" />
                             </video>
                           </div>
                           <div className="space-y-3">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="rounded-full bg-[var(--panel)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-900">Single slot</span>
+                              <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-900">Single slot</span>
                               {listingVideo.duration_seconds != null ? <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-900">{formatDuration(listingVideo.duration_seconds)}</span> : null}
                             </div>
-                            <p className="text-sm font-medium text-[var(--ink)]">{describeExistingListingVideo(listingVideo.original_filename, listingVideo.duration_seconds)}</p>
-                            <p className="text-sm leading-7 text-slate-900">Delete this video before selecting a replacement. The backend remains the source of truth for the saved slot.</p>
+                            <p className="text-sm font-medium text-slate-900">{describeExistingListingVideo(listingVideo.original_filename, listingVideo.duration_seconds)}</p>
+                            <p className="text-sm leading-7 text-slate-900">Hapus video di atas ini terlebih dahulu jika Anda ingin menggantinya dengan video versi baru.</p>
                             <Button disabled={videoMutation.isPending} onClick={() => videoMutation.mutate({ type: "delete" })} type="button" variant="destructive">
-                              {videoMutation.isPending ? "Deleting video..." : "Delete video"}
+                              {videoMutation.isPending ? "Menghapus video..." : "Hapus Video"}
                             </Button>
                           </div>
                         </div>
                       ) : (
-                        <div className="rounded-[1.25rem] border border-dashed border-[var(--line)] bg-white/70 p-4 text-sm leading-7 text-slate-900">
-                          No video yet. Add one optional walkthrough clip; the first upload will autosave a draft if needed.
+                        <div className="rounded-[1.25rem] border border-dashed border-slate-200 bg-white/70 p-4 text-sm leading-7 text-slate-900">
+                          Belum ada video tur properti. Tambahkan sebuah klip bila tersedia.
                         </div>
                       )}
 
-                      <label className="block text-sm font-medium text-[var(--ink)]" htmlFor="listing-video-upload">
+                      <label className="block text-sm font-medium text-slate-900" htmlFor="listing-video-upload">
                         <span className="sr-only">Choose listing video</span>
                         <input
                           key={videoInputKey}
                           accept="video/*,.mp4,.mov,.m4v,.webm,.mkv,.flv,.avi,.mpg,.mpeg,.ogv"
-                          className="block w-full text-sm text-slate-900 file:mr-4 file:rounded-full file:border-0 file:bg-[var(--accent)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                          className="block w-full text-sm text-slate-900 file:mr-4 file:rounded-full file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white disabled:cursor-not-allowed disabled:opacity-60"
                           data-testid="listing-video-upload"
                           disabled={Boolean(listingVideo) || isVideoPrecheckPending || videoMutation.isPending}
                           id="listing-video-upload"
@@ -1060,7 +1059,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                         type="button"
                       >
                         {isVideoPrecheckPending
-                          ? "Checking video..."
+                          ? "Memeriksa file..."
                           : videoMutation.isPending
                             ? "Uploading video..."
                             : "Upload video"}
@@ -1090,26 +1089,26 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                 ) : null}
 
                 {orderedImages.length === 0 ? (
-                  <div className="rounded-[1.5rem] border border-dashed border-[var(--line)] bg-white/60 p-5 text-sm leading-7 text-slate-900">
-                    No images yet. Upload the first seller photos to let the backend assign ordering and primary state.
+                  <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-white/60 p-5 text-sm leading-7 text-slate-900">
+                    Belum ada gambar yang terunggah. Silakan pilih foto dengan tombol di atas.
                   </div>
                 ) : (
                   <div className="grid gap-4 lg:grid-cols-2">
                     {orderedImages.map((image, index) => (
-                      <article className="overflow-hidden rounded-[1.5rem] border border-[var(--line)] bg-white/72" data-testid={`listing-image-card-${image.id}`} key={image.id}>
+                      <article className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white/72" data-testid={`listing-image-card-${image.id}`} key={image.id}>
                         <div data-testid="listing-image-item">
-                          <div className="relative aspect-[4/3] bg-[var(--panel)]">
+                          <div className="relative aspect-[4/3] bg-slate-50">
                             <Image alt={image.original_filename ?? `Listing image ${index + 1}`} className="object-cover" fill sizes="(min-width: 1024px) 30vw, 100vw" src={image.url} unoptimized />
                           </div>
                           <div className="space-y-4 p-5">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="rounded-full bg-[var(--panel)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-900">Order {image.sort_order + 1}</span>
+                              <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-900">Order {image.sort_order + 1}</span>
                               {image.is_primary ? <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Primary</span> : null}
                             </div>
-                            <p className="text-sm font-medium text-[var(--ink)]">{image.original_filename ?? `Listing image ${index + 1}`}</p>
+                            <p className="text-sm font-medium text-slate-900">{image.original_filename ?? `Listing image ${index + 1}`}</p>
                             <div className="flex flex-wrap gap-3">
                               <Button data-testid="listing-image-make-primary" disabled={imageMutation.isPending || image.is_primary} onClick={() => imageMutation.mutate({ type: "set-primary", imageId: image.id })} type="button" variant="secondary">
-                                Set primary
+                                Jadikan Utama
                               </Button>
                               <Button
                                 aria-label={`Move ${image.original_filename ?? `image ${index + 1}`} earlier`}
@@ -1118,7 +1117,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                                 type="button"
                                 variant="secondary"
                               >
-                                Move earlier
+                                Pindah Kiri
                               </Button>
                               <Button
                                 aria-label={`Move ${image.original_filename ?? `image ${index + 1}`} later`}
@@ -1127,10 +1126,10 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                                 type="button"
                                 variant="secondary"
                               >
-                                Move later
+                                Pindah Kanan
                               </Button>
                               <Button disabled={imageMutation.isPending} onClick={() => imageMutation.mutate({ type: "delete", imageId: image.id })} type="button" variant="destructive">
-                                Delete image
+                                Hapus Gambar
                               </Button>
                             </div>
                           </div>
@@ -1143,16 +1142,16 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
               </div>
           </section>
 
-          <section className="rounded-[1.75rem] border border-[var(--line)] bg-[var(--panel)] p-6 sm:p-8">
+          <section className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-6 sm:p-8">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="space-y-2">
                 <p className="text-xs uppercase tracking-[0.3em] text-slate-900" style={{ fontFamily: "var(--font-mono), monospace" }}>
-                  Submission state
+                  Status Pengisian
                 </p>
                 <p className="text-sm leading-7 text-slate-900">
                   {effectiveMode === "create"
-                    ? "Creating a listing sends the canonical create payload and redirects into edit mode once the backend returns the new record."
-                    : "Saving changes sends the full listing contract back through the update endpoint so seller edits stay explicit."}
+                    ? "Mohon periksa kembali kelengkapan informasi dasar sebelum Anda menyimpan. Saat menekan tombol, properti ini akan masuk ke database."
+                    : "Perubahan apa pun yang Anda simpan akan langsung terhubung dengan database utama PAL Property."}
                 </p>
                 {formError ? (
                   <p className="text-sm font-medium text-red-700" data-testid="listing-form-error" role="alert">
@@ -1163,7 +1162,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
               </div>
 
               <Button data-testid="listing-submit-button" disabled={submitMutation.isPending} type="submit">
-                {submitMutation.isPending ? (effectiveMode === "create" ? "Create listing..." : "Save changes...") : effectiveMode === "create" ? "Create listing" : "Save changes"}
+                {submitMutation.isPending ? (effectiveMode === "create" ? "Menyimpan Listing..." : "Menyimpan Perubahan...") : effectiveMode === "create" ? "Buat & Simpan Listing" : "Simpan Perubahan"}
               </Button>
             </div>
           </section>
@@ -1415,5 +1414,5 @@ function findRegionOptionByName(options: RegionOption[] | undefined, value: stri
 }
 
 function getChoiceButtonClassName(selected: boolean) {
-  return `rounded-full border px-4 py-2 text-sm font-medium transition ${selected ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--line)] bg-white text-slate-900 hover:border-[var(--accent)]/50"}`;
+  return `rounded-full border px-4 py-2 text-sm font-medium transition ${selected ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-900 hover:border-slate-900/50"}`;
 }
