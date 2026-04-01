@@ -8,12 +8,14 @@ const {
   getSavedListingIdsForListingsMock,
   getSearchListingsMock,
   listingFiltersMock,
+  listingsMapPanelMock,
   searchListingCardItemMock,
 } = vi.hoisted(() => ({
   getOptionalUserMock: vi.fn(),
   getSavedListingIdsForListingsMock: vi.fn(),
   getSearchListingsMock: vi.fn(),
   listingFiltersMock: vi.fn(),
+  listingsMapPanelMock: vi.fn(),
   searchListingCardItemMock: vi.fn(),
 }));
 
@@ -46,6 +48,14 @@ vi.mock("@/features/listings/components/search-listing-card", () => ({
     searchListingCardItemMock(props);
 
     return <article data-testid="listing-card">{`${props.listing.title}:${String(props.initialSaved ?? false)}`}</article>;
+  },
+}));
+
+vi.mock("@/features/listings/components/listings-map-panel", () => ({
+  ListingsMapPanel: (props: { listings: Array<{ title: string }> }) => {
+    listingsMapPanelMock(props);
+
+    return <div data-testid="listings-map-canvas">{`markers:${props.listings.length}`}</div>;
   },
 }));
 
@@ -109,6 +119,7 @@ describe("PublicListingsPage", () => {
     expect(screen.getByTestId("listing-filters")).toBeInTheDocument();
     expect(screen.getByText("view:map")).toBeInTheDocument();
     expect(screen.getByTestId("listing-map-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("listings-map-canvas")).toHaveTextContent("markers:2");
     expect(screen.getByTestId("listing-pagination")).toBeInTheDocument();
     expect(screen.getAllByTestId("listing-card")).toHaveLength(2);
     expect(screen.getByText("City Loft:false")).toBeInTheDocument();

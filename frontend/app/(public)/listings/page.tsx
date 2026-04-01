@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { getOptionalUser } from "@/features/auth/server/current-user";
 import { ListingFilters } from "@/features/listings/components/listing-filters";
+import { ListingsMapPanel } from "@/features/listings/components/listings-map-panel";
 import { SearchListingCardItem } from "@/features/listings/components/search-listing-card";
 import { getSearchListings } from "@/features/listings/server/get-search-listings";
 import { getSavedListingIdsForListings } from "@/features/saved-listings/server/get-saved-listing-ids";
@@ -68,13 +69,7 @@ export default async function PublicListingsPage({
         {view === "map" && (
           <div data-testid="listing-map-panel" className="hidden w-[45%] border-r border-gray-200 lg:block">
             <div className="sticky top-[68px] h-[calc(100vh-68px)] w-full">
-              <iframe
-                className="h-full w-full border-0 grayscale-20 opacity-90"
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                src="https://www.openstreetmap.org/export/embed.html?bbox=106.5608%2C-6.3754%2C107.0217%2C-5.9949&layer=mapnik"
-                title="Property search map"
-              />
+              <ListingsMapPanel listings={displayListings} />
             </div>
           </div>
         )}

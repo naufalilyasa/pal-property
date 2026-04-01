@@ -35,6 +35,8 @@ export type SearchListingCard = {
   location_city?: string;
   location_district?: string;
   location_village?: string;
+  latitude?: number;
+  longitude?: number;
   bedroom_count?: number;
   bathroom_count?: number;
   land_area_sqm?: number;

@@ -37,8 +37,10 @@ const listingPage = {
       price: 3250000000,
       currency: "IDR",
       location_province: "DKI Jakarta",
-      location_city: "Jakarta",
-      location_district: "Menteng",
+      location_city: "Jakarta Selatan",
+      location_district: "Setiabudi",
+      latitude: -6.2207,
+      longitude: 106.8296,
       status: "active",
       is_featured: true,
       primary_image_url: "https://images.example/river-house.jpg",
@@ -56,9 +58,11 @@ const listingPage = {
       transaction_type: "sale",
       price: 2890000000,
       currency: "IDR",
-      location_province: "DKI Jakarta",
-      location_city: "Jakarta",
-      location_district: "Kebayoran",
+      location_province: "Jawa Barat",
+      location_city: "Depok",
+      location_district: "Cimanggis",
+      latitude: -6.3652,
+      longitude: 106.9015,
       status: "active",
       is_featured: false,
       primary_image_url: "https://images.example/garden-court.jpg",
@@ -232,6 +236,11 @@ test("desktop listings shell keeps map-left and results-right layout", async ({ 
   await expect(page.getByTestId("listing-filters")).toBeVisible();
   await expect(page.getByTestId("listing-map-panel")).toBeVisible();
   await expect(page.getByTestId("listing-card")).toHaveCount(2);
+  await expect(page.getByTestId("listing-map-marker-listing-1")).toBeVisible();
+  await expect(page.getByTestId("listing-map-popup")).toContainText("Jakarta River House");
+  await page.getByTestId("listing-map-marker-listing-2").click();
+  await expect(page.getByTestId("listing-map-popup")).toContainText("Garden Court Residence");
+  await expect(page.getByRole("link", { name: /lihat detail/i })).toHaveAttribute("href", "/listings/garden-court-residence");
 
   const boxes = await Promise.all([
     page.getByTestId("listing-map-panel").boundingBox(),
@@ -255,11 +264,19 @@ test("public listings detail renders an additive video tour block when video met
   await page.goto("/listings/jakarta-river-house");
 
   await expect(page.getByRole("heading", { level: 1, name: /jakarta river house/i })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 2, name: /video tour/i })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: /video properti/i })).toBeVisible();
   await expect(page.getByTestId("listing-video-tour")).toBeVisible();
   await expect(page.getByTestId("listing-detail-video")).toBeVisible();
   await expect(page.getByTestId("listing-detail-video")).toHaveAttribute("src", /river-house-tour\.mp4/);
   await expect(page.getByText(/river-house-tour\.mp4/i)).toBeVisible();
+
+  await expect(page.getByTestId("listing-detail-gallery")).toBeVisible();
+  await page.getByTestId("listing-detail-gallery-next").click();
+  await page.getByTestId("listing-detail-gallery-open").click();
+  await expect(page.getByTestId("listing-detail-gallery-lightbox")).toBeVisible();
+  await page.getByRole("button", { name: /foto berikutnya di galeri/i }).click();
+  await page.getByRole("button", { name: /tutup galeri/i }).click();
+  await expect(page.getByTestId("listing-detail-gallery-lightbox")).toHaveCount(0);
 });
 
 test("search-backed listings shell tolerates query params without crashing", async ({ page }) => {
