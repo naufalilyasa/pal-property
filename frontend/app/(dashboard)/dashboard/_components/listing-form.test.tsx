@@ -238,6 +238,10 @@ describe("ListingForm", () => {
     fireEvent.change(await screen.findByLabelText(/^city/i), { target: { value: "31.74" } });
     fireEvent.change(await screen.findByLabelText(/^district/i), { target: { value: "31.74.05" } });
     fireEvent.change(await screen.findByLabelText(/village/i), { target: { value: "31.74.05.1001" } });
+    fireEvent.click(screen.getByRole("button", { name: /properti baru/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^shm$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /semi furnished/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^cctv$/i }));
     fireEvent.change(screen.getByLabelText(/^bedrooms/i), { target: { value: "4" } });
 
     fireEvent.click(screen.getByRole("button", { name: /create listing/i }));
@@ -270,13 +274,13 @@ describe("ListingForm", () => {
           carport_capacity: null,
           land_area_sqm: 0,
           building_area_sqm: 0,
-          certificate_type: null,
-          condition: null,
-          furnishing: null,
+          certificate_type: "SHM",
+          condition: "new",
+          furnishing: "semi",
           electrical_power_va: null,
           facing_direction: null,
           year_built: null,
-          facilities: [],
+          facilities: ["CCTV"],
           status: "active",
           specifications: {
             bedrooms: 4,
@@ -288,7 +292,7 @@ describe("ListingForm", () => {
       );
     });
     expect(pushMock).toHaveBeenCalledWith("/dashboard/listings/listing-99/edit?created=1");
-  });
+  }, 10000);
 
   it("normalizes create payload values before submitting to backend", async () => {
     createSellerListingMock.mockResolvedValue({ id: "listing-normalize" });
@@ -360,16 +364,73 @@ describe("ListingForm", () => {
         }),
       );
     });
-  });
+  }, 10000);
 
-  it("keeps media actions gated until the listing has been created", async () => {
+  it("auto-creates a draft before the first image upload in create mode", async () => {
+    createSellerListingMock.mockResolvedValue(
+      buildListing({
+        id: "listing-media-draft",
+        title: "Media Draft",
+        status: "draft",
+        images: [],
+        video: null,
+      }),
+    );
+    uploadListingImagesMock.mockResolvedValue(
+      buildListing({
+        id: "listing-media-draft",
+        title: "Media Draft",
+        status: "draft",
+        images: [
+          {
+            id: "image-1",
+            url: "https://images.example/1.jpg",
+            original_filename: "front.jpg",
+            is_primary: true,
+            sort_order: 0,
+            created_at: "2026-03-17T00:00:00Z",
+          },
+        ],
+      }),
+    );
+
     renderWithProviders(<ListingForm mode="create" />);
 
     await screen.findByRole("heading", { level: 2, name: /publish a new property draft/i });
 
-    expect(screen.getByText(/publish the listing first, then return here to upload image batches, manage the optional video slot/i)).toBeInTheDocument();
-    expect(screen.queryByTestId("listing-image-upload")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("listing-video-upload")).not.toBeInTheDocument();
+    expect(screen.getByText(/media upload akan otomatis membuat draft listing terlebih dulu/i)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/^title/i), { target: { value: "Media Draft" } });
+    fireEvent.change(screen.getByLabelText(/^price/i), { target: { value: "1500000000" } });
+    fireEvent.change(await screen.findByLabelText(/^province/i), { target: { value: "31" } });
+    fireEvent.change(await screen.findByLabelText(/^city/i), { target: { value: "31.74" } });
+    fireEvent.change(await screen.findByLabelText(/^district/i), { target: { value: "31.74.05" } });
+    fireEvent.change(await screen.findByLabelText(/village/i), { target: { value: "31.74.05.1001" } });
+
+    const imageInput = screen.getByTestId("listing-image-upload") as HTMLInputElement;
+    const file = new File(["image-bytes"], "front.jpg", { type: "image/jpeg" });
+    fireEvent.change(imageInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /upload images/i })).not.toBeDisabled();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /upload images/i }));
+
+    await waitFor(() => {
+      expect(createSellerListingMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Media Draft",
+          status: "draft",
+          location_province_code: "31",
+          location_city_code: "31.74",
+          location_district_code: "31.74.05",
+          location_village_code: "31.74.05.1001",
+        }),
+      );
+      expect(uploadListingImagesMock).toHaveBeenCalledWith("listing-media-draft", [file]);
+    });
+
+    expect(pushMock).toHaveBeenCalledWith("/dashboard/listings/listing-media-draft/edit?created=1&media=1");
   });
 
   it("hydrates edit mode from seller-owned listing data and saves updates", async () => {

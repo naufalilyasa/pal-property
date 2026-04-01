@@ -33,6 +33,13 @@ const categoriesResponse = [
   },
 ];
 
+const regionFixtures = {
+  provinces: [{ code: "35", name: "Jawa Timur" }],
+  cities: [{ code: "35.78", name: "Surabaya" }],
+  districts: [{ code: "35.78.10", name: "Wonokromo" }],
+  villages: [{ code: "35.78.10.1001", name: "Darmo" }],
+};
+
 function buildListing(
   overrides: Partial<{
     id: string;
@@ -184,10 +191,10 @@ test("seller foundation shell loads", async ({ page }) => {
   await expect(
     page.getByRole("heading", {
       level: 1,
-      name: /a calm workspace for sellers to prepare listing operations/i,
+      name: /jual beli properti mewah & eksklusif di indonesia\./i,
     }),
   ).toBeVisible();
-  await expect(page.getByText(/seller app foundation/i)).toBeVisible();
+  await expect(page.getByText(/agen properti tepercaya/i)).toBeVisible();
 });
 
 test("unauthenticated users are redirected away from the dashboard subtree", async ({ page }) => {
@@ -208,7 +215,7 @@ test("unauthenticated users are redirected away from the dashboard subtree", asy
 
   await page.goto("/dashboard");
 
-  await expect(page).toHaveURL(/\/seller\/login$/);
+  await expect(page).toHaveURL(/\/seller\/login(\?returnTo=%2Fdashboard)?$/);
   await expect(page.getByTestId("login-google-button")).toBeVisible();
   await expect(page.getByTestId("dashboard-shell")).toHaveCount(0);
 });
@@ -280,6 +287,26 @@ test("create listing route accepts the expanded listing fields", async ({ page }
       return { status: 200, body: backendEnvelope(categoriesResponse) };
     }
 
+    if (request.path === "/api/regions/provinces") {
+      expect(request.method).toBe("GET");
+      return { status: 200, body: backendEnvelope(regionFixtures.provinces) };
+    }
+
+    if (request.path === "/api/regions/cities") {
+      expect(request.method).toBe("GET");
+      return { status: 200, body: backendEnvelope(regionFixtures.cities) };
+    }
+
+    if (request.path === "/api/regions/districts") {
+      expect(request.method).toBe("GET");
+      return { status: 200, body: backendEnvelope(regionFixtures.districts) };
+    }
+
+    if (request.path === "/api/regions/villages") {
+      expect(request.method).toBe("GET");
+      return { status: 200, body: backendEnvelope(regionFixtures.villages) };
+    }
+
     if (request.path === "/auth/me/listings") {
       expect(request.method).toBe("GET");
       return {
@@ -304,8 +331,13 @@ test("create listing route accepts the expanded listing fields", async ({ page }
 
   await page.getByLabel(/^title/i).fill("  Sunset Loft  ");
   await page.getByLabel(/^price/i).fill("0");
-  await page.getByLabel(/^city/i).fill("  Surabaya ");
-  await page.getByLabel(/^district/i).fill("   ");
+  await expect(page.getByLabel(/^province/i)).toBeVisible();
+  await expect(page.getByLabel(/^city/i)).toBeVisible();
+  await expect(page.getByLabel(/^district/i)).toBeVisible();
+  await expect(page.getByLabel(/village/i)).toBeVisible();
+  await page.getByRole("button", { name: /^shm$/i }).click();
+  await page.getByRole("button", { name: /semi furnished/i }).click();
+  await page.getByRole("button", { name: /^cctv$/i }).click();
   await page.getByLabel(/^address detail/i).fill("  Tower A  ");
   await page.getByLabel(/^status/i).selectOption("sold");
   await page.getByLabel(/^transaction type/i).selectOption("sale");
@@ -315,7 +347,6 @@ test("create listing route accepts the expanded listing fields", async ({ page }
 
   await expect(page.getByLabel(/^title/i)).toHaveValue("  Sunset Loft  ");
   await expect(page.getByLabel(/^price/i)).toHaveValue("0");
-  await expect(page.getByLabel(/^city/i)).toHaveValue("  Surabaya ");
   await expect(page.getByLabel(/^status/i)).toHaveValue("sold");
   await expect(page.getByLabel(/^transaction type/i)).toHaveValue("sale");
   await expect(page.getByLabel(/^land area/i)).toHaveValue("120");

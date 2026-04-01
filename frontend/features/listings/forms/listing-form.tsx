@@ -93,6 +93,32 @@ const TRANSACTION_TYPE_OPTIONS: Array<{ value: ListingTransactionType; label: st
   { value: "rent", label: "For rent" },
 ];
 
+const CONDITION_OPTIONS = [
+  { value: "new", label: "Properti Baru" },
+  { value: "second", label: "Properti Second" },
+] as const;
+
+const CERTIFICATE_TYPE_OPTIONS = [
+  { value: "SHM", label: "SHM" },
+  { value: "HGB", label: "HGB" },
+  { value: "Hak Pakai", label: "Hak Pakai" },
+  { value: "Hak Sewa", label: "Hak Sewa" },
+  { value: "HGU", label: "HGU" },
+  { value: "Adat", label: "Adat" },
+  { value: "Girik", label: "Girik" },
+  { value: "PPJB", label: "PPJB" },
+  { value: "Strata", label: "Strata" },
+  { value: "Lainnya", label: "Lainnya" },
+] as const;
+
+const FURNISHING_OPTIONS = [
+  { value: "furnished", label: "Furnished" },
+  { value: "semi", label: "Semi Furnished" },
+  { value: "unfurnished", label: "Unfurnished" },
+] as const;
+
+const FACILITY_OPTIONS = ["AC", "Akses Parkir", "CCTV", "Keamanan", "Wifi / Internet"] as const;
+
 export function ListingForm({ initialListing = null, mode, listingId }: ListingFormProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -107,6 +133,8 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
   const [isVideoPrecheckPending, setIsVideoPrecheckPending] = useState(false);
   const [uploadInputKey, setUploadInputKey] = useState(0);
   const [videoInputKey, setVideoInputKey] = useState(0);
+  const activeListingId = listingId ?? listing?.id ?? null;
+  const effectiveMode: ListingFormMode = activeListingId ? "edit" : mode;
 
   const categoriesQuery = useQuery({
     queryKey: queryKeys.categories,
@@ -121,6 +149,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
   const selectedProvinceCode = form.watch("location_province_code");
   const selectedCityCode = form.watch("location_city_code");
   const selectedDistrictCode = form.watch("location_district_code");
+  const selectedFacilitiesValue = form.watch("facilities");
 
   const provincesQuery = useQuery({
     queryKey: ["regions", "provinces"],
@@ -192,23 +221,23 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
     mutationFn: async (values: ListingFormSchema) => {
       const payload = toRequestPayload(values);
 
-      if (mode === "create") {
+      if (effectiveMode === "create") {
         return createSellerListing(payload);
       }
 
-      if (!listingId) {
+      if (!activeListingId) {
         throw new Error("Listing id is required for edit mode.");
       }
 
-      return updateSellerListing(listingId, payload);
+      return updateSellerListing(activeListingId, payload);
     },
     onSuccess: (nextListing) => {
       setFormError(null);
-      setFormSuccess(mode === "create" ? null : "Listing changes saved successfully.");
+      setFormSuccess(effectiveMode === "create" ? null : "Listing changes saved successfully.");
       setListing(nextListing);
       queryClient.invalidateQueries({ queryKey: queryKeys.sellerListings });
 
-      if (mode === "create") {
+      if (effectiveMode === "create") {
         router.push(`/dashboard/listings/${nextListing.id}/edit?created=1`);
         return;
       }
@@ -222,13 +251,39 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
     },
   });
 
+  const ensureListingForMedia = async () => {
+    if (activeListingId) {
+      return activeListingId;
+    }
+
+    const isValid = await form.trigger();
+    if (!isValid) {
+      throw new Error("Complete the required listing fields before uploading media.");
+    }
+
+    const createdListing = await createSellerListing({
+      ...toRequestPayload(form.getValues()),
+      status: "draft",
+    });
+
+    setListing(createdListing);
+    form.reset(toFormValues(createdListing));
+    setFormError(null);
+    setFormSuccess("Draft listing created automatically so you can continue uploading media.");
+    queryClient.invalidateQueries({ queryKey: queryKeys.sellerListings });
+
+    return createdListing.id;
+  };
+
   const imageMutation = useMutation({
     mutationFn: async (action: {
       type: "upload" | "set-primary" | "delete" | "reorder";
       imageId?: string;
       direction?: "earlier" | "later";
     }) => {
-      if (!listingId) {
+      const ensuredListingId = action.type === "upload" ? await ensureListingForMedia() : activeListingId;
+
+      if (!ensuredListingId) {
         throw new Error("Save the listing first before updating images.");
       }
 
@@ -237,15 +292,15 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
           throw new Error("Choose at least one image before uploading.");
         }
 
-        return uploadSellerListingImages(listingId, selectedImageFiles);
+        return uploadSellerListingImages(ensuredListingId, selectedImageFiles);
       }
 
       if (action.type === "set-primary" && action.imageId) {
-        return setSellerPrimaryListingImage(listingId, action.imageId);
+        return setSellerPrimaryListingImage(ensuredListingId, action.imageId);
       }
 
       if (action.type === "delete" && action.imageId) {
-        return deleteSellerListingImage(listingId, action.imageId);
+        return deleteSellerListingImage(ensuredListingId, action.imageId);
       }
 
       if (action.type === "reorder" && action.imageId && action.direction) {
@@ -260,7 +315,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
         const [movedId] = reorderedIds.splice(currentIndex, 1);
         reorderedIds.splice(targetIndex, 0, movedId);
 
-        return reorderSellerListingImages(listingId, reorderedIds);
+        return reorderSellerListingImages(ensuredListingId, reorderedIds);
       }
 
       throw new Error("Unsupported image action.");
@@ -269,7 +324,11 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
       setListing(nextListing);
       setImageMessage({ tone: "success", text: getImageSuccessMessage(action.type, selectedImageFiles.length) });
       queryClient.invalidateQueries({ queryKey: queryKeys.sellerListings });
-      router.refresh();
+      if (mode === "create" && !listingId) {
+        router.push(`/dashboard/listings/${nextListing.id}/edit?created=1&media=1`);
+      } else {
+        router.refresh();
+      }
 
       if (action.type === "upload") {
         setSelectedImageFiles([]);
@@ -283,12 +342,14 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
 
   const videoMutation = useMutation({
     mutationFn: async (action: { type: "upload" | "delete" }) => {
-      if (!listingId) {
+      const ensuredListingId = action.type === "upload" ? await ensureListingForMedia() : activeListingId;
+
+      if (!ensuredListingId) {
         throw new Error("Save the listing first before updating media.");
       }
 
       if (action.type === "delete") {
-        return deleteSellerListingVideo(listingId);
+        return deleteSellerListingVideo(ensuredListingId);
       }
 
       if (listingVideo) {
@@ -299,7 +360,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
         throw new Error("Choose a video file before uploading.");
       }
 
-      return uploadSellerListingVideo(listingId, selectedVideoFile);
+      return uploadSellerListingVideo(ensuredListingId, selectedVideoFile);
     },
     onSuccess: (nextListing, action) => {
       setListing(nextListing);
@@ -313,7 +374,11 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
       setSelectedVideoFile(null);
       setVideoInputKey((current) => current + 1);
       queryClient.invalidateQueries({ queryKey: queryKeys.sellerListings });
-      router.refresh();
+      if (mode === "create" && !listingId) {
+        router.push(`/dashboard/listings/${nextListing.id}/edit?created=1&media=1`);
+      } else {
+        router.refresh();
+      }
     },
     onError: (error) => {
       setVideoMessage({ tone: "error", text: formatListingFormError(error) });
@@ -369,9 +434,9 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
   if (categoriesQuery.isError) {
     return (
       <section className="rounded-[1.75rem] border border-[var(--line)] bg-white/72 p-8">
-        <p className="text-xs uppercase tracking-[0.3em] text-[var(--muted)]">Listing form</p>
+        <p className="text-xs uppercase tracking-[0.3em] text-slate-900">Listing form</p>
         <h2 className="mt-4 text-2xl font-semibold tracking-[-0.03em] text-[var(--ink)]">We could not prepare this listing form</h2>
-        <p className="mt-3 text-sm leading-7 text-[var(--muted)]">{formatListingFormError(categoriesQuery.error)}</p>
+        <p className="mt-3 text-sm leading-7 text-slate-900">{formatListingFormError(categoriesQuery.error)}</p>
         <Button className="mt-6" onClick={() => void categoriesQuery.refetch()} type="button" variant="secondary">
           Retry
         </Button>
@@ -383,14 +448,14 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
     <div className="space-y-6">
       <section className="flex flex-col gap-4 rounded-[1.75rem] border border-[var(--line)] bg-white/72 p-6 sm:p-8 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-3">
-          <p className="text-xs uppercase tracking-[0.3em] text-[var(--muted)]" style={{ fontFamily: "var(--font-mono), monospace" }}>
-            {mode === "create" ? "Create listing" : "Edit listing"}
+          <p className="text-xs uppercase tracking-[0.3em] text-slate-900" style={{ fontFamily: "var(--font-mono), monospace" }}>
+            {effectiveMode === "create" ? "Create listing" : "Edit listing"}
           </p>
           <div className="space-y-2">
             <h2 className="text-3xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
-              {mode === "create" ? "Publish a new property draft" : "Refine an existing property record"}
+              {effectiveMode === "create" ? "Publish a new property draft" : "Refine an existing property record"}
             </h2>
-            <p className="max-w-3xl text-sm leading-7 text-[var(--muted)] sm:text-base">
+            <p className="max-w-3xl text-sm leading-7 text-slate-900 sm:text-base">
               Use RHF, Zod, and the canonical backend listing contract so every saved field stays aligned with the PAL Property API.
             </p>
           </div>
@@ -408,7 +473,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
               <div className="space-y-5">
                 <div className="space-y-2">
                   <h3 className="text-xl font-semibold tracking-[-0.03em] text-[var(--ink)]">Listing basics</h3>
-                  <p className="text-sm leading-7 text-[var(--muted)]">The backend remains the source of truth for create and update payloads.</p>
+                  <p className="text-sm leading-7 text-slate-900">The backend remains the source of truth for create and update payloads.</p>
                 </div>
 
                 <FormField
@@ -576,7 +641,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
               <div className="space-y-5">
                 <div className="space-y-2">
                   <h3 className="text-xl font-semibold tracking-[-0.03em] text-[var(--ink)]">Location and property details</h3>
-                  <p className="text-sm leading-7 text-[var(--muted)]">Richer listing fields map directly to the backend request contract while preserving compatibility `specifications`.</p>
+                  <p className="text-sm leading-7 text-slate-900">Richer listing fields map directly to the backend request contract while preserving compatibility `specifications`.</p>
                 </div>
 
                 <div className="grid gap-5 sm:grid-cols-2">
@@ -722,6 +787,137 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                   />
                 </div>
 
+                <FormField
+                  control={form.control}
+                  name="condition"
+                  render={({ field }) => (
+                    <div className="sm:col-span-2">
+                      <FormItem>
+                      <FormLabel>Kondisi</FormLabel>
+                      <FormControl>
+                        <div className="flex flex-wrap gap-3">
+                          {CONDITION_OPTIONS.map((option) => (
+                            <button
+                              key={option.value}
+                              className={getChoiceButtonClassName(field.value === option.value)}
+                              onClick={() => field.onChange(field.value === option.value ? "" : option.value)}
+                              type="button"
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                      </FormItem>
+                    </div>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="certificate_type"
+                  render={({ field }) => (
+                    <div className="sm:col-span-2">
+                      <FormItem>
+                      <FormLabel>Sertifikat</FormLabel>
+                      <FormControl>
+                        <div className="flex flex-wrap gap-3">
+                          {CERTIFICATE_TYPE_OPTIONS.map((option) => (
+                            <button
+                              key={option.value}
+                              className={getChoiceButtonClassName(field.value === option.value)}
+                              onClick={() => field.onChange(field.value === option.value ? "" : option.value)}
+                              type="button"
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                      </FormItem>
+                    </div>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="furnishing"
+                  render={({ field }) => (
+                    <div className="sm:col-span-2">
+                      <FormItem>
+                      <FormLabel>Kondisi Perabotan</FormLabel>
+                      <FormControl>
+                        <div className="flex flex-wrap gap-3">
+                          {FURNISHING_OPTIONS.map((option) => (
+                            <button
+                              key={option.value}
+                              className={getChoiceButtonClassName(field.value === option.value)}
+                              onClick={() => field.onChange(field.value === option.value ? "" : option.value)}
+                              type="button"
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                      </FormItem>
+                    </div>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="facilities"
+                  render={({ field }) => {
+                    const selectedFacilities = new Set(parseStringList(selectedFacilitiesValue));
+
+                    return (
+                      <div className="sm:col-span-2">
+                        <FormItem>
+                        <FormLabel>Fasilitas Properti</FormLabel>
+                        <FormControl>
+                          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                            {FACILITY_OPTIONS.map((option) => {
+                              const selected = selectedFacilities.has(option);
+
+                              return (
+                                <button
+                                  key={option}
+                                  className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-medium transition ${selected ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]" : "border-[var(--line)] bg-white text-[var(--ink)] hover:border-[var(--accent)]/50"}`}
+                                  onClick={() => {
+                                    const next = new Set(parseStringList(form.getValues("facilities")));
+                                    if (selected) {
+                                      next.delete(option);
+                                    } else {
+                                      next.add(option);
+                                    }
+                                    form.setValue("facilities", Array.from(next).join(", "), {
+                                      shouldDirty: true,
+                                      shouldValidate: true,
+                                    });
+                                  }}
+                                  type="button"
+                                >
+                                  <span>{option}</span>
+                                  <span
+                                    aria-hidden="true"
+                                    className={`h-5 w-5 rounded-md border ${selected ? "border-[var(--accent)] bg-[var(--accent)]" : "border-[var(--line)] bg-transparent"}`}
+                                  />
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                      </div>
+                    );
+                  }}
+                />
+
                 {(
                   [
                     ["address_detail", "Address detail"],
@@ -733,13 +929,9 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                     ["carport_capacity", "Carport capacity"],
                     ["land_area_sqm", "Land area (sqm)"],
                     ["building_area_sqm", "Building area (sqm)"],
-                    ["certificate_type", "Certificate type"],
-                    ["condition", "Condition"],
-                    ["furnishing", "Furnishing"],
                     ["electrical_power_va", "Electrical power (VA)"],
                     ["facing_direction", "Facing direction"],
                     ["year_built", "Year built"],
-                    ["facilities", "Facilities"],
                   ] as const
                 ).map(([name, label]) => (
                   <FormField
@@ -750,7 +942,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                       <FormItem>
                         <FormLabel htmlFor={`field-${name}`}>{label}</FormLabel>
                         <FormControl>
-                          {name === "address_detail" || name === "facilities" ? (
+                          {name === "address_detail" ? (
                             <Textarea className="min-h-28 resize-y" id={`field-${name}`} {...field} value={field.value ?? ""} />
                           ) : (
                             <Input id={`field-${name}`} inputMode={name.includes("sqm") || name === "bedrooms" || name === "bathrooms" || name === "floor_count" || name === "carport_capacity" || name === "year_built" || name === "electrical_power_va" || name === "latitude" || name === "longitude" ? "numeric" : undefined} pattern={name.includes("sqm") || name === "bedrooms" || name === "bathrooms" || name === "floor_count" || name === "carport_capacity" || name === "year_built" || name === "electrical_power_va" ? "[0-9]*" : undefined} {...field} value={field.value ?? ""} />
@@ -768,18 +960,24 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
           <section className="rounded-[1.75rem] border border-[var(--line)] bg-white/80 p-6 sm:p-8">
             <div className="space-y-3">
               <h3 className="text-xl font-semibold tracking-[-0.03em] text-[var(--ink)]">Listing media</h3>
-              <p className="text-sm leading-7 text-[var(--muted)]">Images stay reorderable and primary-aware, while the optional seller video remains a single backend-confirmed slot.</p>
+              <p className="text-sm leading-7 text-slate-900">Images stay reorderable and primary-aware, while the optional seller video remains a single backend-confirmed slot.</p>
             </div>
 
-            {mode === "edit" && listingId ? (
+            <div className="mt-6 space-y-6">
+              {!activeListingId ? (
+                <div className="rounded-[1.25rem] border border-dashed border-[var(--line)] bg-white/70 p-4 text-sm leading-7 text-slate-900">
+                  Media upload akan otomatis membuat draft listing terlebih dulu agar backend punya <code>listingId</code> untuk menyimpan gambar dan video.
+                </div>
+              ) : null}
+
               <div className="mt-6 space-y-6">
                 <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
                   <div className="rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel)] p-5">
                     <div className="flex h-full flex-col gap-4 lg:justify-between">
                       <div className="space-y-2">
                         <p className="text-sm font-medium text-[var(--ink)]">Batch image upload</p>
-                        <p className="text-sm leading-7 text-[var(--muted)]">Select one or many images in one action. The gallery refreshes only after the backend returns the updated listing.</p>
-                        <p className="text-sm leading-7 text-[var(--muted)]">Recommended image ratio: {RECOMMENDED_LISTING_IMAGE_RATIO_LABEL}. Listings cards now keep the full image visible, so non-matching ratios will show with padding instead of cropping.</p>
+                        <p className="text-sm leading-7 text-slate-900">Select one or many images in one action. If this listing is still new, the first upload will autosave a draft before the backend stores the media.</p>
+                        <p className="text-sm leading-7 text-slate-900">Recommended image ratio: {RECOMMENDED_LISTING_IMAGE_RATIO_LABEL}. Listings cards now keep the full image visible, so non-matching ratios will show with padding instead of cropping.</p>
                       </div>
                       <div className="space-y-3">
                         <label className="block text-sm font-medium text-[var(--ink)]" htmlFor="listing-image-upload">
@@ -787,7 +985,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                           <input
                             key={uploadInputKey}
                             accept="image/*"
-                            className="block w-full text-sm text-[var(--muted)] file:mr-4 file:rounded-full file:border-0 file:bg-[var(--accent)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+                            className="block w-full text-sm text-slate-900 file:mr-4 file:rounded-full file:border-0 file:bg-[var(--accent)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
                             data-testid="listing-image-upload"
                             id="listing-image-upload"
                             multiple
@@ -798,7 +996,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                             type="file"
                           />
                         </label>
-                        <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]" style={{ fontFamily: "var(--font-mono), monospace" }}>
+                        <p className="text-xs uppercase tracking-[0.24em] text-slate-900" style={{ fontFamily: "var(--font-mono), monospace" }}>
                           {describeSelectedImageFiles(selectedImageFiles)}
                         </p>
                         <Button disabled={imageMutation.isPending || isImagePrecheckPending || selectedImageFiles.length === 0} onClick={() => imageMutation.mutate({ type: "upload" })} type="button">
@@ -812,7 +1010,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                     <div className="space-y-4">
                       <div className="space-y-2">
                         <p className="text-sm font-medium text-[var(--ink)]">Optional listing video</p>
-                        <p className="text-sm leading-7 text-[var(--muted)]">One video slot only. Delete the current clip before uploading another. Client hints stay aligned to {formatVideoBytes(MAX_LISTING_VIDEO_BYTES)} and {formatDuration(MAX_LISTING_VIDEO_DURATION_SECONDS)}.</p>
+                        <p className="text-sm leading-7 text-slate-900">One video slot only. Delete the current clip before uploading another. Client hints stay aligned to {formatVideoBytes(MAX_LISTING_VIDEO_BYTES)} and {formatDuration(MAX_LISTING_VIDEO_DURATION_SECONDS)}.</p>
                       </div>
 
                       {listingVideo ? (
@@ -824,19 +1022,19 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                           </div>
                           <div className="space-y-3">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="rounded-full bg-[var(--panel)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Single slot</span>
-                              {listingVideo.duration_seconds != null ? <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{formatDuration(listingVideo.duration_seconds)}</span> : null}
+                              <span className="rounded-full bg-[var(--panel)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-900">Single slot</span>
+                              {listingVideo.duration_seconds != null ? <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-900">{formatDuration(listingVideo.duration_seconds)}</span> : null}
                             </div>
                             <p className="text-sm font-medium text-[var(--ink)]">{describeExistingListingVideo(listingVideo.original_filename, listingVideo.duration_seconds)}</p>
-                            <p className="text-sm leading-7 text-[var(--muted)]">Delete this video before selecting a replacement. The backend remains the source of truth for the saved slot.</p>
+                            <p className="text-sm leading-7 text-slate-900">Delete this video before selecting a replacement. The backend remains the source of truth for the saved slot.</p>
                             <Button disabled={videoMutation.isPending} onClick={() => videoMutation.mutate({ type: "delete" })} type="button" variant="destructive">
                               {videoMutation.isPending ? "Deleting video..." : "Delete video"}
                             </Button>
                           </div>
                         </div>
                       ) : (
-                        <div className="rounded-[1.25rem] border border-dashed border-[var(--line)] bg-white/70 p-4 text-sm leading-7 text-[var(--muted)]">
-                          No video yet. Add one optional walkthrough clip after the listing exists.
+                        <div className="rounded-[1.25rem] border border-dashed border-[var(--line)] bg-white/70 p-4 text-sm leading-7 text-slate-900">
+                          No video yet. Add one optional walkthrough clip; the first upload will autosave a draft if needed.
                         </div>
                       )}
 
@@ -845,7 +1043,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                         <input
                           key={videoInputKey}
                           accept="video/*,.mp4,.mov,.m4v,.webm,.mkv,.flv,.avi,.mpg,.mpeg,.ogv"
-                          className="block w-full text-sm text-[var(--muted)] file:mr-4 file:rounded-full file:border-0 file:bg-[var(--accent)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                          className="block w-full text-sm text-slate-900 file:mr-4 file:rounded-full file:border-0 file:bg-[var(--accent)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white disabled:cursor-not-allowed disabled:opacity-60"
                           data-testid="listing-video-upload"
                           disabled={Boolean(listingVideo) || isVideoPrecheckPending || videoMutation.isPending}
                           id="listing-video-upload"
@@ -892,7 +1090,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                 ) : null}
 
                 {orderedImages.length === 0 ? (
-                  <div className="rounded-[1.5rem] border border-dashed border-[var(--line)] bg-white/60 p-5 text-sm leading-7 text-[var(--muted)]">
+                  <div className="rounded-[1.5rem] border border-dashed border-[var(--line)] bg-white/60 p-5 text-sm leading-7 text-slate-900">
                     No images yet. Upload the first seller photos to let the backend assign ordering and primary state.
                   </div>
                 ) : (
@@ -905,7 +1103,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                           </div>
                           <div className="space-y-4 p-5">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="rounded-full bg-[var(--panel)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Order {image.sort_order + 1}</span>
+                              <span className="rounded-full bg-[var(--panel)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-900">Order {image.sort_order + 1}</span>
                               {image.is_primary ? <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Primary</span> : null}
                             </div>
                             <p className="text-sm font-medium text-[var(--ink)]">{image.original_filename ?? `Listing image ${index + 1}`}</p>
@@ -942,21 +1140,17 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                   </div>
                 )}
               </div>
-            ) : (
-              <div className="mt-6 rounded-[1.5rem] border border-dashed border-[var(--line)] bg-[var(--panel)] p-5 text-sm leading-7 text-[var(--muted)]">
-                Publish the listing first, then return here to upload image batches, manage the optional video slot, set a primary photo, remove outdated media, and adjust ordering from backend-backed state.
               </div>
-            )}
           </section>
 
           <section className="rounded-[1.75rem] border border-[var(--line)] bg-[var(--panel)] p-6 sm:p-8">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="space-y-2">
-                <p className="text-xs uppercase tracking-[0.3em] text-[var(--muted)]" style={{ fontFamily: "var(--font-mono), monospace" }}>
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-900" style={{ fontFamily: "var(--font-mono), monospace" }}>
                   Submission state
                 </p>
-                <p className="text-sm leading-7 text-[var(--muted)]">
-                  {mode === "create"
+                <p className="text-sm leading-7 text-slate-900">
+                  {effectiveMode === "create"
                     ? "Creating a listing sends the canonical create payload and redirects into edit mode once the backend returns the new record."
                     : "Saving changes sends the full listing contract back through the update endpoint so seller edits stay explicit."}
                 </p>
@@ -969,7 +1163,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
               </div>
 
               <Button data-testid="listing-submit-button" disabled={submitMutation.isPending} type="submit">
-                {submitMutation.isPending ? (mode === "create" ? "Create listing..." : "Save changes...") : mode === "create" ? "Create listing" : "Save changes"}
+                {submitMutation.isPending ? (effectiveMode === "create" ? "Create listing..." : "Save changes...") : effectiveMode === "create" ? "Create listing" : "Save changes"}
               </Button>
             </div>
           </section>
@@ -1158,7 +1352,7 @@ function getFeedbackMessageClassName(tone: FeedbackMessage["tone"]) {
     case "success":
       return "text-sm font-medium text-emerald-700";
     case "info":
-      return "text-sm font-medium text-[var(--muted)]";
+      return "text-sm font-medium text-slate-900";
   }
 }
 
@@ -1218,4 +1412,8 @@ function findRegionOptionByName(options: RegionOption[] | undefined, value: stri
   }
 
   return (options ?? []).find((option) => option.name.trim().toLowerCase() === normalizedValue) ?? null;
+}
+
+function getChoiceButtonClassName(selected: boolean) {
+  return `rounded-full border px-4 py-2 text-sm font-medium transition ${selected ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--line)] bg-white text-slate-900 hover:border-[var(--accent)]/50"}`;
 }

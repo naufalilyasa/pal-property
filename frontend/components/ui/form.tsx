@@ -46,7 +46,7 @@ export function FormControl({ children }: { children: ReactNode }) {
 }
 
 export function FormDescription({ children }: { children: ReactNode }) {
-  return <p className="text-xs leading-6 text-[var(--muted)]">{children}</p>;
+  return <p className="text-xs leading-6 text-slate-900">{children}</p>;
 }
 
 export function FormMessage() {
