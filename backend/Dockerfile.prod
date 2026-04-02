@@ -23,7 +23,7 @@ COPY --from=builder /out/property-service /usr/local/bin/property-service
 COPY --from=builder /out/listing-indexer /usr/local/bin/listing-indexer
 COPY --from=builder /out/migrate /usr/local/bin/migrate
 COPY db/migrations /app/db/migrations
-COPY ../wilayah /app/wilayah
+COPY db/wilayah.sql /app/db/wilayah.sql
 
 EXPOSE 8080
 
