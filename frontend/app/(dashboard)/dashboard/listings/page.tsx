@@ -1,8 +1,8 @@
 import Link from "next/link";
 
 import { requireUser } from "@/features/auth/server/require-user";
+import { DashboardListingsGrid } from "@/features/listings/components/dashboard-listings-grid";
 import { DashboardRefreshButton } from "@/features/listings/components/dashboard-refresh-button";
-import { DashboardListingsTable } from "@/features/listings/components/dashboard-listings-table";
 import { getSellerListingsPage } from "@/features/listings/server/get-seller-listings";
 
 export default async function DashboardListingsPage() {
@@ -29,7 +29,7 @@ export default async function DashboardListingsPage() {
           No listings yet. Create your first property record to start the seller workflow.
         </section>
       ) : (
-        <DashboardListingsTable listings={listingsPage.data} />
+        <DashboardListingsGrid listings={listingsPage.data} />
       )}
     </div>
   );

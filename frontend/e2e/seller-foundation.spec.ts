@@ -269,7 +269,10 @@ test("authenticated dashboard listings route renders seller inventory", async ({
 
   await expect(page).toHaveTitle(/pal property seller/i);
   await expect(page.getByRole("heading", { level: 1, name: /seller inventory/i })).toBeVisible();
-  await expect(page.getByTestId("dashboard-listings-table")).toBeVisible();
+  await expect(page.getByTestId("dashboard-listings-grid")).toBeVisible();
+  await expect(page.getByRole("button", { name: /mark sold/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /archive/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /delete/i })).toBeVisible();
   await expect(page.getByText(/seller@example.com/i)).toBeVisible();
   await expect(page.getByText(/garden residence/i)).toBeVisible();
   await expect(page.getByTestId("dashboard-refresh-button")).toBeVisible();
@@ -328,28 +331,29 @@ test("create listing route accepts the expanded listing fields", async ({ page }
   };
 
   await page.goto("/dashboard/listings/new");
+  await expect(page.getByRole("heading", { level: 2, name: /tambah properti baru/i })).toBeVisible();
 
-  await page.getByLabel(/^title/i).fill("  Sunset Loft  ");
-  await page.getByLabel(/^price/i).fill("0");
-  await expect(page.getByLabel(/^province/i)).toBeVisible();
-  await expect(page.getByLabel(/^city/i)).toBeVisible();
-  await expect(page.getByLabel(/^district/i)).toBeVisible();
-  await expect(page.getByLabel(/village/i)).toBeVisible();
+  await page.locator("#listing-title").fill("  Sunset Loft  ");
+  await page.locator("#listing-price").fill("0");
+  await expect(page.locator("#field-location-province")).toBeVisible();
+  await expect(page.locator("#field-location-city")).toBeVisible();
+  await expect(page.locator("#field-location-district")).toBeVisible();
+  await expect(page.locator("#field-location-village")).toBeVisible();
   await page.getByRole("button", { name: /^shm$/i }).click();
   await page.getByRole("button", { name: /semi furnished/i }).click();
   await page.getByRole("button", { name: /^cctv$/i }).click();
-  await page.getByLabel(/^address detail/i).fill("  Tower A  ");
-  await page.getByLabel(/^status/i).selectOption("sold");
-  await page.getByLabel(/^transaction type/i).selectOption("sale");
-  await page.getByLabel(/^bedrooms/i).fill("0");
-  await page.getByLabel(/^bathrooms/i).fill("0");
-  await page.getByLabel(/^land area/i).fill("120");
+  await page.locator("#field-address_detail").fill("  Tower A  ");
+  await page.locator("#listing-status").selectOption("sold");
+  await page.locator("#listing-transaction-type").selectOption("sale");
+  await page.locator("#field-bedrooms").fill("0");
+  await page.locator("#field-bathrooms").fill("0");
+  await page.locator("#field-land_area_sqm").fill("120");
 
-  await expect(page.getByLabel(/^title/i)).toHaveValue("  Sunset Loft  ");
-  await expect(page.getByLabel(/^price/i)).toHaveValue("0");
-  await expect(page.getByLabel(/^status/i)).toHaveValue("sold");
-  await expect(page.getByLabel(/^transaction type/i)).toHaveValue("sale");
-  await expect(page.getByLabel(/^land area/i)).toHaveValue("120");
+  await expect(page.locator("#listing-title")).toHaveValue("  Sunset Loft  ");
+  await expect(page.locator("#listing-price")).toHaveValue("0");
+  await expect(page.locator("#listing-status")).toHaveValue("sold");
+  await expect(page.locator("#listing-transaction-type")).toHaveValue("sale");
+  await expect(page.locator("#field-land_area_sqm")).toHaveValue("120");
 });
 
 test("seller foundation edit flow saves changes and keeps image and video controls available", async ({ page }) => {
@@ -606,17 +610,19 @@ test("seller foundation edit flow saves changes and keeps image and video contro
   };
 
   await page.goto("/dashboard/listings/listing-7/edit");
+  await expect(page.getByRole("heading", { level: 2, name: /edit data properti/i })).toBeVisible();
 
-  await page.getByLabel(/^title/i).fill("Existing Residence Updated");
+  await page.locator("#listing-title").fill("Existing Residence Updated");
   await page.locator("#listing-price").fill("3300000000");
-  await page.getByRole("button", { name: /save changes/i }).click();
+  await page.getByTestId("listing-submit-button").click();
 
-  await expect(page.getByText(/listing media/i)).toBeVisible();
-  await expect(page.getByRole("button", { name: /upload image/i })).toBeVisible();
+  await expect(page.getByText(/media properti/i)).toBeVisible();
+  await expect(page.getByTestId("listing-image-upload")).toBeVisible();
+  await expect(page.getByRole("button", { name: /unggah gambar/i })).toBeVisible();
   await expect(page.locator("[data-testid='listing-image-card-image-1']")).toBeVisible();
   await expect(page.locator("[data-testid='listing-image-card-image-2']")).toBeVisible();
-  await expect(page.getByText(/no video yet/i)).toBeVisible();
-  await expect(page.getByText(/optional listing video/i)).toBeVisible();
+  await expect(page.getByText(/belum ada video tur properti/i)).toBeVisible();
+  await expect(page.getByText(/hanya dapat mengunggah maksimal satu video tayangan properti/i)).toBeVisible();
   await expect(page.getByTestId("listing-video-upload")).toBeVisible();
   await expect(page.getByRole("button", { name: /upload video/i })).toBeDisabled();
 
