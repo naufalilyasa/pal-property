@@ -6,6 +6,7 @@ Thumbs.db
 *.swp
 /plan
 /.agent
+/.sisyphus
 
 # --- SECURITY (HARAM MASUK GIT) ---
 .env
