@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { IBM_Plex_Mono, Manrope } from "next/font/google";
 
 import { Providers } from "@/app/providers";
+import { BotChat } from "@/features/chat/components/bot-chat";
 
 import "./globals.css";
 
@@ -30,6 +31,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${manrope.variable} ${ibmPlexMono.variable} antialiased`}>
         <Providers>{children}</Providers>
+        <BotChat />
       </body>
     </html>
   );
