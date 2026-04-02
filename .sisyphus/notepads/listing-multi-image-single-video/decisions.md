@@ -1,1 +1,0 @@
-- Kept the video logic as a dedicated domain entity/storage contract before touching services or handlers so Task 2/3 can safely layer in upload behavior later.

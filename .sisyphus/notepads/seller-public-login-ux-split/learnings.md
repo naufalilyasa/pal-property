@@ -1,3 +1,0 @@
-- Added a versioned AuthIntent payload (intent/returnTo/nonce) that is base64-url encoded so the OAuth state carries seller vs public intent without relying on localStorage.
-- Split login UX can stay route-specific without forking the OAuth contract by rendering both `/login` and `/seller/login` from one shared auth entry shell that only swaps copy, CTA text, and `intent`.
-- Added Playwright coverage for both login journeys plus a shared auth-state helper so the browser tests validate the distinct copy, CTA links, and intent-specific returnTo defaults while documenting the seller-route redirect to `/seller/login`.
