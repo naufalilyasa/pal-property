@@ -1,0 +1,30 @@
+FROM golang:1.26.0-trixie AS builder
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/property-service ./cmd/property-service && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/listing-indexer ./cmd/listing-indexer && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/migrate ./cmd/migrate
+
+FROM debian:12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tzdata && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV TZ=Asia/Jakarta
+WORKDIR /app
+
+COPY --from=builder /out/property-service /usr/local/bin/property-service
+COPY --from=builder /out/listing-indexer /usr/local/bin/listing-indexer
+COPY --from=builder /out/migrate /usr/local/bin/migrate
+COPY db/migrations /app/db/migrations
+COPY ../wilayah /app/wilayah
+
+EXPOSE 8080
+
+CMD ["property-service"]
