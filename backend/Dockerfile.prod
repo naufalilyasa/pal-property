@@ -9,7 +9,8 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/property-service ./cmd/property-service && \
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/listing-indexer ./cmd/listing-indexer && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/migrate ./cmd/migrate
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/migrate ./cmd/migrate && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/seed-demo ./cmd/seed-demo-listings
 
 FROM debian:12-slim
 
@@ -22,6 +23,7 @@ WORKDIR /app
 COPY --from=builder /out/property-service /usr/local/bin/property-service
 COPY --from=builder /out/listing-indexer /usr/local/bin/listing-indexer
 COPY --from=builder /out/migrate /usr/local/bin/migrate
+COPY --from=builder /out/seed-demo /usr/local/bin/seed-demo
 COPY db/migrations /app/db/migrations
 COPY db/wilayah.sql /app/db/wilayah.sql
 
