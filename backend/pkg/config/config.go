@@ -45,6 +45,7 @@ type AppConfig struct {
 
 	// CORS
 	CorsAllowedOrigins string `env:"CORS_ALLOWED_ORIGINS" envDefault:"http://localhost:3000"`
+	FrontendBaseURL    string `env:"FRONTEND_BASE_URL" envDefault:"http://localhost:3000" validate:"required,url"`
 
 	// Rate Limiting
 	RateLimitMax int `env:"RATE_LIMIT_MAX" envDefault:"100"`

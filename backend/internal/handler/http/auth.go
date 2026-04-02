@@ -184,8 +184,12 @@ type authIntentStatePayload struct {
 }
 
 func resolveFrontendRedirectURL(state string) string {
-	const baseURL = "http://localhost:3000"
 	const defaultPath = "/dashboard"
+
+	baseURL := strings.TrimRight(strings.TrimSpace(config.Env.FrontendBaseURL), "/")
+	if baseURL == "" {
+		baseURL = "http://localhost:3000"
+	}
 
 	path := defaultPath
 	if state != "" {
