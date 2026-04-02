@@ -227,11 +227,11 @@ describe("ListingForm", () => {
 
     renderWithProviders(<ListingForm mode="create" />);
 
-    expect(await screen.findByRole("heading", { level: 2, name: /publish a new property draft/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 2, name: /tambah properti baru/i })).toBeInTheDocument();
     expect(await screen.findByRole("option", { name: /house \/ villa/i })).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText(/^title/i), { target: { value: "Garden Residence" } });
-    fireEvent.change(screen.getByLabelText(/^price/i), { target: { value: "2750000000" } });
+    fireEvent.change(screen.getByLabelText(/judul listing/i), { target: { value: "Garden Residence" } });
+    fireEvent.change(screen.getByLabelText(/harga \(idr\)/i), { target: { value: "2750000000" } });
     fireEvent.change(screen.getByLabelText(/^category/i), { target: { value: "cat-child" } });
     fireEvent.change(screen.getByLabelText(/^transaction type/i), { target: { value: "rent" } });
     fireEvent.change(await screen.findByLabelText(/^province/i), { target: { value: "31" } });
@@ -242,9 +242,9 @@ describe("ListingForm", () => {
     fireEvent.click(screen.getByRole("button", { name: /^shm$/i }));
     fireEvent.click(screen.getByRole("button", { name: /semi furnished/i }));
     fireEvent.click(screen.getByRole("button", { name: /^cctv$/i }));
-    fireEvent.change(screen.getByLabelText(/^bedrooms/i), { target: { value: "4" } });
+    fireEvent.change(screen.getByLabelText(/kamar tidur/i), { target: { value: "4" } });
 
-    fireEvent.click(screen.getByRole("button", { name: /create listing/i }));
+    fireEvent.click(screen.getByTestId("listing-submit-button"));
 
     await waitFor(() => {
       expect(createSellerListingMock).toHaveBeenCalledWith(
@@ -299,25 +299,25 @@ describe("ListingForm", () => {
 
     renderWithProviders(<ListingForm mode="create" />);
 
-    await screen.findByRole("heading", { level: 2, name: /publish a new property draft/i });
+    await screen.findByRole("heading", { level: 2, name: /tambah properti baru/i });
 
-    fireEvent.change(screen.getByLabelText(/^title/i), { target: { value: "  Sunset Loft  " } });
-    fireEvent.change(screen.getByLabelText(/^description/i), {
+    fireEvent.change(screen.getByLabelText(/judul listing/i), { target: { value: "  Sunset Loft  " } });
+    fireEvent.change(screen.getByLabelText(/deskripsi properti/i), {
       target: { value: "   " },
     });
-    fireEvent.change(screen.getByLabelText(/^price/i), { target: { value: "0" } });
-    fireEvent.change(screen.getByLabelText(/^transaction type/i), { target: { value: "sale" } });
+    fireEvent.change(screen.getByLabelText(/harga \(idr\)/i), { target: { value: "0" } });
+    fireEvent.change(screen.getByLabelText(/tipe transaksi/i), { target: { value: "sale" } });
     fireEvent.change(await screen.findByLabelText(/^province/i), { target: { value: "35" } });
     fireEvent.change(await screen.findByLabelText(/^city/i), { target: { value: "35.78" } });
     fireEvent.change(await screen.findByLabelText(/^district/i), { target: { value: "35.78.10" } });
     fireEvent.change(await screen.findByLabelText(/village/i), { target: { value: "35.78.10.1001" } });
-    fireEvent.change(screen.getByLabelText(/^address detail/i), { target: { value: "  Tower A  " } });
-    fireEvent.change(screen.getByLabelText(/^status/i), { target: { value: "sold" } });
-    fireEvent.change(screen.getByLabelText(/^bedrooms/i), { target: { value: "" } });
-    fireEvent.change(screen.getByLabelText(/^bathrooms/i), { target: { value: "" } });
-    fireEvent.change(screen.getByLabelText(/^land area/i), { target: { value: "120" } });
+    fireEvent.change(screen.getByLabelText(/alamat lengkap/i), { target: { value: "  Tower A  " } });
+    fireEvent.change(screen.getByLabelText(/status publikasi/i), { target: { value: "sold" } });
+    fireEvent.change(screen.getByLabelText(/kamar tidur/i), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText(/kamar mandi/i), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText(/luas tanah/i), { target: { value: "120" } });
 
-    fireEvent.click(screen.getByRole("button", { name: /create listing/i }));
+    fireEvent.click(screen.getByTestId("listing-submit-button"));
 
     await waitFor(() => {
       expect(createSellerListingMock).toHaveBeenCalledWith(
@@ -396,11 +396,11 @@ describe("ListingForm", () => {
 
     renderWithProviders(<ListingForm mode="create" />);
 
-    await screen.findByRole("heading", { level: 2, name: /publish a new property draft/i });
+    await screen.findByRole("heading", { level: 2, name: /tambah properti baru/i });
 
-    expect(screen.getByText(/media upload akan otomatis membuat draft listing terlebih dulu/i)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(/^title/i), { target: { value: "Media Draft" } });
-    fireEvent.change(screen.getByLabelText(/^price/i), { target: { value: "1500000000" } });
+    expect(screen.getByText(/mengubah media otomatis memberlakukan sistem autosave/i)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/judul listing/i), { target: { value: "Media Draft" } });
+    fireEvent.change(screen.getByLabelText(/harga \(idr\)/i), { target: { value: "1500000000" } });
     fireEvent.change(await screen.findByLabelText(/^province/i), { target: { value: "31" } });
     fireEvent.change(await screen.findByLabelText(/^city/i), { target: { value: "31.74" } });
     fireEvent.change(await screen.findByLabelText(/^district/i), { target: { value: "31.74.05" } });
@@ -411,10 +411,10 @@ describe("ListingForm", () => {
     fireEvent.change(imageInput, { target: { files: [file] } });
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /upload images/i })).not.toBeDisabled();
+      expect(screen.getByRole("button", { name: /unggah gambar/i })).not.toBeDisabled();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /upload images/i }));
+    fireEvent.click(screen.getByRole("button", { name: /unggah gambar/i }));
 
     await waitFor(() => {
       expect(createSellerListingMock).toHaveBeenCalledWith(
@@ -453,12 +453,12 @@ describe("ListingForm", () => {
     expect(screen.getByDisplayValue("Jawa Barat")).toBeInTheDocument();
     expect(screen.getByDisplayValue("5")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText(/^title/i), { target: { value: "Existing Residence Updated" } });
-    fireEvent.change(screen.getByLabelText(/^price/i), { target: { value: "3300000000" } });
+    fireEvent.change(screen.getByLabelText(/judul listing/i), { target: { value: "Existing Residence Updated" } });
+    fireEvent.change(screen.getByLabelText(/harga \(idr\)/i), { target: { value: "3300000000" } });
     fireEvent.change(screen.getByLabelText(/^category/i), { target: { value: "cat-root" } });
-    fireEvent.change(screen.getByLabelText(/^transaction type/i), { target: { value: "rent" } });
+    fireEvent.change(screen.getByLabelText(/tipe transaksi/i), { target: { value: "rent" } });
 
-    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+    fireEvent.click(screen.getByTestId("listing-submit-button"));
 
     await waitFor(() => {
       expect(updateSellerListingMock).toHaveBeenCalledWith(
@@ -513,16 +513,16 @@ describe("ListingForm", () => {
 
     renderWithProviders(<ListingForm mode="create" />);
 
-    await screen.findByRole("heading", { level: 2, name: /publish a new property draft/i });
+    await screen.findByRole("heading", { level: 2, name: /tambah properti baru/i });
 
-    fireEvent.change(screen.getByLabelText(/^title/i), { target: { value: "Tiny home" } });
-    fireEvent.change(screen.getByLabelText(/^price/i), { target: { value: "950000000" } });
+    fireEvent.change(screen.getByLabelText(/judul listing/i), { target: { value: "Tiny home" } });
+    fireEvent.change(screen.getByLabelText(/harga \(idr\)/i), { target: { value: "950000000" } });
     fireEvent.change(await screen.findByLabelText(/^province/i), { target: { value: "31" } });
     fireEvent.change(await screen.findByLabelText(/^city/i), { target: { value: "31.74" } });
     fireEvent.change(await screen.findByLabelText(/^district/i), { target: { value: "31.74.05" } });
     fireEvent.change(await screen.findByLabelText(/village/i), { target: { value: "31.74.05.1001" } });
 
-    fireEvent.click(screen.getByRole("button", { name: /create listing/i }));
+    fireEvent.click(screen.getByTestId("listing-submit-button"));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       /title must be at least 5 characters \(trace trace-422\)/i,
@@ -674,7 +674,7 @@ describe("ListingForm", () => {
     expect(screen.getByText(/ready: 2 images selected/i)).toBeInTheDocument();
     expect(await screen.findByText(/recommended ratio: 4:3/i)).toBeInTheDocument();
 
-    const uploadImagesButton = await screen.findByRole("button", { name: /upload images/i });
+    const uploadImagesButton = await screen.findByRole("button", { name: /unggah gambar/i });
     await waitFor(() => expect(uploadImagesButton).toBeEnabled());
     fireEvent.click(uploadImagesButton);
 
@@ -687,13 +687,13 @@ describe("ListingForm", () => {
       expect(reorderListingImagesMock).toHaveBeenCalledWith("listing-7", ["image-2", "image-1", "image-3"]);
     });
 
-    fireEvent.click(screen.getAllByRole("button", { name: /set primary/i })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: /jadikan utama/i })[0]);
 
     await waitFor(() => expect(setPrimaryListingImageMock).toHaveBeenCalledWith("listing-7", "image-2"));
     expect(await screen.findByTestId("listing-image-card-image-2")).toHaveTextContent(/primary/i);
     expect(screen.getByTestId("listing-image-card-image-1")).not.toHaveTextContent(/^primary$/i);
 
-    fireEvent.click(within(screen.getByTestId("listing-image-card-image-3")).getByRole("button", { name: /delete image/i }));
+    fireEvent.click(within(screen.getByTestId("listing-image-card-image-3")).getByRole("button", { name: /hapus gambar/i }));
 
     await waitFor(() => expect(deleteListingImageMock).toHaveBeenCalledWith("listing-7", "image-3"));
     expect(screen.queryByText(/garden\.png/i)).not.toBeInTheDocument();
@@ -709,7 +709,7 @@ describe("ListingForm", () => {
 
     renderWithProviders(<ListingForm initialListing={buildListing()} listingId="listing-7" mode="edit" />);
 
-    await screen.findByText(/no images yet/i);
+    await screen.findByText(/belum ada gambar yang terunggah/i);
     const fileInput = screen.getByLabelText(/choose listing images/i);
     const file = new File(["not-an-image"], "bad.txt", { type: "text/plain" });
     inspectListingImageSelectionMock.mockResolvedValueOnce({
@@ -719,7 +719,7 @@ describe("ListingForm", () => {
 
     fireEvent.change(fileInput, { target: { files: [file] } });
 
-    const uploadImagesButton = await screen.findByRole("button", { name: /upload images/i });
+    const uploadImagesButton = await screen.findByRole("button", { name: /unggah gambar/i });
     await waitFor(() => expect(uploadImagesButton).toBeEnabled());
     fireEvent.click(uploadImagesButton);
 
@@ -800,13 +800,13 @@ describe("ListingForm", () => {
     await waitFor(() => expect(uploadListingVideoMock).toHaveBeenCalledWith("listing-7", video));
     expect(await screen.findByText(/walkthrough\.mp4/i)).toBeInTheDocument();
     expect(screen.getByText(/front\.jpg/i)).toBeInTheDocument();
-    expect(screen.getByText(/delete this video before selecting a replacement/i)).toBeInTheDocument();
+    expect(screen.getByText(/hapus video di atas ini terlebih dahulu jika anda ingin menggantinya dengan video versi baru/i)).toBeInTheDocument();
     expect(screen.getByTestId("listing-video-upload")).toBeDisabled();
 
-    fireEvent.click(screen.getByRole("button", { name: /delete video/i }));
+    fireEvent.click(screen.getByRole("button", { name: /hapus video/i }));
 
     await waitFor(() => expect(deleteListingVideoMock).toHaveBeenCalledWith("listing-7"));
-    expect(await screen.findByText(/no video yet/i)).toBeInTheDocument();
+    expect(await screen.findByText(/belum ada video tur properti/i)).toBeInTheDocument();
     expect(screen.queryByText(/walkthrough\.mp4/i)).not.toBeInTheDocument();
     expect(screen.getByText(/front\.jpg/i)).toBeInTheDocument();
   });
