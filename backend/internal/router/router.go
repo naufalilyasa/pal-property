@@ -132,17 +132,18 @@ func Register(
 	// 4. Listing Routes (Protected)
 	// ==========================================
 	listingProtected := api.Group("/listings", middleware.Protected(db, authzService))
-	listingProtected.Post("/", listingHandler.Create)
-	listingProtected.Put("/:id", listingHandler.Update)
-	listingProtected.Delete("/:id", listingHandler.Delete)
-	listingProtected.Post("/:id/images", listingHandler.UploadImage)
-	listingProtected.Delete("/:id/images/:imageId", listingHandler.DeleteImage)
-	listingProtected.Post("/:id/video", listingHandler.UploadVideo)
-	listingProtected.Delete("/:id/video", listingHandler.DeleteVideo)
-	listingProtected.Patch("/:id/images/:imageId/primary", listingHandler.SetPrimaryImage)
-	listingProtected.Patch("/:id/images/reorder", listingHandler.ReorderImages)
+	listingAdmin := listingProtected.Use(middleware.RequireRole(authz.RoleAdmin))
+	listingAdmin.Post("/", listingHandler.Create)
+	listingAdmin.Put("/:id", listingHandler.Update)
+	listingAdmin.Delete("/:id", listingHandler.Delete)
+	listingAdmin.Post("/:id/images", listingHandler.UploadImage)
+	listingAdmin.Delete("/:id/images/:imageId", listingHandler.DeleteImage)
+	listingAdmin.Post("/:id/video", listingHandler.UploadVideo)
+	listingAdmin.Delete("/:id/video", listingHandler.DeleteVideo)
+	listingAdmin.Patch("/:id/images/:imageId/primary", listingHandler.SetPrimaryImage)
+	listingAdmin.Patch("/:id/images/reorder", listingHandler.ReorderImages)
 
-	apiProtected.Get("/me/listings", listingHandler.ListByUserID)
+	apiProtected.Get("/me/listings", middleware.RequireRole(authz.RoleAdmin), listingHandler.ListByUserID)
 	// ==========================================
 	// 5. Category Routes (Public)
 	// ==========================================

@@ -32,7 +32,7 @@ function renderWithProviders(node: React.ReactNode) {
 describe("DashboardPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    requireUserMock.mockResolvedValue({ id: "seller-1", email: "seller@example.com" });
+    requireUserMock.mockResolvedValue({ id: "admin-1", email: "admin@example.com" });
   });
 
   it("renders seller dashboard overview metrics", async () => {

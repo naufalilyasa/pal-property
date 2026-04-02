@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/base64"
 	"fmt"
+	"strings"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/go-playground/validator/v10"
@@ -120,6 +121,14 @@ func LoadConfig() error {
 		return fmt.Errorf("config: OAUTH_TOKEN_ENCRYPTION_KEY must decode to exactly 32 bytes (got %d)", len(encKey))
 	}
 	cfg.OAuthTokenEncryptionKey = encKey
+
+	// Robustly clean up cookie domain if protocol was accidentally included
+	if cfg.AuthCookieDomain != "" {
+		cfg.AuthCookieDomain = strings.TrimPrefix(cfg.AuthCookieDomain, "https://")
+		cfg.AuthCookieDomain = strings.TrimPrefix(cfg.AuthCookieDomain, "http://")
+		cfg.AuthCookieDomain = strings.Split(cfg.AuthCookieDomain, "/")[0]
+		cfg.AuthCookieDomain = strings.Split(cfg.AuthCookieDomain, ":")[0]
+	}
 
 	if err := validateCloudinaryConfig(cfg); err != nil {
 		return err

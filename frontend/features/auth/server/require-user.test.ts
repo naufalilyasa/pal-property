@@ -37,13 +37,13 @@ describe("requireUser", () => {
     );
   });
 
-  it("returns the current user when already authenticated", async () => {
+  it("returns the current admin when seller dashboard access is allowed", async () => {
     const user: CurrentUser = {
-      id: "seller-1",
-      name: "Seller One",
-      email: "seller@example.com",
+      id: "admin-1",
+      name: "Admin One",
+      email: "admin@example.com",
       avatar_url: null,
-      role: "seller",
+      role: "admin",
       seller_capabilities: {
         canAccessDashboard: true,
         requiresOnboarding: false,
@@ -56,5 +56,23 @@ describe("requireUser", () => {
 
     expect(result).toBe(user);
     expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it("redirects authenticated non-admin users away from seller routes", async () => {
+    getOptionalUserMock.mockResolvedValue({
+      id: "user-1",
+      name: "Basic User",
+      email: "user@example.com",
+      avatar_url: null,
+      role: "user",
+      seller_capabilities: {
+        canAccessDashboard: false,
+        requiresOnboarding: false,
+      },
+      created_at: "2026-03-18T00:00:00Z",
+    });
+
+    await expect(requireUser({ intent: "seller", returnTo: "/dashboard" })).rejects.toThrow("redirect called");
+    expect(redirectMock).toHaveBeenCalledWith("/seller/onboarding");
   });
 });

@@ -161,6 +161,7 @@ func main() {
 	app := fiber.New(fiber.Config{
 		JSONEncoder: sonic.Marshal,
 		JSONDecoder: sonic.Unmarshal,
+		ProxyHeader: "CF-Connecting-IP",
 		ErrorHandler: func(c fiber.Ctx, err error) error {
 			code := fiber.StatusInternalServerError
 			if errors.Is(err, domain.ErrNotFound) {

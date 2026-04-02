@@ -71,7 +71,7 @@ func TestGetMe_Success(t *testing.T) {
 	assert.NotNil(t, res)
 	assert.Equal(t, userID, res.ID)
 	assert.Equal(t, "test@example.com", res.Email)
-	assert.True(t, res.SellerCapabilities.CanAccessDashboard)
+	assert.False(t, res.SellerCapabilities.CanAccessDashboard)
 	assert.False(t, res.SellerCapabilities.RequiresOnboarding)
 	mockRepo.AssertExpectations(t)
 }

@@ -392,7 +392,7 @@ func (s *AuthHandlerTestSuite) TestGetMe_Success() {
 	s.Equal("John Doe", data["name"])
 	s.Equal("john@example.com", data["email"])
 	s.Equal(userID.String(), data["id"])
-	s.Equal(map[string]interface{}{"canAccessDashboard": true, "requiresOnboarding": false}, data["seller_capabilities"])
+	s.Equal(map[string]interface{}{"canAccessDashboard": false, "requiresOnboarding": false}, data["seller_capabilities"])
 }
 
 func (s *AuthHandlerTestSuite) TestGetMe_Unauthorized() {

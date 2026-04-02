@@ -12,11 +12,15 @@ const backendEnvelope = <T,>(data: T, message = "Success") => ({
 const MOCK_API_ORIGIN = "http://127.0.0.1:45731";
 
 const sellerUser = {
-  id: "seller-1",
-  name: "Seller One",
-  email: "seller@example.com",
+  id: "admin-1",
+  name: "Admin One",
+  email: "admin@example.com",
   avatar_url: null,
-  role: "seller",
+  role: "admin",
+  seller_capabilities: {
+    canAccessDashboard: true,
+    requiresOnboarding: false,
+  },
   created_at: "2026-03-17T00:00:00Z",
 };
 
