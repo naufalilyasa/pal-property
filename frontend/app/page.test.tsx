@@ -17,7 +17,7 @@ describe("Home", () => {
     expect(screen.getByText(/jual beli mudah/i)).toBeInTheDocument();
     expect(screen.getByText(/properti pilihan/i)).toBeInTheDocument();
     expect(screen.getByTestId("home-shell")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /jelajahi properti/i })).toHaveAttribute("href", "/listings");
-    expect(screen.getByRole("link", { name: /login public/i })).toHaveAttribute("href", "/login");
+    expect(screen.getAllByRole("link", { name: /cari properti/i })[0]).toHaveAttribute("href", "/listings");
+    expect(screen.getByRole("link", { name: /^login$/i })).toHaveAttribute("href", "/login");
   });
 });

@@ -11,6 +11,14 @@ vi.mock("next/image", () => ({
   ),
 }));
 
+class ResizeObserverMock {
+  observe() {}
+  disconnect() {}
+  unobserve() {}
+}
+
+vi.stubGlobal("ResizeObserver", ResizeObserverMock);
+
 vi.mock("leaflet", () => {
   type MockMap = {
     container: HTMLElement;
