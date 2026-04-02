@@ -8,11 +8,30 @@ import { SaveListingButton } from "@/features/saved-listings/components/save-lis
 import type { SearchListingCard } from "@/features/listings/server/get-search-listings";
 
 function formatPrice(price: number, currency: string) {
-  return new Intl.NumberFormat("en-US", {
+  const normalizedCurrency = currency || "IDR";
+
+  if (normalizedCurrency === "IDR") {
+    if (price >= 1_000_000_000) {
+      return `Rp ${formatCompactNumber(price / 1_000_000_000)} Miliar`;
+    }
+
+    if (price >= 1_000_000) {
+      return `Rp ${formatCompactNumber(price / 1_000_000)} Juta`;
+    }
+  }
+
+  return new Intl.NumberFormat("id-ID", {
     style: "currency",
-    currency: currency || "IDR",
+    currency: normalizedCurrency,
     maximumFractionDigits: 0,
   }).format(price);
+}
+
+function formatCompactNumber(value: number) {
+  return new Intl.NumberFormat("id-ID", {
+    minimumFractionDigits: value < 10 && !Number.isInteger(value) ? 1 : 0,
+    maximumFractionDigits: value < 10 ? 1 : 0,
+  }).format(value);
 }
 
 function formatMetric(label: string, value?: number) {

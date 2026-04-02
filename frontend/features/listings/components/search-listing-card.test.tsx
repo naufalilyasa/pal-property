@@ -76,6 +76,7 @@ describe("SearchListingCardItem", () => {
   it("renders denser location and property metrics without changing the image shell", () => {
     render(<SearchListingCardItem href="/listings/jakarta-river-house" listing={buildListing()} />);
 
+    expect(screen.getByText("Rp 3,3 Miliar")).toBeInTheDocument();
     expect(screen.getByText(/ciracas, cibubur, jakarta timur/i)).toBeInTheDocument();
     expect(screen.getByText(/dki jakarta/i)).toBeInTheDocument();
     expect(screen.getByText("KT 4")).toBeInTheDocument();
