@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/adaptor"
@@ -76,11 +77,13 @@ func (h *AuthHandler) Callback(c fiber.Ctx) error {
 	}
 
 	isSecure := config.Env.AppEnv == "production"
+	cookieDomain := strings.TrimSpace(config.Env.AuthCookieDomain)
 
 	// Set Access Token Cookie
 	c.Cookie(&fiber.Cookie{
 		Name:     "access_token",
 		Value:    tokens.AccessToken,
+		Domain:   cookieDomain,
 		HTTPOnly: true,
 		Secure:   isSecure,
 		SameSite: "Lax",
@@ -91,6 +94,7 @@ func (h *AuthHandler) Callback(c fiber.Ctx) error {
 	c.Cookie(&fiber.Cookie{
 		Name:     "refresh_token",
 		Value:    tokens.RefreshToken,
+		Domain:   cookieDomain,
 		HTTPOnly: true,
 		Secure:   isSecure,
 		SameSite: "Lax",
@@ -142,11 +146,13 @@ func (h *AuthHandler) RefreshToken(c fiber.Ctx) error {
 	}
 
 	isSecure := config.Env.AppEnv == "production"
+	cookieDomain := strings.TrimSpace(config.Env.AuthCookieDomain)
 
 	// 3. Set new Access Token Cookie
 	c.Cookie(&fiber.Cookie{
 		Name:     "access_token",
 		Value:    tokens.AccessToken,
+		Domain:   cookieDomain,
 		HTTPOnly: true,
 		Secure:   isSecure,
 		SameSite: "Lax",
@@ -157,6 +163,7 @@ func (h *AuthHandler) RefreshToken(c fiber.Ctx) error {
 	c.Cookie(&fiber.Cookie{
 		Name:     "refresh_token",
 		Value:    tokens.RefreshToken,
+		Domain:   cookieDomain,
 		HTTPOnly: true,
 		Secure:   isSecure,
 		SameSite: "Lax",
@@ -167,6 +174,7 @@ func (h *AuthHandler) RefreshToken(c fiber.Ctx) error {
 }
 
 func (h *AuthHandler) Logout(c fiber.Ctx) error {
+	cookieDomain := strings.TrimSpace(config.Env.AuthCookieDomain)
 	refreshToken := c.Cookies("refresh_token")
 	if refreshToken != "" {
 		// Invalidate session in Redis
@@ -174,7 +182,8 @@ func (h *AuthHandler) Logout(c fiber.Ctx) error {
 	}
 
 	// Clear cookies
-	c.ClearCookie("access_token", "refresh_token")
+	c.Cookie(&fiber.Cookie{Name: "access_token", Value: "", Domain: cookieDomain, Path: "/", MaxAge: -1, Expires: time.Unix(0, 0), HTTPOnly: true})
+	c.Cookie(&fiber.Cookie{Name: "refresh_token", Value: "", Domain: cookieDomain, Path: "/", MaxAge: -1, Expires: time.Unix(0, 0), HTTPOnly: true})
 
 	return utils.SendResponse(c, fiber.StatusOK, fiber.Map{"message": "logged out successfully"})
 }

@@ -55,6 +55,8 @@ type AppConfig struct {
 	OAuthClientID     string `env:"OAUTH_CLIENT_ID"     validate:"required"`
 	OAuthClientSecret string `env:"OAUTH_CLIENT_SECRET" validate:"required"`
 	OAuthCallbackURL  string `env:"OAUTH_CALLBACK_URL"  validate:"required"`
+	SessionSecret     string `env:"SESSION_SECRET"       validate:"required,min=32"`
+	AuthCookieDomain  string `env:"AUTH_COOKIE_DOMAIN"`
 
 	// JWT — RS256, keys stored base64-encoded
 	JwtPrivateKeyBase64  string `env:"JWT_PRIVATE_KEY_BASE64" validate:"required"`

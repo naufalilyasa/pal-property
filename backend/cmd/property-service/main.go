@@ -5,12 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/bytedance/sonic"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
+	"github.com/gorilla/sessions"
 	"github.com/markbates/goth"
+	"github.com/markbates/goth/gothic"
 	"github.com/markbates/goth/providers/google"
 	"github.com/naufalilyasa/pal-property-backend/internal/domain"
 	handler "github.com/naufalilyasa/pal-property-backend/internal/handler/http"
@@ -58,6 +62,16 @@ func main() {
 			"email", "profile",
 		),
 	)
+
+	sessionStore := sessions.NewCookieStore([]byte(config.Env.SessionSecret))
+	sessionStore.Options = &sessions.Options{
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   config.Env.AppEnv == "production",
+		SameSite: http.SameSiteLaxMode,
+		Domain:   strings.TrimSpace(config.Env.AuthCookieDomain),
+	}
+	gothic.Store = sessionStore
 
 	rdb := goRedis.NewClient(&goRedis.Options{
 		Addr:     config.Env.RedisAddr,

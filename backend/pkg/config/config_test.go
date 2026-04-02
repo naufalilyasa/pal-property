@@ -69,6 +69,7 @@ func setRequiredConfigEnv(t *testing.T) {
 		"OAUTH_CLIENT_ID":            "client-id",
 		"OAUTH_CLIENT_SECRET":        "secret",
 		"OAUTH_CALLBACK_URL":         "https://example.com/oauth",
+		"SESSION_SECRET":             "0123456789abcdef0123456789abcdef",
 		"JWT_PRIVATE_KEY_BASE64":     "cHJpdmF0ZQ==",
 		"JWT_PUBLIC_KEY_BASE64":      "cHVibGlj",
 		"OAUTH_TOKEN_ENCRYPTION_KEY": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
