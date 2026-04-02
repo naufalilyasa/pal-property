@@ -188,7 +188,12 @@ func main() {
 				code = e.Code
 			}
 
-			logger.Log.Error("Fiber trapped error", zap.Error(err), zap.String("path", c.Path()))
+			if code >= 500 {
+				logger.Log.Error("Fiber trapped server error", zap.Error(err), zap.String("path", c.Path()))
+			} else {
+				// Don't log expected auth/client errors as ERROR level to avoid log pollution
+				logger.Log.Warn("Fiber trapped client error", zap.Error(err), zap.String("path", c.Path()), zap.Int("status", code))
+			}
 
 			msg := "An unexpected error occurred"
 			if code < 500 {

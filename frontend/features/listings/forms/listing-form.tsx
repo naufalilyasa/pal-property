@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { type ChangeEvent, useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -62,7 +62,6 @@ import {
   formatVideoBytes,
   inspectListingImageSelection,
   MAX_LISTING_VIDEO_BYTES,
-  MAX_LISTING_VIDEO_DURATION_SECONDS,
   RECOMMENDED_LISTING_IMAGE_RATIO_LABEL,
   validateListingVideoSelection,
 } from "./listing-media";
@@ -146,10 +145,10 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
     defaultValues: toFormValues(initialListing),
   });
 
-  const selectedProvinceCode = form.watch("location_province_code");
-  const selectedCityCode = form.watch("location_city_code");
-  const selectedDistrictCode = form.watch("location_district_code");
-  const selectedFacilitiesValue = form.watch("facilities");
+  const selectedProvinceCode = useWatch({ control: form.control, name: "location_province_code" });
+  const selectedCityCode = useWatch({ control: form.control, name: "location_city_code" });
+  const selectedDistrictCode = useWatch({ control: form.control, name: "location_district_code" });
+  const selectedFacilitiesValue = useWatch({ control: form.control, name: "facilities" });
 
   const provincesQuery = useQuery({
     queryKey: ["regions", "provinces"],
@@ -871,7 +870,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                 <FormField
                   control={form.control}
                   name="facilities"
-                  render={({ field }) => {
+                  render={() => {
                     const selectedFacilities = new Set(parseStringList(selectedFacilitiesValue));
 
                     return (
@@ -972,7 +971,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
 
               <div className="mt-6 space-y-6">
                 <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-                  <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
+                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
                     <div className="flex h-full flex-col gap-4 lg:justify-between">
                       <div className="space-y-2">
                         <p className="text-sm font-medium text-slate-900">Unggah Foto (Bisa Lebih Dari Satu)</p>
@@ -1005,7 +1004,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                     </div>
                   </div>
 
-                  <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
+                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
                     <div className="space-y-4">
                       <div className="space-y-2">
                         <p className="text-sm font-medium text-slate-900">Optional listing video</p>
@@ -1014,7 +1013,7 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
 
                       {listingVideo ? (
                         <div className="space-y-4 rounded-[1.25rem] border border-slate-200 bg-white/80 p-4">
-                          <div className="overflow-hidden rounded-[1rem] border border-slate-200 bg-black/90">
+                          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-black/90">
                             <video className="aspect-video h-full w-full object-cover" controls preload="metadata" src={listingVideo.url}>
                               <track kind="captions" label="Listing video captions unavailable" />
                             </video>
@@ -1089,15 +1088,15 @@ export function ListingForm({ initialListing = null, mode, listingId }: ListingF
                 ) : null}
 
                 {orderedImages.length === 0 ? (
-                  <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-white/60 p-5 text-sm leading-7 text-slate-900">
+                  <div className="rounded-3xl border border-dashed border-slate-200 bg-white/60 p-5 text-sm leading-7 text-slate-900">
                     Belum ada gambar yang terunggah. Silakan pilih foto dengan tombol di atas.
                   </div>
                 ) : (
                   <div className="grid gap-4 lg:grid-cols-2">
                     {orderedImages.map((image, index) => (
-                      <article className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white/72" data-testid={`listing-image-card-${image.id}`} key={image.id}>
+                      <article className="overflow-hidden rounded-3xl border border-slate-200 bg-white/72" data-testid={`listing-image-card-${image.id}`} key={image.id}>
                         <div data-testid="listing-image-item">
-                          <div className="relative aspect-[4/3] bg-slate-50">
+                          <div className="relative aspect-4/3 bg-slate-50">
                             <Image alt={image.original_filename ?? `Listing image ${index + 1}`} className="object-cover" fill sizes="(min-width: 1024px) 30vw, 100vw" src={image.url} unoptimized />
                           </div>
                           <div className="space-y-4 p-5">

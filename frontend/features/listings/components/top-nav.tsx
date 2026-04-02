@@ -1,6 +1,10 @@
 import Link from "next/link";
+import { getOptionalUser } from "@/features/auth/server/current-user";
+import { UserMenu } from "@/features/auth/components/user-menu";
 
-export function TopNav() {
+export async function TopNav() {
+  const user = await getOptionalUser();
+
   return (
     <nav className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 sm:px-6">
       <div className="flex items-center gap-8">
@@ -20,12 +24,16 @@ export function TopNav() {
         </div>
       </div>
       <div>
-        <Link
-          href="/login"
-          className="rounded-full bg-[#111] px-5 py-2 text-sm font-semibold text-white transition hover:bg-black/90"
-        >
-          Login
-        </Link>
+        {user ? (
+          <UserMenu user={user} />
+        ) : (
+          <Link
+            href="/login"
+            className="rounded-full bg-[#111] px-5 py-2 text-sm font-semibold text-white transition hover:bg-black/90"
+          >
+            Login
+          </Link>
+        )}
       </div>
     </nav>
   );

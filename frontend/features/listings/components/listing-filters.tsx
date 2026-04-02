@@ -57,6 +57,7 @@ export function ListingFilters({ view }: { view: "map" | "list" }) {
 
   useEffect(() => {
     if (selectedProvince && selectedProvinceCode === "" && selectedProvinceOption) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedProvinceCode(selectedProvinceOption.code);
     }
   }, [selectedProvince, selectedProvinceCode, selectedProvinceOption]);

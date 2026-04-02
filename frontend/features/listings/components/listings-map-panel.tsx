@@ -71,14 +71,16 @@ export function ListingsMapPanel({ listings }: ListingsMapPanelProps) {
       });
     };
 
-    void setupMap();
+    const markers = markersRef.current;
+
+    setupMap();
 
     return () => {
       cancelled = true;
-      markersRef.current.forEach((marker) => {
+      markers.forEach((marker) => {
         marker.remove();
       });
-      markersRef.current.clear();
+      markers.clear();
       mapRef.current?.remove();
       mapRef.current = null;
       setIsMapReady(false);
@@ -159,7 +161,7 @@ export function ListingsMapPanel({ listings }: ListingsMapPanelProps) {
 
   if (markerListings.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center bg-[var(--panel)] p-6 text-center text-sm text-muted-foreground">
+      <div className="flex h-full items-center justify-center bg-(--panel) p-6 text-center text-sm text-muted-foreground">
         Koordinat listing aktif belum tersedia, jadi titik properti belum bisa ditampilkan di peta.
       </div>
     );
@@ -170,7 +172,7 @@ export function ListingsMapPanel({ listings }: ListingsMapPanelProps) {
       <div className="h-full w-full" data-testid="listings-map-canvas" ref={mapContainerRef} />
 
       {activeListing ? (
-        <div className="pointer-events-none absolute bottom-4 left-4 right-4 z-[700]" data-testid="listing-map-popup">
+        <div className="pointer-events-none absolute bottom-4 left-4 right-4 z-700" data-testid="listing-map-popup">
           <div className="pointer-events-auto max-w-sm rounded-[1.25rem] border border-border bg-white/95 p-4 shadow-xl backdrop-blur-sm">
             <div className="flex gap-4">
               <div className="relative h-24 w-28 shrink-0 overflow-hidden rounded-xl bg-muted">

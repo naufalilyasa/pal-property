@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { getOptionalUser } from "@/features/auth/server/current-user";
 import { getListingBySlug } from "@/features/listings/server/get-listing-by-slug";
 import { SaveListingButton } from "@/features/saved-listings/components/save-listing-button";
@@ -245,7 +244,7 @@ export default async function PublicListingDetailPage({ params }: { params: Prom
           <ListingDetailGallery address={address} images={images} />
 
           {/* Price and Specs */}
-          <div className="mt-6 flex flex-col justify-between gap-6 rounded-[1.5rem] border border-border bg-[var(--panel)] p-6 sm:flex-row sm:items-end">
+          <div className="mt-6 flex flex-col justify-between gap-6 rounded-3xl border border-border bg-(--panel) p-6 sm:flex-row sm:items-end">
             <div>
               <div className="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">{price}</div>
               <p className="mt-2 text-sm leading-7 text-muted-foreground">Ringkasan properti utama dengan fokus pada ukuran bangunan, jumlah kamar, dan kesiapan hunian.</p>
@@ -300,7 +299,7 @@ export default async function PublicListingDetailPage({ params }: { params: Prom
               </div>
 
               <div className="space-y-4">
-                <div className="overflow-hidden rounded-[1.5rem] border border-border bg-black/90 shadow-sm">
+                <div className="overflow-hidden rounded-3xl border border-border bg-black/90 shadow-sm">
                   <video
                     className="aspect-video h-full w-full object-cover"
                     controls
@@ -363,7 +362,7 @@ export default async function PublicListingDetailPage({ params }: { params: Prom
                 Galeri <br/><span className="text-muted-foreground">properti</span>
               </h2>
             </div>
-            <div className="flex items-center justify-between rounded-[1.25rem] border border-border bg-[var(--panel)] px-5 py-4 text-sm text-muted-foreground">
+            <div className="flex items-center justify-between rounded-[1.25rem] border border-border bg-(--panel) px-5 py-4 text-sm text-muted-foreground">
               <span>{images.length} foto tersedia</span>
               <span>Gunakan panah atau klik foto utama untuk melihat detail galeri.</span>
             </div>
@@ -389,7 +388,7 @@ export default async function PublicListingDetailPage({ params }: { params: Prom
                   />
                 </div>
               ) : (
-                <div className="rounded-[1.25rem] border border-dashed border-border bg-[var(--panel)] p-5 text-sm leading-7 text-muted-foreground">
+                <div className="rounded-[1.25rem] border border-dashed border-border bg-(--panel) p-5 text-sm leading-7 text-muted-foreground">
                   Titik koordinat properti belum tersedia, jadi peta belum bisa ditampilkan secara akurat.
                 </div>
               )}
