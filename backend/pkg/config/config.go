@@ -28,11 +28,20 @@ type AppConfig struct {
 	RedisPassword string `env:"REDIS_PASSWORD"`
 	RedisDB       int    `env:"REDIS_DB"       envDefault:"0"`
 
-	ElasticAddress       string `env:"ELASTIC_ADDRESS" envDefault:"http://localhost:9200"`
-	ElasticUsername      string `env:"ELASTIC_USERNAME"`
-	ElasticPassword      string `env:"ELASTIC_PASSWORD"`
-	ElasticListingsIndex string `env:"ELASTIC_INDEX_LISTINGS" envDefault:"listings"`
-	WilayahDataPath      string `env:"WILAYAH_DATA_PATH" envDefault:"../wilayah/db/wilayah.sql"`
+	ElasticAddress            string `env:"ELASTIC_ADDRESS" envDefault:"http://localhost:9200"`
+	ElasticUsername           string `env:"ELASTIC_USERNAME"`
+	ElasticPassword           string `env:"ELASTIC_PASSWORD"`
+	ElasticListingsIndex      string `env:"ELASTIC_INDEX_LISTINGS" envDefault:"listings"`
+	ElasticChatRetrievalIndex string `env:"ELASTIC_INDEX_CHAT_RETRIEVAL" envDefault:"chat-retrieval"`
+	WilayahDataPath           string `env:"WILAYAH_DATA_PATH" envDefault:"../wilayah/db/wilayah.sql"`
+
+	ChatGeminiAPIKey         string `env:"CHAT_GEMINI_API_KEY" validate:"required"`
+	ChatGeminiModel          string `env:"CHAT_GEMINI_MODEL" envDefault:"gemini-2.5-flash-lite"`
+	ChatSessionTTLSeconds    int    `env:"CHAT_SESSION_TTL_SECONDS" envDefault:"900" validate:"gte=60,lte=86400"`
+	ChatMaxHistoryTurns      int    `env:"CHAT_MAX_HISTORY_TURNS" envDefault:"10" validate:"gte=1,lte=100"`
+	ChatGeminiTimeoutSeconds int    `env:"CHAT_GEMINI_TIMEOUT_SECONDS" envDefault:"20" validate:"gte=1,lte=120"`
+	ChatRetrievalTimeoutMs   int    `env:"CHAT_RETRIEVAL_TIMEOUT_MS" envDefault:"1500" validate:"gte=100,lte=30000"`
+	ChatMaxRetrievalDocs     int    `env:"CHAT_MAX_RETRIEVAL_DOCS" envDefault:"5" validate:"gte=1,lte=20"`
 
 	// CORS
 	CorsAllowedOrigins string `env:"CORS_ALLOWED_ORIGINS" envDefault:"http://localhost:3000"`
@@ -149,6 +158,14 @@ func validateSearchIndexConfig(cfg AppConfig) error {
 
 	if cfg.ElasticUsername == "" || cfg.ElasticPassword == "" {
 		return fmt.Errorf("config: ELASTIC_USERNAME and ELASTIC_PASSWORD must be set together")
+	}
+
+	if cfg.ElasticListingsIndex == "" {
+		return fmt.Errorf("config: ELASTIC_INDEX_LISTINGS must be set")
+	}
+
+	if cfg.ElasticChatRetrievalIndex == "" {
+		return fmt.Errorf("config: ELASTIC_INDEX_CHAT_RETRIEVAL must be set")
 	}
 
 	return nil

@@ -44,6 +44,19 @@ func TestLoadConfigRejectsPartialElasticCredentials(t *testing.T) {
 	require.ErrorContains(t, err, "ELASTIC_USERNAME and ELASTIC_PASSWORD must be set together")
 }
 
+func TestLoadConfigUsesDefaultChatModel(t *testing.T) {
+	t.Cleanup(func() { Env = AppConfig{} })
+	setRequiredConfigEnv(t)
+
+	require.NoError(t, LoadConfig())
+	require.Equal(t, "gemini-2.5-flash-lite", Env.ChatGeminiModel)
+	require.Equal(t, 900, Env.ChatSessionTTLSeconds)
+	require.Equal(t, 10, Env.ChatMaxHistoryTurns)
+	require.Equal(t, 20, Env.ChatGeminiTimeoutSeconds)
+	require.Equal(t, 1500, Env.ChatRetrievalTimeoutMs)
+	require.Equal(t, 5, Env.ChatMaxRetrievalDocs)
+}
+
 func setRequiredConfigEnv(t *testing.T) {
 	t.Helper()
 
@@ -59,6 +72,7 @@ func setRequiredConfigEnv(t *testing.T) {
 		"JWT_PRIVATE_KEY_BASE64":     "cHJpdmF0ZQ==",
 		"JWT_PUBLIC_KEY_BASE64":      "cHVibGlj",
 		"OAUTH_TOKEN_ENCRYPTION_KEY": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+		"CHAT_GEMINI_API_KEY":        "chat-key",
 	} {
 		t.Setenv(key, value)
 	}
