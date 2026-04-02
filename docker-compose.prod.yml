@@ -27,7 +27,9 @@ services:
     restart: unless-stopped
     environment:
       discovery.type: single-node
-      xpack.security.enabled: "false"
+      xpack.security.enabled: "true"
+      xpack.security.http.ssl.enabled: "false"
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}
       ES_JAVA_OPTS: "-Xms512m -Xmx512m"
     volumes:
       - elastic_data:/usr/share/elasticsearch/data
@@ -51,6 +53,8 @@ services:
     restart: unless-stopped
     env_file:
       - ./backend/.env.production
+    ports:
+      - "8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -78,26 +82,7 @@ services:
         condition: service_completed_successfully
     command: ["listing-indexer"]
 
-  caddy:
-    image: caddy:2.10-alpine
-    restart: unless-stopped
-    depends_on:
-      backend:
-        condition: service_started
-    ports:
-      - "80:80"
-      - "443:443"
-    environment:
-      API_DOMAIN: ${API_DOMAIN}
-      API_UPSTREAM: backend:8080
-    volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-
 volumes:
   postgres_data:
   redis_data:
   elastic_data:
-  caddy_data:
-  caddy_config:
