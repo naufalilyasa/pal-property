@@ -3,14 +3,21 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import CurrencyInput from "react-currency-input-field";
 
 import { browserFetch } from "@/lib/api/browser-fetch";
-import type { ListingCategory } from "@/lib/api/listing-form";
+import type { ListingCategory, RegionOption } from "@/lib/api/listing-form";
 import { queryKeys } from "@/lib/query/keys";
 
 export function ListingFilters({ view }: { view: "map" | "list" }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [selectedProvince, setSelectedProvince] = useState(searchParams.get("location_province") ?? "");
+  const [selectedProvinceCode, setSelectedProvinceCode] = useState("");
+  const [selectedCity, setSelectedCity] = useState(searchParams.get("location_city") ?? "");
+  const [priceMin, setPriceMin] = useState(searchParams.get("price_min") ?? "");
+  const [priceMax, setPriceMax] = useState(searchParams.get("price_max") ?? "");
 
   const categoriesQuery = useQuery({
     queryKey: queryKeys.categories,
@@ -22,6 +29,37 @@ export function ListingFilters({ view }: { view: "map" | "list" }) {
       return response.data;
     },
   });
+
+  const provincesQuery = useQuery({
+    queryKey: ["regions", "provinces", "public-filters"],
+    queryFn: async () => {
+      const response = await browserFetch<RegionOption[]>("/api/regions/provinces", {
+        method: "GET",
+        cache: "no-store",
+      });
+      return response.data;
+    },
+  });
+
+  const citiesQuery = useQuery({
+    queryKey: ["regions", "cities", "public-filters", selectedProvinceCode],
+    queryFn: async () => {
+      const response = await browserFetch<RegionOption[]>(`/api/regions/cities?province_code=${selectedProvinceCode}`, {
+        method: "GET",
+        cache: "no-store",
+      });
+      return response.data;
+    },
+    enabled: Boolean(selectedProvinceCode),
+  });
+
+  const selectedProvinceOption = provincesQuery.data?.find((province) => province.name === selectedProvince) ?? null;
+
+  useEffect(() => {
+    if (selectedProvince && selectedProvinceCode === "" && selectedProvinceOption) {
+      setSelectedProvinceCode(selectedProvinceOption.code);
+    }
+  }, [selectedProvince, selectedProvinceCode, selectedProvinceOption]);
 
   const updateView = (newView: "map" | "list") => {
     const params = new URLSearchParams(searchParams.toString());
@@ -57,6 +95,7 @@ export function ListingFilters({ view }: { view: "map" | "list" }) {
         {/* Search Input */}
         <div className="relative flex items-center">
           <svg
+            aria-hidden="true"
             className="absolute left-3 text-gray-400"
             xmlns="http://www.w3.org/2000/svg"
             width="16"
@@ -96,37 +135,74 @@ export function ListingFilters({ view }: { view: "map" | "list" }) {
           <option value="rent">Rent</option>
         </select>
 
-        <input
+        <select
+          className="w-44 cursor-pointer appearance-none rounded-full border border-gray-300 bg-white px-4 py-1.5 pr-8 text-sm text-[#111] outline-none hover:border-black bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-position-[calc(100%-12px)_center] bg-no-repeat"
           name="location_province"
-          className="w-40 rounded-full border border-gray-300 bg-white px-4 py-1.5 text-sm text-[#111] outline-none transition focus:border-black placeholder:text-gray-500"
-          placeholder="Province"
-          type="text"
-          defaultValue={searchParams.get("location_province") ?? ""}
-        />
+          onChange={(event) => {
+            const nextProvince = event.target.value;
+            const option = provincesQuery.data?.find((province) => province.name === nextProvince) ?? null;
+            setSelectedProvince(nextProvince);
+            setSelectedProvinceCode(option?.code ?? "");
+            setSelectedCity("");
+          }}
+          value={selectedProvince}
+        >
+          <option value="">Province</option>
+          {(provincesQuery.data ?? []).map((province) => (
+            <option key={province.code} value={province.name}>
+              {province.name}
+            </option>
+          ))}
+        </select>
 
-        <input
+        <select
+          className="w-44 cursor-pointer appearance-none rounded-full border border-gray-300 bg-white px-4 py-1.5 pr-8 text-sm text-[#111] outline-none hover:border-black disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-position-[calc(100%-12px)_center] bg-no-repeat"
+          disabled={!selectedProvinceCode}
           name="location_city"
-          className="w-40 rounded-full border border-gray-300 bg-white px-4 py-1.5 text-sm text-[#111] outline-none transition focus:border-black placeholder:text-gray-500"
-          placeholder="City"
-          type="text"
-          defaultValue={searchParams.get("location_city") ?? ""}
-        />
+          onChange={(event) => setSelectedCity(event.target.value)}
+          value={selectedCity}
+        >
+          <option value="">City</option>
+          {(citiesQuery.data ?? []).map((city) => (
+            <option key={city.code} value={city.name}>
+              {city.name}
+            </option>
+          ))}
+        </select>
 
-        <input
-          name="price_min"
-          className="w-32 rounded-full border border-gray-300 bg-white px-4 py-1.5 text-sm text-[#111] outline-none transition focus:border-black placeholder:text-gray-500"
-          placeholder="Min price"
-          type="number"
-          defaultValue={searchParams.get("price_min") ?? ""}
-        />
+        <div className="w-40 rounded-full border border-gray-300 bg-white px-4 py-1.5 text-sm text-[#111] transition focus-within:border-black">
+          <CurrencyInput
+            allowNegativeValue={false}
+            className="w-full bg-transparent outline-none placeholder:text-gray-500"
+            decimalsLimit={0}
+            defaultValue={undefined}
+            groupSeparator="."
+            inputMode="numeric"
+            intlConfig={{ locale: "id-ID", currency: "IDR" }}
+            name="price_min"
+            onValueChange={(value) => setPriceMin(value ?? "")}
+            placeholder="Min price"
+            prefix="Rp "
+            value={priceMin}
+          />
+        </div>
 
-        <input
-          name="price_max"
-          className="w-32 rounded-full border border-gray-300 bg-white px-4 py-1.5 text-sm text-[#111] outline-none transition focus:border-black placeholder:text-gray-500"
-          placeholder="Max price"
-          type="number"
-          defaultValue={searchParams.get("price_max") ?? ""}
-        />
+        <div className="w-40 rounded-full border border-gray-300 bg-white px-4 py-1.5 text-sm text-[#111] transition focus-within:border-black">
+          <CurrencyInput
+            allowNegativeValue={false}
+            className="w-full bg-transparent outline-none placeholder:text-gray-500"
+            decimalsLimit={0}
+            defaultValue={undefined}
+            groupSeparator="."
+            inputMode="numeric"
+            intlConfig={{ locale: "id-ID", currency: "IDR" }}
+            name="price_max"
+            onValueChange={(value) => setPriceMax(value ?? "")}
+            placeholder="Max price"
+            prefix="Rp "
+            value={priceMax}
+          />
+        </div>
 
         <select name="sort" className="w-auto cursor-pointer appearance-none rounded-full border border-gray-300 bg-white px-4 py-1.5 pr-8 text-sm font-medium text-[#111] outline-none hover:border-black bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-position-[calc(100%-12px)_center] bg-no-repeat" defaultValue={searchParams.get("sort") ?? ""}>
           <option value="">Sort</option>
@@ -150,12 +226,14 @@ export function ListingFilters({ view }: { view: "map" | "list" }) {
         <button
           onClick={() => updateView("map")}
           className={`rounded-full px-4 py-1 text-sm font-semibold transition ${view === "map" ? "bg-black text-white" : "text-gray-600 hover:text-black"}`}
+          type="button"
         >
           Map
         </button>
         <button
           onClick={() => updateView("list")}
           className={`rounded-full px-4 py-1 text-sm font-semibold transition ${view === "list" ? "bg-black text-white" : "text-gray-600 hover:text-black"}`}
+          type="button"
         >
           List
         </button>
