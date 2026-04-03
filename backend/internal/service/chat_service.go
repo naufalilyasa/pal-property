@@ -95,9 +95,10 @@ func (s *chatService) Respond(ctx context.Context, req requestdto.ChatRequest) (
 	}
 
 	response := &responsedto.ChatResponse{
-		SessionID: req.SessionID,
-		Answer:    modelResponse.Answer,
-		Grounding: retrievalResult.Grounding,
+		SessionID:       req.SessionID,
+		Answer:          modelResponse.Answer,
+		Grounding:       retrievalResult.Grounding,
+		Recommendations: toChatRecommendations(retrievalResult.Documents),
 	}
 	if memoryIssue != "" {
 		response.Grounding.IsDegraded = true
@@ -107,6 +108,17 @@ func (s *chatService) Respond(ctx context.Context, req requestdto.ChatRequest) (
 	}
 	appendConversation(ctx, s.memory, req.SessionID, req.Message, response.Answer)
 	return response, nil
+}
+
+func toChatRecommendations(documents []domain.ChatRetrievalDocument) []responsedto.ChatRetrievalDocumentResponse {
+	recommendations := make([]responsedto.ChatRetrievalDocumentResponse, 0, len(documents))
+	for _, document := range documents {
+		if !isPublicListingStatus(document.Status) {
+			continue
+		}
+		recommendations = append(recommendations, responsedto.ChatRetrievalDocumentResponse(document))
+	}
+	return recommendations
 }
 
 func (s *chatService) loadRecentTurns(ctx context.Context, sessionID string) ([]domain.ChatTurn, string) {

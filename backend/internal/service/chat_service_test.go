@@ -76,6 +76,8 @@ func TestChatServiceRespondUsesMemoryAndGenerator(t *testing.T) {
 	require.Equal(t, "Saya rekomendasikan Rumah Aktif.", response.Answer)
 	require.Contains(t, gen.request.Question, "Riwayat percakapan singkat")
 	require.Len(t, memory.appendCalls, 2)
+	require.Len(t, response.Recommendations, 1)
+	require.Equal(t, "rumah-aktif", response.Recommendations[0].Slug)
 }
 
 func TestChatServiceRespondDegradesOnRetrievalError(t *testing.T) {
