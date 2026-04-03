@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	defaultEmbeddingModel    = "text-embedding-004"
+	defaultEmbeddingModel    = "gemini-embedding-001"
 	defaultGenerationModel   = "gemini-2.5-flash-lite"
 	defaultTimeout           = 20 * time.Second
 	defaultRetryAttempts     = 2
@@ -165,6 +165,7 @@ func NewClientFromConfig(ctx context.Context, opts ...Option) (*Client, error) {
 	}
 
 	base := []Option{
+		WithEmbeddingModel(config.Env.ChatEmbeddingModel),
 		WithGenerationModel(config.Env.ChatGeminiModel),
 		WithTimeout(time.Duration(config.Env.ChatGeminiTimeoutSeconds) * time.Second),
 	}
@@ -259,6 +260,8 @@ func (c *Client) embed(ctx context.Context, task EmbeddingTask, inputs ...string
 
 func buildEmbedConfig(task EmbeddingTask) *genai.EmbedContentConfig {
 	config := &genai.EmbedContentConfig{}
+	outputDimensionality := int32(768)
+	config.OutputDimensionality = &outputDimensionality
 	switch task {
 	case EmbeddingTaskQuery:
 		config.TaskType = "RETRIEVAL_QUERY"
