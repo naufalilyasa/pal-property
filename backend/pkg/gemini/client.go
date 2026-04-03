@@ -19,7 +19,7 @@ const (
 	defaultRetryAttempts     = 2
 	defaultMaxOutputTokens   = 512
 	defaultTemperature       = 0.2
-	defaultSystemInstruction = "You are a concise Indonesian real-estate assistant. Base answers only on the provided documents and cite each source by document ID or title."
+	defaultSystemInstruction = "You are PAL Property's Indonesian customer-service assistant. Answer naturally, warmly, and clearly like a helpful real-estate CS agent. Use only the provided property context, never mention internal document processing, never say 'berdasarkan dokumen', and do not expose raw IDs unless the user explicitly asks. If recommendations exist, summarize the best matches conversationally and let the UI handle property cards/links."
 )
 
 // EmbeddingTask differentiates between query and document workloads.
@@ -320,27 +320,24 @@ func buildGroundedContents(req GroundedAnswerRequest) []*genai.Content {
 
 func buildDocumentSummary(docs []GroundingDocument) string {
 	if len(docs) == 0 {
-		return "Context: No grounding documents were provided."
+		return "Konteks properti: tidak ada data properti yang cocok untuk pertanyaan ini."
 	}
 	var sb strings.Builder
-	sb.WriteString("Context:\n")
+	sb.WriteString("Ringkasan properti kandidat:\n")
 	for idx, doc := range docs {
 		if idx > 0 {
 			sb.WriteString("\n")
 		}
-		sb.WriteString(fmt.Sprintf("Document %d", idx+1))
-		if doc.ID != "" {
-			sb.WriteString(fmt.Sprintf(" (ID: %s)", doc.ID))
-		}
+		sb.WriteString(fmt.Sprintf("Properti %d", idx+1))
 		if doc.Title != "" {
 			sb.WriteString(fmt.Sprintf(" - %s", doc.Title))
 		}
 		sb.WriteString("\n")
 		if doc.Source != "" {
-			sb.WriteString(fmt.Sprintf("Source: %s\n", doc.Source))
+			sb.WriteString(fmt.Sprintf("Slug: %s\n", doc.Source))
 		}
 		if doc.Excerpt != "" {
-			sb.WriteString(fmt.Sprintf("Excerpt: %s\n", doc.Excerpt))
+			sb.WriteString(fmt.Sprintf("Deskripsi singkat: %s\n", doc.Excerpt))
 		}
 	}
 	return strings.TrimSpace(sb.String())

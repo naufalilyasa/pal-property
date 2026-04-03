@@ -1,13 +1,46 @@
 "use client";
 
+import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { browserFetch } from "@/lib/api/browser-fetch";
+
+type Recommendation = {
+  listing_id: string;
+  title: string;
+  slug: string;
+  price: number;
+  currency: string;
+  location_city?: string | null;
+  location_district?: string | null;
+  location_province?: string | null;
+  primary_image_url?: string | null;
+  category?: {
+    id: string;
+    name: string;
+    slug: string;
+  } | null;
+};
 
 type Message = {
   id: string;
   role: "user" | "bot";
   content: string;
+  recommendations?: Recommendation[];
 };
+
+function formatRecommendationPrice(price: number, currency: string) {
+  if ((currency || "IDR") === "IDR") {
+    if (price >= 1_000_000_000) {
+      return `Rp ${new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 }).format(price / 1_000_000_000)} Miliar`;
+    }
+    if (price >= 1_000_000) {
+      return `Rp ${new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 }).format(price / 1_000_000)} Juta`;
+    }
+  }
+
+  return new Intl.NumberFormat("id-ID", { style: "currency", currency: currency || "IDR", maximumFractionDigits: 0 }).format(price);
+}
 
 export function BotChat() {
   const [isOpen, setIsOpen] = useState(false);
@@ -16,6 +49,7 @@ export function BotChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messageCount = messages.length;
 
   // Initialize session and welcome message
   useEffect(() => {
@@ -33,8 +67,10 @@ export function BotChat() {
 
   // Auto-scroll to bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading]);
+    if (messageCount > 0 || isLoading) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messageCount, isLoading]);
 
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -69,6 +105,7 @@ export function BotChat() {
             id: crypto.randomUUID(),
             role: "bot",
             content: response.data.answer,
+            recommendations: response.data.recommendations ?? [],
           },
         ]);
       } else {
@@ -97,7 +134,7 @@ export function BotChat() {
           <div className="flex items-center justify-between border-b border-border bg-muted/30 px-5 py-4">
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 8V4H8" />
                   <rect width="16" height="12" x="4" y="8" rx="2" />
                   <path d="M2 14h2" />
@@ -115,8 +152,9 @@ export function BotChat() {
               onClick={() => setIsOpen(false)}
               className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted"
               aria-label="Close chat"
+              type="button"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M18 6 6 18" />
                 <path d="m6 6 12 12" />
               </svg>
@@ -137,7 +175,43 @@ export function BotChat() {
                       : "bg-background border border-border text-foreground rounded-bl-sm shadow-sm"
                   }`}
                 >
-                  {msg.content}
+                  <p className="whitespace-pre-line leading-7">{msg.content}</p>
+
+                  {msg.role === "bot" && msg.recommendations && msg.recommendations.length > 0 ? (
+                    <div className="mt-3 space-y-3">
+                      {msg.recommendations.map((recommendation) => (
+                        <Link
+                          key={recommendation.listing_id}
+                          className="block rounded-2xl border border-border bg-card px-3 py-3 text-foreground transition hover:border-primary/50 hover:shadow-sm"
+                          href={`/listings/${recommendation.slug}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-muted">
+                              {recommendation.primary_image_url ? (
+                                <Image
+                                  alt={recommendation.title}
+                                  fill
+                                  src={recommendation.primary_image_url}
+                                  className="object-cover"
+                                  unoptimized
+                                />
+                              ) : null}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="line-clamp-2 text-sm font-semibold text-foreground">{recommendation.title}</p>
+                              <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+                                {[recommendation.location_district, recommendation.location_city, recommendation.location_province].filter(Boolean).join(", ")}
+                              </p>
+                              <p className="mt-2 text-xs font-semibold text-foreground">
+                                {formatRecommendationPrice(recommendation.price, recommendation.currency)}
+                              </p>
+                              <span className="mt-2 inline-block text-[11px] font-semibold text-primary underline underline-offset-4">Lihat detail</span>
+                            </div>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -171,7 +245,7 @@ export function BotChat() {
                 disabled={!input.trim() || isLoading}
                 className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground transition-all disabled:opacity-50 hover:bg-primary/90"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m5 12 7-7 7 7" />
                   <path d="M12 19V5" />
                 </svg>
@@ -187,8 +261,9 @@ export function BotChat() {
           onClick={() => setIsOpen(true)}
           className="group flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95"
           aria-label="Open chatbot"
+          type="button"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="transition-transform group-hover:-translate-y-1">
+          <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="transition-transform group-hover:-translate-y-1">
             <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
             <path d="M8 12h.01" />
             <path d="M12 12h.01" />
