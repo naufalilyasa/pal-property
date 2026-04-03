@@ -50,6 +50,7 @@ func TestLoadConfigUsesDefaultChatModel(t *testing.T) {
 
 	require.NoError(t, LoadConfig())
 	require.Equal(t, "gemini-2.5-flash-lite", Env.ChatGeminiModel)
+	require.Equal(t, "gemini-embedding-001", Env.ChatEmbeddingModel)
 	require.Equal(t, 900, Env.ChatSessionTTLSeconds)
 	require.Equal(t, 10, Env.ChatMaxHistoryTurns)
 	require.Equal(t, 20, Env.ChatGeminiTimeoutSeconds)

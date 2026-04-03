@@ -38,6 +38,7 @@ type AppConfig struct {
 
 	ChatGeminiAPIKey         string `env:"CHAT_GEMINI_API_KEY" validate:"required"`
 	ChatGeminiModel          string `env:"CHAT_GEMINI_MODEL" envDefault:"gemini-2.5-flash-lite"`
+	ChatEmbeddingModel       string `env:"CHAT_EMBEDDING_MODEL" envDefault:"gemini-embedding-001"`
 	ChatSessionTTLSeconds    int    `env:"CHAT_SESSION_TTL_SECONDS" envDefault:"900" validate:"gte=60,lte=86400"`
 	ChatMaxHistoryTurns      int    `env:"CHAT_MAX_HISTORY_TURNS" envDefault:"10" validate:"gte=1,lte=100"`
 	ChatGeminiTimeoutSeconds int    `env:"CHAT_GEMINI_TIMEOUT_SECONDS" envDefault:"20" validate:"gte=1,lte=120"`
