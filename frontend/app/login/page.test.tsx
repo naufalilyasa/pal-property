@@ -1,7 +1,15 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { parseAuthIntentState } from "@/features/auth/auth-intent";
+
+vi.mock("@/features/listings/components/top-nav", () => ({
+  TopNav: () => <div data-testid="top-nav" />,
+}));
+
+vi.mock("@/features/listings/components/footer", () => ({
+  Footer: () => <div data-testid="footer" />,
+}));
 
 import LoginPage from "./page";
 

@@ -42,6 +42,14 @@ vi.mock("@/features/saved-listings/server/get-saved-listing-ids", () => ({
   getSavedListingIdsForListings: getSavedListingIdsForListingsMock,
 }));
 
+vi.mock("@/features/listings/components/top-nav", () => ({
+  TopNav: () => <div data-testid="top-nav" />,
+}));
+
+vi.mock("@/features/listings/components/footer", () => ({
+  Footer: () => <div data-testid="footer" />,
+}));
+
 vi.mock("@/features/saved-listings/components/save-listing-button", () => ({
   SaveListingButton: (props: { initialSaved: boolean; listingId: string; variant: string }) => {
     saveListingButtonMock(props);

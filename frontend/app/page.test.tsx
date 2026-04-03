@@ -1,5 +1,13 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/features/listings/components/top-nav", () => ({
+  TopNav: () => <div data-testid="top-nav" />,
+}));
+
+vi.mock("@/features/listings/components/footer", () => ({
+  Footer: () => <div data-testid="footer" />,
+}));
 
 import Home from "./page";
 
@@ -16,8 +24,9 @@ describe("Home", () => {
     expect(screen.getByText(/agen properti tepercaya/i)).toBeInTheDocument();
     expect(screen.getByText(/jual beli mudah/i)).toBeInTheDocument();
     expect(screen.getByText(/properti pilihan/i)).toBeInTheDocument();
+    expect(screen.getByTestId("top-nav")).toBeInTheDocument();
     expect(screen.getByTestId("home-shell")).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /cari properti/i })[0]).toHaveAttribute("href", "/listings");
-    expect(screen.getByRole("link", { name: /^login$/i })).toHaveAttribute("href", "/login");
+    expect(screen.getByTestId("footer")).toBeInTheDocument();
   });
 });

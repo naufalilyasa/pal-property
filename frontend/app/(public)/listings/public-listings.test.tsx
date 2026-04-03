@@ -25,6 +25,14 @@ vi.mock("@/features/listings/server/get-search-listings", () => ({
   getSearchListings: getSearchListingsMock,
 }));
 
+vi.mock("@/features/listings/components/top-nav", () => ({
+  TopNav: () => <div data-testid="top-nav" />,
+}));
+
+vi.mock("@/features/listings/components/footer", () => ({
+  Footer: () => <div data-testid="footer" />,
+}));
+
 vi.mock("@/features/listings/components/listing-filters", () => ({
   ListingFilters: () => <div data-testid="listing-filters" />,
 }));

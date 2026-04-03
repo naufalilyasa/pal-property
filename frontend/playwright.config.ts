@@ -15,7 +15,7 @@ export default defineConfig({
   webServer: {
     command:
       "NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:45731 API_BASE_URL=http://127.0.0.1:45731 npm run dev -- --hostname 127.0.0.1 --port 3100",
-    url: "http://127.0.0.1:3100",
+    url: "http://127.0.0.1:3100/favicon.ico",
     reuseExistingServer: true,
   },
   projects: [
