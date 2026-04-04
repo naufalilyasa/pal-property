@@ -2,16 +2,18 @@
 
 ## OVERVIEW
 
-Next.js 16 + React 19 + TypeScript App Router frontend. Current scope includes a seller workspace (`/dashboard`, `/dashboard/listings`, create/edit/image flows), a login entry route, and public listing browse/detail routes.
+Next.js 16 + React 19 + TypeScript App Router frontend. Current scope includes an admin dashboard workspace (`/dashboard`, `/dashboard/listings`, create/edit/image flows), login + seller-login entry routes, protected saved listings, public listing browse/detail routes, and a floating chat assistant.
 
 ## STRUCTURE
 
 ```text
 frontend/
 ├── app/
-│   ├── (dashboard)/dashboard/            # protected seller routes
+│   ├── (dashboard)/dashboard/            # admin dashboard routes
+│   ├── (protected)/saved-listings/       # protected saved-listings route
 │   ├── (public)/listings/                # public browse + detail routes
 │   ├── login/page.tsx                    # backend-owned Google OAuth entry
+│   ├── seller/login/page.tsx             # seller/admin intent login entry
 │   ├── layout.tsx                        # server root layout
 │   ├── providers.tsx                     # QueryClientProvider boundary
 │   ├── page.tsx                          # public home shell
@@ -20,8 +22,9 @@ frontend/
 │   ├── ui/                               # shadcn-style primitives only
 │   └── shared/                           # app header, sidebar, shared shells
 ├── features/
-│   ├── auth/server/                      # current-user + require-user helpers
+│   ├── auth/                             # auth intent, entry shell, current-user helpers
 │   ├── categories/server/                # public category reads
+│   ├── chat/                             # floating assistant UI
 │   └── listings/                         # server reads, forms, images, widgets
 ├── lib/
 │   ├── api/                              # envelope, browser/server fetch helpers
@@ -38,10 +41,13 @@ frontend/
 ## CURRENT REALITY
 
 - Backend cookie auth is authoritative; frontend never owns canonical session state.
-- Seller routes are gated server-side via `/auth/me` and redirect to `/login` when unauthenticated.
+- Dashboard routes are gated server-side via `/auth/me`; only admins may stay in `/dashboard`.
+- Protected saved listings combine SSR reads with client save/remove toggles.
 - Public listing browse now fetches server-side from `/api/search/listings`; listing detail still uses the slug-based backend listing read path.
 - Listing create/edit uses RHF + Zod and backend-aligned payload shaping.
 - Listing image actions upload through backend endpoints and rehydrate from backend responses.
+- The root layout mounts the floating `BotChat` client widget while keeping page/layout data server-first.
+- Playwright specs run against a local mock backend origin; e2e helpers assume that pattern.
 
 ## CONVENTIONS
 
