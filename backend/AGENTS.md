@@ -10,7 +10,9 @@ Go 1.26 REST API. Fiber v3 + GORM + PostgreSQL + Redis with strict layering. Lis
 backend/
 ├── cmd/
 │   ├── property-service/main.go   # DI wiring + server start
-│   └── migrate/main.go            # golang-migrate runner
+│   ├── listing-indexer/main.go    # search worker + rebuild/rebuild-chat CLI
+│   ├── migrate/main.go            # golang-migrate runner
+│   └── seed-demo-listings/main.go # demo data + index rebuild helper
 ├── internal/                      # See internal/AGENTS.md
 ├── pkg/                           # See pkg/AGENTS.md
 ├── db/migrations/                 # SQL files: NNNNNN_desc.{up,down}.sql
@@ -57,15 +59,19 @@ listingHandler := http.NewListingHandler(listingSvc)
 **Search indexing behavior**:
 - Listing/category write paths enqueue search index jobs and keep request semantics best-effort with warning logs on indexing handoff failures.
 - `cmd/listing-indexer` now processes DB-backed outbox jobs by default and can fully recreate the index in `rebuild` mode.
-- The future public search-read proposal currently lives in `backend/search-read-contract.md`.
+- `cmd/listing-indexer rebuild-chat` rebuilds the chat retrieval index with Gemini embeddings and authenticated Elasticsearch access.
 
 ## CURRENT FEATURE AREAS
 
 - Auth + refresh rotation
 - Casbin-backed RBAC + owner-aware listing authorization
+- Region/wilayah-backed location APIs + listing fields
 - Category CRUD
 - Listing CRUD + read filters
 - Listing image upload/delete/set-primary/reorder
+- Saved listings
+- Public search read path + listing detail enrichments
+- Chat orchestration + retrieval-backed recommendations
 
 ## ANTI-PATTERNS
 
