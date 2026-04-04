@@ -118,8 +118,13 @@ This repository is organized as a practical production-oriented stack:
 - native Gemini Go SDK integration
 - Redis session memory foundation
 - dedicated chat retrieval index foundation
+- cards-first responses remain the CTA even when markdown rendering is disabled.
+- richer chat behavior ships on the same `CHAT_GEMINI_MODEL` and `CHAT_EMBEDDING_MODEL` values already documented; no new model or embedding-dimension change is required.
+- the rollout depends only on the existing `CHAT_*` environment flags, so no additional env variables were introduced for the richer experience.
 
-> The chatbot layer currently exists as a backend foundation and integration surface. A production chat UI can be built on top of it later.
+After any chat retrieval or index projector change, run `listing-indexer rebuild-chat` from the production stack so the Elasticsearch data, Gemini embeddings, and retrieval projector stay aligned with the new code. Without that step the updated retrieval logic will be masked by the stale index snapshot.
+
+> The chatbot layer now powers a richer, cards-first experience that can render recommendations with optional markdown. The backend still exposes the same API surface while the cards remain the primary CTA even if markdown is disabled.
 
 ---
 
@@ -146,7 +151,6 @@ pal-property/
 │   ├── e2e/
 │   ├── features/
 │   └── lib/
-├── deploy/
 ├── docker-compose.yml
 └── docker-compose.prod.yml
 ```
@@ -207,6 +211,7 @@ This starts:
 - listing-indexer
 
 > Note: local PostgreSQL is exposed on host port `5433`.
+> Note: when speaking to infrastructure from the host you reach `postgres` on `localhost:5433`, `redis` on `localhost:6379`, and `elasticsearch` on `localhost:9200`. When services run inside the Docker network use the service hostnames `postgres`, `redis`, and `elasticsearch` on their container ports (5432, 6379, 9200). Keep the right endpoints straight when running migrations, chat rebuilds, or other automation so you do not mix host- and container-level addresses.
 
 ## 2. Backend
 
@@ -260,6 +265,7 @@ Key areas:
 - JWT keys
 - Cloudinary
 - chat/RAG settings
+- All of the richer chat rollout configuration lives under the existing `CHAT_*` entries above; no new environment flags or embedding-dimension knobs are required.
 
 ### Frontend
 Use:
@@ -285,7 +291,6 @@ Recommended production split for a small VPS:
   - PostgreSQL
   - Redis
   - Elasticsearch
-  - Caddy
 
 Included production assets:
 
@@ -293,7 +298,8 @@ Included production assets:
 - `docker-compose.prod.yml`
 - `backend/.env.production.example`
 - `frontend/.env.production.example`
-- `deploy/Caddyfile`
+
+> TLS or reverse-proxy configuration (Caddy, Nginx, etc.) stays outside this repo; bring your own edge configuration when exposing the stack.
 
 This hybrid deployment is recommended for small VPS instances because Elasticsearch is the heaviest service in the stack, while Next.js frontend hosting is much easier to operate on Vercel.
 
@@ -309,6 +315,20 @@ Recommended follow-up:
 docker compose -f docker-compose.prod.yml --env-file backend/.env.production run --rm listing-indexer rebuild
 docker compose -f docker-compose.prod.yml --env-file backend/.env.production run --rm listing-indexer rebuild-chat
 ```
+
+## Chat Rollout & Recovery
+
+The richer chat experience relies on the existing retrieval index and cards-first UI surface. Rollout guidance:
+
+- Run `docker compose -f docker-compose.prod.yml --env-file backend/.env.production run --rm listing-indexer rebuild-chat` whenever you change chat retrieval logic, index projectors, or the embeddings that populate the chat index. This step is mandatory because a code change without rebuilding the chat index leaves the new retrieval data out of sync.
+- The behavior uses the documented `CHAT_GEMINI_MODEL` and `CHAT_EMBEDDING_MODEL` values, so there is no new model, embedding dimension, or additional `CHAT_*` flag to land the richer experience.
+- Recommendation cards stay the primary CTA; markdown rendering is optional, which means you can disable markdown if formatting issues arise without losing the cards. Keep the backend `answer_format` set to `text` as the safe fallback whenever markdown is off.
+
+Rollback guidance:
+
+- Deploy the prior release or revert your artifacts to remove the new chat logic.
+- Rerun `listing-indexer rebuild-chat` with the matching production env so the retrieval index matches the rolled-back code.
+- Disable markdown rendering while leaving the card data path intact so the cards-first chat can continue but the markdown layer stays out of the critical path.
 
 ---
 
