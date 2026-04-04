@@ -3,6 +3,8 @@ package search
 import (
 	"context"
 	"fmt"
+	"strings"
+	"unicode"
 
 	"github.com/google/uuid"
 	"github.com/naufalilyasa/pal-property-backend/internal/domain"
@@ -109,13 +111,17 @@ func buildChatRetrievalQuery(filters domain.ChatRetrievalFilters, queryVector []
 	}
 
 	if filters.Query != "" {
-		body["query"].(map[string]any)["bool"].(map[string]any)["must"] = []any{
+		boolQuery := body["query"].(map[string]any)["bool"].(map[string]any)
+		boolQuery["must"] = []any{
 			map[string]any{
 				"multi_match": map[string]any{
 					"query":  filters.Query,
-					"fields": []string{"title^4", "description_excerpt", "location_city", "location_province", "category.name"},
+					"fields": []string{"title^4", "lexical_search_text^3", "lexical_text^2", "description_excerpt^2", "location_province", "location_city", "category.name", "category.slug"},
 				},
 			},
+		}
+		if shouldClauses := buildChatRetrievalExactShouldClauses(filters.Query); len(shouldClauses) > 0 {
+			boolQuery["should"] = shouldClauses
 		}
 	}
 
@@ -137,4 +143,70 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func buildChatRetrievalExactShouldClauses(query string) []any {
+	trimmedQuery := strings.TrimSpace(query)
+	normalizedQuery := normalizeChatRetrievalQueryText(query)
+	if trimmedQuery == "" || normalizedQuery == "" {
+		return nil
+	}
+
+	querySlug := strings.ReplaceAll(normalizedQuery, " ", "-")
+	shouldClauses := []any{
+		map[string]any{
+			"match_phrase": map[string]any{
+				"title": map[string]any{
+					"query": trimmedQuery,
+					"boost": 20,
+				},
+			},
+		},
+		buildCaseInsensitiveTermQuery("category.name", trimmedQuery, 14),
+		buildCaseInsensitiveTermQuery("location_city", trimmedQuery, 12),
+		buildCaseInsensitiveTermQuery("location_province", trimmedQuery, 10),
+	}
+	if querySlug != "" {
+		shouldClauses = append(shouldClauses,
+			buildCaseInsensitiveTermQuery("slug", querySlug, 24),
+			buildCaseInsensitiveTermQuery("category.slug", querySlug, 16),
+		)
+	}
+
+	return shouldClauses
+}
+
+func buildCaseInsensitiveTermQuery(field string, value string, boost float64) map[string]any {
+	return map[string]any{
+		"term": map[string]any{
+			field: map[string]any{
+				"value":            value,
+				"boost":            boost,
+				"case_insensitive": true,
+			},
+		},
+	}
+}
+
+func normalizeChatRetrievalQueryText(input string) string {
+	input = strings.TrimSpace(strings.ToLower(input))
+	if input == "" {
+		return ""
+	}
+
+	var builder strings.Builder
+	lastWasSpace := true
+	for _, r := range input {
+		if unicode.IsLetter(r) || unicode.IsNumber(r) {
+			builder.WriteRune(r)
+			lastWasSpace = false
+			continue
+		}
+		if !lastWasSpace {
+			builder.WriteRune(' ')
+			lastWasSpace = true
+		}
+	}
+
+	return strings.Join(strings.Fields(builder.String()), " ")
 }

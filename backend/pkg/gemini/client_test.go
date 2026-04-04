@@ -84,6 +84,90 @@ func TestGenerateGroundedAnswerRejectsUnsafeHook(t *testing.T) {
 	require.Zero(t, fake.generateCalls)
 }
 
+func TestBuildGenerateConfigUsesMinaSingleResultRules(t *testing.T) {
+	config := buildGenerateConfig(GroundedAnswerRequest{
+		Documents: []GroundingDocument{{Title: "Rumah Keluarga", Source: "rumah-keluarga"}},
+	})
+
+	require.NotNil(t, config.SystemInstruction)
+	instruction := flattenContent(config.SystemInstruction)
+	lowerInstruction := strings.ToLower(instruction)
+	require.Contains(t, instruction, "Mina")
+	require.Contains(t, instruction, "single-result detail")
+	require.Contains(t, lowerInstruction, "jangan mengarang harga")
+	require.Contains(t, instruction, "raw ID")
+	require.Contains(t, instruction, "[Nama Properti](/listings/<slug>)")
+	require.Contains(t, instruction, "p, br, h3, h4, strong, em, ul, ol, li, a")
+	require.Contains(t, instruction, "survey/kunjungan")
+	require.NotContains(t, instruction, "multi-result comparison")
+}
+
+func TestBuildGenerateConfigUsesMinaMultiResultRules(t *testing.T) {
+	config := buildGenerateConfig(GroundedAnswerRequest{
+		Documents: []GroundingDocument{{Title: "Rumah A", Source: "rumah-a"}, {Title: "Rumah B", Source: "rumah-b"}},
+	})
+
+	require.NotNil(t, config.SystemInstruction)
+	instruction := flattenContent(config.SystemInstruction)
+	lowerInstruction := strings.ToLower(instruction)
+	require.Contains(t, instruction, "Mina")
+	require.Contains(t, instruction, "multi-result comparison")
+	require.Contains(t, lowerInstruction, "perbandingan singkat")
+	require.Contains(t, lowerInstruction, "pertanyaan follow-up singkat")
+	require.Contains(t, lowerInstruction, "tautan relatif")
+	require.NotContains(t, instruction, "single-result detail")
+}
+
+func TestBuildDocumentSummaryFormatsPublicSafeGroundingContext(t *testing.T) {
+	province := "Jawa Barat"
+	city := "Bogor"
+	district := "Bogor Barat"
+	village := "Menteng"
+	bedrooms := 3
+	bathrooms := 2
+	landArea := 120
+	buildingArea := 90
+
+	summary := buildDocumentSummary([]GroundingDocument{{
+		ID:               "11111111-1111-1111-1111-111111111111",
+		Title:            "Rumah Keluarga Bogor",
+		Source:           "rumah-keluarga-bogor",
+		Excerpt:          "Dekat sekolah dan akses tol.",
+		Category:         "Rumah",
+		TransactionType:  "sale",
+		Price:            1500000000,
+		Currency:         "IDR",
+		LocationProvince: &province,
+		LocationCity:     &city,
+		LocationDistrict: &district,
+		LocationVillage:  &village,
+		BedroomCount:     &bedrooms,
+		BathroomCount:    &bathrooms,
+		LandAreaSqm:      &landArea,
+		BuildingAreaSqm:  &buildingArea,
+	}, {
+		ID:      "22222222-2222-2222-2222-222222222222",
+		Title:   "Cluster Sentul",
+		Source:  "cluster-sentul",
+		Excerpt: "Cocok untuk keluarga muda.",
+	}})
+
+	require.Contains(t, summary, "Jumlah properti kandidat: 2")
+	require.Contains(t, summary, "Mode jawaban Mina: comparison-style singkat untuk beberapa properti")
+	require.Contains(t, summary, "Link listing: /listings/rumah-keluarga-bogor")
+	require.Contains(t, summary, "Link listing: /listings/cluster-sentul")
+	require.Contains(t, summary, "Kategori: Rumah")
+	require.Contains(t, summary, "Harga: Rp 1.500.000.000")
+	require.Contains(t, summary, "Lokasi: Menteng, Bogor Barat, Bogor, Jawa Barat")
+	require.Contains(t, summary, "Kamar tidur: 3")
+	require.Contains(t, summary, "Kamar mandi: 2")
+	require.Contains(t, summary, "Luas tanah: 120 m²")
+	require.Contains(t, summary, "Luas bangunan: 90 m²")
+	require.Contains(t, summary, "Deskripsi singkat: Dekat sekolah dan akses tol.")
+	require.NotContains(t, summary, "11111111-1111-1111-1111-111111111111")
+	require.NotContains(t, summary, "Slug:")
+}
+
 type fakeModelsAPI struct {
 	embedCall            int
 	lastEmbedModel       string

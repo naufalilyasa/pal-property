@@ -27,7 +27,7 @@ func (f *fakeChatService) Respond(_ context.Context, req requestdto.ChatRequest)
 }
 
 func TestChatHandler_CreateMessage_Success(t *testing.T) {
-	fake := &fakeChatService{res: &responsedto.ChatResponse{SessionID: "ses-1", Answer: "Ada satu rumah aktif.", Grounding: responsedto.ChatGrounding{ListingSlugs: []string{"rumah-aktif"}}}}
+	fake := &fakeChatService{res: &responsedto.ChatResponse{SessionID: "ses-1", Answer: "Ada satu rumah aktif.", AnswerFormat: responsedto.ChatAnswerFormatText, Grounding: responsedto.ChatGrounding{ListingSlugs: []string{"rumah-aktif"}}}}
 	app := fiber.New()
 	app.Post("/api/chat/messages", handler.NewChatHandler(fake).CreateMessage)
 

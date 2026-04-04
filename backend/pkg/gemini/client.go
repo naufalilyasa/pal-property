@@ -19,7 +19,7 @@ const (
 	defaultRetryAttempts     = 2
 	defaultMaxOutputTokens   = 512
 	defaultTemperature       = 0.2
-	defaultSystemInstruction = "You are PAL Property's Indonesian customer-service assistant. Answer naturally, warmly, and clearly like a helpful real-estate CS agent. Use only the provided property context, never mention internal document processing, never say 'berdasarkan dokumen', and do not expose raw IDs unless the user explicitly asks. If recommendations exist, summarize the best matches conversationally and let the UI handle property cards/links."
+	defaultSystemInstruction = "Kamu adalah Mina, customer-service PAL Property yang ramah, hangat, dan sigap untuk membantu pencari properti di Indonesia. Gunakan hanya fakta yang benar-benar ada di konteks properti yang diberikan. Jangan mengarang harga, spesifikasi, lokasi, fasilitas, status, atau detail lain yang tidak tertulis jelas. Jika ada informasi yang tidak tersedia, katakan dengan sopan bahwa detail tersebut belum tersedia di data properti Mina. Jangan pernah memakai frasa internal seperti 'berdasarkan dokumen', 'berdasarkan data internal', 'hasil retrieval', 'konteks yang diberikan', atau kalimat sejenis. Jangan tampilkan raw ID, UUID, nama field internal, skor ranking, atau metadata sistem. Jika menyebut tautan, gunakan hanya tautan relatif untuk listing yang memang ada di konteks, dengan format markdown [Nama Properti](/listings/<slug>). Jangan membuat tautan eksternal, tautan absolut, atau tautan ke halaman lain. Jika memakai markdown, batasi hanya ke markdown sederhana yang dirender ke subset aman berikut: p, br, h3, h4, strong, em, ul, ol, li, a. Jangan tulis HTML mentah, tabel, blockquote, code fence, atau gambar."
 )
 
 // EmbeddingTask differentiates between query and document workloads.
@@ -175,10 +175,22 @@ func NewClientFromConfig(ctx context.Context, opts ...Option) (*Client, error) {
 
 // GroundingDocument represents a source that can be cited in responses.
 type GroundingDocument struct {
-	ID      string
-	Title   string
-	Source  string
-	Excerpt string
+	ID               string
+	Title            string
+	Source           string
+	Excerpt          string
+	Category         string
+	TransactionType  string
+	Price            int64
+	Currency         string
+	LocationProvince *string
+	LocationCity     *string
+	LocationDistrict *string
+	LocationVillage  *string
+	BedroomCount     *int
+	BathroomCount    *int
+	LandAreaSqm      *int
+	BuildingAreaSqm  *int
 }
 
 // GroundedAnswerRequest contains a user question plus documents for grounding.
@@ -313,17 +325,23 @@ func buildGroundedContents(req GroundedAnswerRequest) []*genai.Content {
 	if summary != "" {
 		contents = append(contents, genai.NewContentFromText(summary, genai.RoleUser))
 	}
-	question := fmt.Sprintf("Question: %s", strings.TrimSpace(req.Question))
+	question := fmt.Sprintf("Pertanyaan pengguna: %s", strings.TrimSpace(req.Question))
 	contents = append(contents, genai.NewContentFromText(question, genai.RoleUser))
 	return contents
 }
 
 func buildDocumentSummary(docs []GroundingDocument) string {
 	if len(docs) == 0 {
-		return "Konteks properti: tidak ada data properti yang cocok untuk pertanyaan ini."
+		return "Konteks properti Mina:\nJumlah properti kandidat: 0\nMode jawaban Mina: jelaskan dengan sopan bahwa belum ada properti aktif yang cocok, jangan mengarang fakta, harga, spesifikasi, atau tautan."
 	}
 	var sb strings.Builder
-	sb.WriteString("Ringkasan properti kandidat:\n")
+	sb.WriteString("Konteks properti Mina:\n")
+	sb.WriteString(fmt.Sprintf("Jumlah properti kandidat: %d\n", len(docs)))
+	if len(docs) == 1 {
+		sb.WriteString("Mode jawaban Mina: detail-style singkat untuk satu properti. Soroti keunggulan utama, jawab singkat, lalu tutup dengan tawaran survey atau kunjungan.\n\n")
+	} else {
+		sb.WriteString("Mode jawaban Mina: comparison-style singkat untuk beberapa properti. Bandingkan pembeda utama, jangan bahas semua properti terlalu panjang, lalu tutup dengan satu pertanyaan follow-up singkat.\n\n")
+	}
 	for idx, doc := range docs {
 		if idx > 0 {
 			sb.WriteString("\n")
@@ -333,8 +351,32 @@ func buildDocumentSummary(docs []GroundingDocument) string {
 			sb.WriteString(fmt.Sprintf(" - %s", doc.Title))
 		}
 		sb.WriteString("\n")
-		if doc.Source != "" {
-			sb.WriteString(fmt.Sprintf("Slug: %s\n", doc.Source))
+		if link := buildListingPath(doc.Source); link != "" {
+			sb.WriteString(fmt.Sprintf("Link listing: %s\n", link))
+		}
+		if doc.TransactionType != "" {
+			sb.WriteString(fmt.Sprintf("Jenis transaksi: %s\n", doc.TransactionType))
+		}
+		if doc.Category != "" {
+			sb.WriteString(fmt.Sprintf("Kategori: %s\n", doc.Category))
+		}
+		if price := formatListingPrice(doc.Price, doc.Currency); price != "" {
+			sb.WriteString(fmt.Sprintf("Harga: %s\n", price))
+		}
+		if location := formatListingLocation(doc); location != "" {
+			sb.WriteString(fmt.Sprintf("Lokasi: %s\n", location))
+		}
+		if doc.BedroomCount != nil {
+			sb.WriteString(fmt.Sprintf("Kamar tidur: %d\n", *doc.BedroomCount))
+		}
+		if doc.BathroomCount != nil {
+			sb.WriteString(fmt.Sprintf("Kamar mandi: %d\n", *doc.BathroomCount))
+		}
+		if doc.LandAreaSqm != nil {
+			sb.WriteString(fmt.Sprintf("Luas tanah: %d m²\n", *doc.LandAreaSqm))
+		}
+		if doc.BuildingAreaSqm != nil {
+			sb.WriteString(fmt.Sprintf("Luas bangunan: %d m²\n", *doc.BuildingAreaSqm))
 		}
 		if doc.Excerpt != "" {
 			sb.WriteString(fmt.Sprintf("Deskripsi singkat: %s\n", doc.Excerpt))
@@ -347,7 +389,7 @@ func buildGenerateConfig(req GroundedAnswerRequest) *genai.GenerateContentConfig
 	cfg := &genai.GenerateContentConfig{
 		CandidateCount:    1,
 		MaxOutputTokens:   defaultMaxOutputTokens,
-		SystemInstruction: genai.NewContentFromText(defaultSystemInstruction, genai.RoleModel),
+		SystemInstruction: genai.NewContentFromText(buildSystemInstruction(req), genai.RoleModel),
 	}
 	if req.CandidateCount > 0 {
 		cfg.CandidateCount = req.CandidateCount
@@ -364,6 +406,67 @@ func buildGenerateConfig(req GroundedAnswerRequest) *genai.GenerateContentConfig
 		cfg.StopSequences = req.StopSequences
 	}
 	return cfg
+}
+
+func buildSystemInstruction(req GroundedAnswerRequest) string {
+	var sb strings.Builder
+	sb.WriteString(defaultSystemInstruction)
+	sb.WriteString("\n\n")
+	if len(req.Documents) <= 1 {
+		sb.WriteString("Mode jawaban saat ini: single-result detail. Untuk satu properti, buka dengan highlight paling relevan, jelaskan 2-4 poin penting yang benar-benar ada di konteks, tetap ringkas, dan tutup dengan ajakan survey/kunjungan atau tawaran bantu detail lanjutan.")
+	} else {
+		sb.WriteString("Mode jawaban saat ini: multi-result comparison. Untuk beberapa properti, fokus pada perbandingan singkat antar kandidat terbaik, tonjolkan pembeda penting seperti harga, lokasi, kategori, atau ukuran bila tersedia, gunakan struktur ringkas yang mudah dipindai, dan tutup dengan satu pertanyaan follow-up singkat agar user bisa mempersempit pilihan.")
+	}
+	sb.WriteString(" Jangan menyebut bahwa jawaban ini dibuat dari dokumen, ringkasan, atau sistem grounding.")
+	return strings.TrimSpace(sb.String())
+}
+
+func buildListingPath(slug string) string {
+	trimmed := strings.Trim(strings.TrimSpace(slug), "/")
+	if trimmed == "" {
+		return ""
+	}
+	return "/listings/" + trimmed
+}
+
+func formatListingLocation(doc GroundingDocument) string {
+	parts := make([]string, 0, 4)
+	for _, value := range []*string{doc.LocationVillage, doc.LocationDistrict, doc.LocationCity, doc.LocationProvince} {
+		if value == nil {
+			continue
+		}
+		if trimmed := strings.TrimSpace(*value); trimmed != "" {
+			parts = append(parts, trimmed)
+		}
+	}
+	return strings.Join(parts, ", ")
+}
+
+func formatListingPrice(price int64, currency string) string {
+	if price <= 0 {
+		return ""
+	}
+	prefix := strings.ToUpper(strings.TrimSpace(currency))
+	if prefix == "" || prefix == "IDR" {
+		prefix = "Rp"
+	}
+	return fmt.Sprintf("%s %s", prefix, formatThousands(price))
+}
+
+func formatThousands(value int64) string {
+	raw := fmt.Sprintf("%d", value)
+	if len(raw) <= 3 {
+		return raw
+	}
+	var parts []string
+	for len(raw) > 3 {
+		parts = append([]string{raw[len(raw)-3:]}, parts...)
+		raw = raw[:len(raw)-3]
+	}
+	if raw != "" {
+		parts = append([]string{raw}, parts...)
+	}
+	return strings.Join(parts, ".")
 }
 
 func float32Ptr(v float32) *float32 {
