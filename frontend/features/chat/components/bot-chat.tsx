@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
 import { browserFetch } from "@/lib/api/browser-fetch";
 
 type Recommendation = {
@@ -26,7 +27,43 @@ type Message = {
   id: string;
   role: "user" | "bot";
   content: string;
+  answer_format?: "text" | "markdown";
   recommendations?: Recommendation[];
+};
+
+type ChatMessageResponse = {
+  answer: string;
+  answer_format?: "text" | "markdown";
+  recommendations?: Recommendation[];
+};
+
+const ALLOWED_MARKDOWN_ELEMENTS = ["p", "br", "h3", "h4", "strong", "em", "ul", "ol", "li", "a"] as const;
+const SAFE_LISTING_HREF_PATTERN = /^\/listings\/[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+function isSafeListingHref(href?: string): href is `/listings/${string}` {
+  return typeof href === "string" && SAFE_LISTING_HREF_PATTERN.test(href);
+}
+
+const markdownComponents: Components = {
+  p: ({ node: _node, ...props }) => <p className="leading-7 [&:not(:first-child)]:mt-3" {...props} />,
+  h3: ({ node: _node, ...props }) => <h3 className="mt-4 text-sm font-semibold tracking-[0.02em] text-foreground" {...props} />,
+  h4: ({ node: _node, ...props }) => <h4 className="mt-4 text-sm font-semibold text-foreground/90" {...props} />,
+  strong: ({ node: _node, ...props }) => <strong className="font-semibold text-foreground" {...props} />,
+  em: ({ node: _node, ...props }) => <em className="italic" {...props} />,
+  ul: ({ node: _node, ...props }) => <ul className="mt-3 list-disc space-y-1.5 pl-5" {...props} />,
+  ol: ({ node: _node, ...props }) => <ol className="mt-3 list-decimal space-y-1.5 pl-5" {...props} />,
+  li: ({ node: _node, ...props }) => <li className="pl-1 leading-7" {...props} />,
+  a: ({ node: _node, href, children, ...props }) => {
+    if (!isSafeListingHref(href)) {
+      return <span className="font-semibold text-foreground">{children}</span>;
+    }
+
+    return (
+      <Link className="font-semibold text-primary underline decoration-primary/50 underline-offset-4 transition-colors hover:text-primary/80" href={href} {...props}>
+        {children}
+      </Link>
+    );
+  },
 };
 
 function formatRecommendationPrice(price: number, currency: string) {
@@ -87,7 +124,7 @@ export function BotChat() {
     setIsLoading(true);
 
     try {
-      const response = await browserFetch<any>("/api/chat/messages", {
+      const response = await browserFetch<ChatMessageResponse>("/api/chat/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -105,6 +142,7 @@ export function BotChat() {
             id: crypto.randomUUID(),
             role: "bot",
             content: response.data.answer,
+            answer_format: response.data.answer_format === "markdown" ? "markdown" : "text",
             recommendations: response.data.recommendations ?? [],
           },
         ]);
@@ -175,10 +213,23 @@ export function BotChat() {
                       : "bg-background border border-border text-foreground rounded-bl-sm shadow-sm"
                   }`}
                 >
-                  <p className="whitespace-pre-line leading-7">{msg.content}</p>
+                  {msg.role === "bot" && msg.answer_format === "markdown" ? (
+                    <div className="space-y-0 text-sm text-foreground">
+                      <ReactMarkdown
+                        allowedElements={[...ALLOWED_MARKDOWN_ELEMENTS]}
+                        components={markdownComponents}
+                        skipHtml
+                        unwrapDisallowed
+                      >
+                        {msg.content}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    <p className="whitespace-pre-line leading-7">{msg.content}</p>
+                  )}
 
                   {msg.role === "bot" && msg.recommendations && msg.recommendations.length > 0 ? (
-                    <div className="mt-3 space-y-3">
+                    <div className="mt-4 space-y-3 border-t border-border/70 pt-3">
                       {msg.recommendations.map((recommendation) => (
                         <Link
                           key={recommendation.listing_id}
