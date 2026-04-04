@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/naufalilyasa/pal-property-backend/internal/domain"
@@ -73,10 +74,22 @@ func (s *chatService) Respond(ctx context.Context, req requestdto.ChatRequest) (
 			continue
 		}
 		groundedDocs = append(groundedDocs, gemini.GroundingDocument{
-			ID:      document.ListingID.String(),
-			Title:   document.Title,
-			Source:  document.Slug,
-			Excerpt: document.DescriptionExcerpt,
+			ID:               document.ListingID.String(),
+			Title:            document.Title,
+			Source:           document.Slug,
+			Excerpt:          document.DescriptionExcerpt,
+			Category:         buildChatGroundingCategory(document.Category),
+			TransactionType:  document.TransactionType,
+			Price:            document.Price,
+			Currency:         document.Currency,
+			LocationProvince: document.LocationProvince,
+			LocationCity:     document.LocationCity,
+			LocationDistrict: document.LocationDistrict,
+			LocationVillage:  document.LocationVillage,
+			BedroomCount:     document.BedroomCount,
+			BathroomCount:    document.BathroomCount,
+			LandAreaSqm:      document.LandAreaSqm,
+			BuildingAreaSqm:  document.BuildingAreaSqm,
 		})
 	}
 
@@ -94,11 +107,19 @@ func (s *chatService) Respond(ctx context.Context, req requestdto.ChatRequest) (
 		return response, nil
 	}
 
+	recommendations := toChatRecommendations(retrievalResult.Documents)
+	allowedSlugs := buildAllowedListingSlugs(recommendations)
+	sanitizedAnswer, hasValidMarkdownLinks := sanitizeChatAnswer(modelResponse.Answer, allowedSlugs)
+	answerFormat := responsedto.ChatAnswerFormatText
+	if hasValidMarkdownLinks {
+		answerFormat = responsedto.ChatAnswerFormatMarkdown
+	}
 	response := &responsedto.ChatResponse{
 		SessionID:       req.SessionID,
-		Answer:          modelResponse.Answer,
+		Answer:          sanitizedAnswer,
+		AnswerFormat:    answerFormat,
 		Grounding:       retrievalResult.Grounding,
-		Recommendations: toChatRecommendations(retrievalResult.Documents),
+		Recommendations: recommendations,
 	}
 	if memoryIssue != "" {
 		response.Grounding.IsDegraded = true
@@ -137,8 +158,9 @@ func (s *chatService) loadRecentTurns(ctx context.Context, sessionID string) ([]
 
 func degradedChatResponse(sessionID, answer, reason string) *responsedto.ChatResponse {
 	return &responsedto.ChatResponse{
-		SessionID: sessionID,
-		Answer:    answer,
+		SessionID:    sessionID,
+		Answer:       answer,
+		AnswerFormat: responsedto.ChatAnswerFormatText,
 		Grounding: responsedto.ChatGrounding{
 			IsDegraded:     true,
 			DegradedReason: reason,
@@ -162,4 +184,131 @@ func buildGroundedQuestion(turns []domain.ChatTurn, message string) string {
 func appendConversation(ctx context.Context, memory domain.ChatMemoryRepository, sessionID, question, answer string) {
 	_ = memory.AppendTurn(ctx, sessionID, domain.ChatTurn{Role: "user", Message: question})
 	_ = memory.AppendTurn(ctx, sessionID, domain.ChatTurn{Role: "assistant", Message: answer})
+}
+
+func buildChatGroundingCategory(category *domain.ChatDocumentCategory) string {
+	if category == nil {
+		return ""
+	}
+	name := strings.TrimSpace(category.Name)
+	slug := strings.TrimSpace(category.Slug)
+	switch {
+	case name != "" && slug != "":
+		return fmt.Sprintf("%s (%s)", name, slug)
+	case name != "":
+		return name
+	default:
+		return slug
+	}
+}
+
+var markdownLinkRegex = regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
+var markdownHeadingRegex = regexp.MustCompile(`(?m)^\s*#{3,4}\s+\S`)
+var markdownListRegex = regexp.MustCompile(`(?m)^\s*(?:[-+*]|\d+\.)\s+\S`)
+var markdownEmphasisRegex = regexp.MustCompile(`(?m)(?:\*\*[^\n*]+\*\*|\*[^\n*]+\*|__[^\n_]+__|_[^\n_]+_)`)
+
+func buildAllowedListingSlugs(recommendations []responsedto.ChatRetrievalDocumentResponse) map[string]struct{} {
+	if len(recommendations) == 0 {
+		return nil
+	}
+	slugs := make(map[string]struct{}, len(recommendations))
+	for _, rec := range recommendations {
+		if slug := strings.TrimSpace(rec.Slug); slug != "" {
+			slugs[slug] = struct{}{}
+		}
+	}
+	return slugs
+}
+
+func sanitizeChatAnswer(answer string, allowedSlugs map[string]struct{}) (string, bool) {
+	if answer == "" {
+		return answer, false
+	}
+	answer = sanitizeUnsupportedMarkdownHeadings(answer)
+	matches := markdownLinkRegex.FindAllStringSubmatchIndex(answer, -1)
+	if len(matches) == 0 {
+		return answer, containsMarkdownStructure(answer)
+	}
+	var builder strings.Builder
+	lastIndex := 0
+	validLinkFound := false
+	for _, match := range matches {
+		builder.WriteString(answer[lastIndex:match[0]])
+		text := answer[match[2]:match[3]]
+		url := answer[match[4]:match[5]]
+		if isAllowedListingLink(url, allowedSlugs) {
+			builder.WriteString(answer[match[0]:match[1]])
+			validLinkFound = true
+		} else {
+			builder.WriteString(text)
+		}
+		lastIndex = match[1]
+	}
+	builder.WriteString(answer[lastIndex:])
+	sanitized := builder.String()
+	return sanitized, validLinkFound || containsMarkdownStructure(sanitized)
+}
+
+func containsMarkdownStructure(answer string) bool {
+	if strings.TrimSpace(answer) == "" {
+		return false
+	}
+	if markdownHeadingRegex.MatchString(answer) {
+		return true
+	}
+	if markdownListRegex.MatchString(answer) {
+		return true
+	}
+	if markdownEmphasisRegex.MatchString(answer) {
+		return true
+	}
+	return false
+}
+
+func sanitizeUnsupportedMarkdownHeadings(answer string) string {
+	if answer == "" {
+		return answer
+	}
+	parts := strings.Split(answer, "\n")
+	var builder strings.Builder
+	for i, part := range parts {
+		if i > 0 {
+			builder.WriteByte('\n')
+		}
+		builder.WriteString(sanitizeUnsupportedHeadingLine(part))
+	}
+	return builder.String()
+}
+
+func sanitizeUnsupportedHeadingLine(line string) string {
+	trimmed := strings.TrimLeft(line, " \t")
+	if trimmed == "" || trimmed[0] != '#' {
+		return line
+	}
+	leading := line[:len(line)-len(trimmed)]
+	count := 0
+	for count < len(trimmed) && trimmed[count] == '#' {
+		count++
+	}
+	if count != 1 && count != 2 && count != 5 && count != 6 {
+		return line
+	}
+	rest := strings.TrimLeft(trimmed[count:], " \t")
+	return leading + rest
+}
+
+func isAllowedListingLink(url string, allowedSlugs map[string]struct{}) bool {
+	if !strings.HasPrefix(url, "/listings/") {
+		return false
+	}
+	slug := strings.TrimPrefix(url, "/listings/")
+	slug = strings.TrimSuffix(slug, "/")
+	if slug == "" || strings.Contains(slug, "/") || strings.ContainsAny(slug, " ?#") {
+		return false
+	}
+	if allowedSlugs == nil {
+		return false
+	}
+	_, ok := allowedSlugs[slug]
+	return ok
 }

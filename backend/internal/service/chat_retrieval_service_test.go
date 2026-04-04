@@ -13,22 +13,36 @@ import (
 )
 
 type fakeChatRetrievalRepository struct {
-	documents []domain.ChatRetrievalDocument
-	err       error
-	filters   domain.ChatRetrievalFilters
-	vector    []float64
-	limit     int
+	documents       []domain.ChatRetrievalDocument
+	err             error
+	filters         domain.ChatRetrievalFilters
+	vector          []float64
+	limit           int
+	fetchCalls      int
+	documentByID    *domain.ChatRetrievalDocument
+	fetchByIDErr    error
+	fetchByIDCalls  int
+	fetchByIDTarget uuid.UUID
 }
 
 func (f *fakeChatRetrievalRepository) FetchDocuments(_ context.Context, filters domain.ChatRetrievalFilters, queryVector []float64, limit int) ([]domain.ChatRetrievalDocument, error) {
 	f.filters = filters
 	f.vector = queryVector
 	f.limit = limit
+	f.fetchCalls++
 	return f.documents, f.err
 }
 
-func (f *fakeChatRetrievalRepository) FetchDocumentByID(_ context.Context, _ uuid.UUID) (*domain.ChatRetrievalDocument, error) {
-	return nil, domain.ErrNotFound
+func (f *fakeChatRetrievalRepository) FetchDocumentByID(_ context.Context, listingID uuid.UUID) (*domain.ChatRetrievalDocument, error) {
+	f.fetchByIDCalls++
+	f.fetchByIDTarget = listingID
+	if f.fetchByIDErr != nil {
+		return nil, f.fetchByIDErr
+	}
+	if f.documentByID == nil {
+		return nil, domain.ErrNotFound
+	}
+	return f.documentByID, nil
 }
 
 type fakeChatEmbedder struct {
@@ -51,6 +65,77 @@ func TestChatRetrievalServiceRetrieveBuildsGrounding(t *testing.T) {
 	require.Equal(t, []string{"rumah-aktif"}, result.Grounding.ListingSlugs)
 	require.False(t, result.Grounding.IsDegraded)
 	require.Len(t, repo.vector, 2)
+}
+
+func TestChatRetrievalServiceRetrieveReordersExactTitleMatchesAheadOfSemanticMatches(t *testing.T) {
+	semanticDoc := domain.ChatRetrievalDocument{
+		ListingID:          uuid.MustParse("22222222-2222-2222-2222-222222222222"),
+		Title:              "Hunian Modern Dekat Pusat Kota",
+		Slug:               "hunian-modern-dekat-pusat-kota",
+		DescriptionExcerpt: "Rumah nyaman dengan akses mudah ke area jakarta selatan.",
+		Status:             "active",
+	}
+	exactDoc := domain.ChatRetrievalDocument{
+		ListingID: uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+		Title:     "Rumah Jakarta Selatan",
+		Slug:      "rumah-jakarta-selatan",
+		Status:    "active",
+	}
+	repo := &fakeChatRetrievalRepository{documents: []domain.ChatRetrievalDocument{semanticDoc, exactDoc}}
+	svc, err := NewChatRetrievalService(repo, fakeChatEmbedder{results: []gemini.EmbeddingResult{{Values: []float64{0.1, 0.2}}}}, 5)
+	require.NoError(t, err)
+
+	result, err := svc.Retrieve(context.Background(), requestdto.ChatRequest{SessionID: "ses-rank-1", Message: "rumah jakarta selatan"})
+	require.NoError(t, err)
+	require.Len(t, result.Documents, 2)
+	require.Equal(t, exactDoc.ListingID, result.Documents[0].ListingID)
+	require.Equal(t, semanticDoc.ListingID, result.Documents[1].ListingID)
+	require.Equal(t, []string{"rumah-jakarta-selatan", "hunian-modern-dekat-pusat-kota"}, result.Grounding.ListingSlugs)
+}
+
+func TestChatRetrievalServiceRetrieveReordersExactCategoryLocationMatchesAheadOfSemanticMatches(t *testing.T) {
+	jakartaSelatan := "Jakarta Selatan"
+	exactDoc := domain.ChatRetrievalDocument{
+		ListingID:    uuid.MustParse("33333333-3333-3333-3333-333333333333"),
+		Title:        "Southview Residence",
+		Slug:         "southview-residence",
+		Category:     &domain.ChatDocumentCategory{ID: uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), Name: "Apartemen", Slug: "apartemen"},
+		LocationCity: &jakartaSelatan,
+		Status:       "active",
+	}
+	semanticDoc := domain.ChatRetrievalDocument{
+		ListingID:          uuid.MustParse("44444444-4444-4444-4444-444444444444"),
+		Title:              "Residensi Premium Selatan",
+		Slug:               "residensi-premium-selatan",
+		DescriptionExcerpt: "Apartemen mewah dengan nuansa jakarta selatan untuk keluarga muda.",
+		Status:             "active",
+	}
+	repo := &fakeChatRetrievalRepository{documents: []domain.ChatRetrievalDocument{semanticDoc, exactDoc}}
+	svc, err := NewChatRetrievalService(repo, fakeChatEmbedder{results: []gemini.EmbeddingResult{{Values: []float64{0.3, 0.4}}}}, 5)
+	require.NoError(t, err)
+
+	result, err := svc.Retrieve(context.Background(), requestdto.ChatRequest{SessionID: "ses-rank-2", Message: "apartemen jakarta selatan"})
+	require.NoError(t, err)
+	require.Len(t, result.Documents, 2)
+	require.Equal(t, exactDoc.ListingID, result.Documents[0].ListingID)
+	require.Equal(t, semanticDoc.ListingID, result.Documents[1].ListingID)
+}
+
+func TestChatRetrievalServiceRetrievePrioritizesListingIDBeforeBroaderRanking(t *testing.T) {
+	listingID := uuid.MustParse("55555555-5555-5555-5555-555555555555")
+	prioritizedDoc := domain.ChatRetrievalDocument{ListingID: listingID, Title: "Rumah Prioritas", Slug: "rumah-prioritas", Status: "active"}
+	repo := &fakeChatRetrievalRepository{documentByID: &prioritizedDoc}
+	svc, err := NewChatRetrievalService(repo, fakeChatEmbedder{results: []gemini.EmbeddingResult{{Values: []float64{0.7}}}}, 5)
+	require.NoError(t, err)
+
+	result, err := svc.Retrieve(context.Background(), requestdto.ChatRequest{SessionID: "ses-id-1", Message: "rumah prioritas", ListingID: &listingID, MaxDocuments: 1})
+	require.NoError(t, err)
+	require.Len(t, result.Documents, 1)
+	require.Equal(t, listingID, result.Documents[0].ListingID)
+	require.Equal(t, 1, repo.fetchByIDCalls)
+	require.Equal(t, listingID, repo.fetchByIDTarget)
+	require.Zero(t, repo.fetchCalls)
+	require.Empty(t, repo.vector)
 }
 
 func TestChatRetrievalServiceRetrieveReturnsDegradedWhenNoActiveResults(t *testing.T) {
